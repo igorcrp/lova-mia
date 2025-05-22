@@ -11,6 +11,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Ensure profitLoss is treated as number
+if (result.tradeHistory) {
+  result.tradeHistory.forEach(item => {
+    if (item.profitLoss === undefined || item.profitLoss === null) {
+      item.profitLoss = 0;
+    }
+  });
+}
+interface TradeHistoryItem {
+  profitLoss: number;
+  currentCapital?: number;
+}
+
 interface StockDetailsTableProps {
   result: DetailedResult;
   params: StockAnalysisParams;
@@ -92,11 +105,16 @@ export function StockDetailsTable({
       // For the first day (oldest entry)
       const firstDay = dateOrdered[0];
       
-      // Check if trade is executed or not
+      // Check trade status
       if (firstDay.trade === "-") {
         // If trade is not executed, use initialCapital directly
         firstDay.currentCapital = initialCapital;
-      } else if (["Executed", "Buy", "Sell"].includes(firstDay.trade)) {
+      } else if (
+        // For Daytrade interval
+        (params.period === "1d" && firstDay.trade === "Executed") ||
+        // For other intervals (Weekly, Monthly, Annual)
+        (params.period !== "1d" && ["Buy", "Sell"].includes(firstDay.trade))
+      ) {
         // If trade is executed, add profit/loss to initialCapital
         firstDay.currentCapital = initialCapital + (firstDay.profitLoss || 0);
       } else {
@@ -109,8 +127,22 @@ export function StockDetailsTable({
         const currentDay = dateOrdered[i];
         const previousDay = dateOrdered[i - 1];
         
-        // Current Capital = Previous day's Current Capital + Profit/Loss of current day
-        currentDay.currentCapital = previousDay.currentCapital + (currentDay.profitLoss || 0);
+        // Check trade status for current day
+        if (currentDay.trade === "-") {
+          // No trade executed, carry forward previous capital
+          currentDay.currentCapital = previousDay.currentCapital;
+        } else if (
+          // For Daytrade interval
+          (params.period === "1d" && currentDay.trade === "Executed") ||
+          // For other intervals
+          (params.period !== "1d" && ["Buy", "Sell"].includes(currentDay.trade))
+        ) {
+          // Trade executed, add profit/loss to previous capital
+          currentDay.currentCapital = previousDay.currentCapital + (currentDay.profitLoss || 0);
+        } else {
+          // Default fallback
+          currentDay.currentCapital = previousDay.currentCapital;
+        }
       }
     }
     
