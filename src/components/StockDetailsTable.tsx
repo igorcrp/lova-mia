@@ -65,7 +65,9 @@ export function StockDetailsTable({
   // Calculate sorted data
   const sortedData = useMemo(() => {
     if (filteredTradeHistory.length === 0) return [];
-    return [...filteredTradeHistory].sort((a, b) => {
+    
+    // Sort the data
+    const sorted = [...filteredTradeHistory].sort((a, b) => {
       if (sortField === "date") {
         const dateA = new Date(a[sortField]);
         const dateB = new Date(b[sortField]);
@@ -77,7 +79,24 @@ export function StockDetailsTable({
       const valB = b[sortField] as number;
       return sortDirection === "asc" ? valA - valB : valB - valA;
     });
-  }, [filteredTradeHistory, sortField, sortDirection]);
+    
+    // Find the oldest date entry and set its currentCapital to initialCapital
+    if (sorted.length > 0) {
+      // Sort by date ascending to find the oldest entry
+      const dateOrdered = [...sorted].sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      // Set the initialCapital to the oldest entry
+      if (dateOrdered[0]) {
+        dateOrdered[0].currentCapital = initialCapital;
+      }
+    }
+    
+    return sorted;
+  }, [filteredTradeHistory, sortField, sortDirection, initialCapital]);
 
   // Capital evolution data is already filtered at the API level
   const filteredCapitalEvolution = result.capitalEvolution || [];
@@ -278,10 +297,23 @@ export function StockDetailsTable({
             <div>
               <label className="block text-sm font-medium mb-1">Entry Price</label>
               <div className="flex items-center">
-                <Input type="text" value={entryPercentage} onChange={e => {
-                const value = parseFloat(e.target.value);
-                setEntryPercentage(!isNaN(value) ? value : entryPercentage);
-              }} disabled={isLoading} className="flex-1" />
+                <Input 
+                  type="text" 
+                  value={entryPercentage !== null ? entryPercentage.toString() : ""} 
+                  onChange={e => {
+                    const inputValue = e.target.value;
+                    if (inputValue === "") {
+                      setEntryPercentage(0);
+                    } else {
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value)) {
+                        setEntryPercentage(value);
+                      }
+                    }
+                  }} 
+                  disabled={isLoading} 
+                  className="flex-1" 
+                />
                 <span className="ml-2">%</span>
               </div>
             </div>
@@ -289,10 +321,23 @@ export function StockDetailsTable({
             <div>
               <label className="block text-sm font-medium mb-1">Stop Price</label>
               <div className="flex items-center">
-                <Input type="text" value={stopPercentage} onChange={e => {
-                const value = parseFloat(e.target.value);
-                setStopPercentage(!isNaN(value) ? value : stopPercentage);
-              }} disabled={isLoading} className="flex-1" />
+                <Input 
+                  type="text" 
+                  value={stopPercentage !== null ? stopPercentage.toString() : ""} 
+                  onChange={e => {
+                    const inputValue = e.target.value;
+                    if (inputValue === "") {
+                      setStopPercentage(0);
+                    } else {
+                      const value = parseFloat(inputValue);
+                      if (!isNaN(value)) {
+                        setStopPercentage(value);
+                      }
+                    }
+                  }} 
+                  disabled={isLoading} 
+                  className="flex-1" 
+                />
                 <span className="ml-2">%</span>
               </div>
             </div>
@@ -475,11 +520,12 @@ export function StockDetailsTable({
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
+              style={{ backgroundColor: "#0f1729" }}
             >
               <option value={10}>10</option>
-              <option value={25}>50</option>
-              <option value={50}>100</option>
-              <option value={100}>500</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
           </div>
           
