@@ -8,8 +8,7 @@ import { api } from "@/services/api";
 import { toast } from "@/components/ui/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,9 +43,9 @@ export function StockSetupForm({
   });
 
   // Estados para o autocomplete
-  const [openComparisonStocks, setOpenComparisonStocks] = useState(false);
   const [comparisonStockInput, setComparisonStockInput] = useState("");
   const [selectedStocks, setSelectedStocks] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Form setup with react-hook-form
   const form = useForm<StockAnalysisParams>({
@@ -293,13 +292,6 @@ export function StockSetupForm({
     }
   });
 
-  // Helper function to handle comparison stocks input
-  const handleComparisonStocksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const stocksString = e.target.value;
-    const stocksArray = stocksString.split(",").map(s => s.trim()).filter(Boolean);
-    form.setValue("comparisonStocks", stocksArray);
-  };
-
   // Format stock name display
   const formatStockDisplay = (stock: StockInfo) => {
     return stock.fullName ? `${stock.code} - ${stock.fullName}` : stock.code;
@@ -312,6 +304,7 @@ export function StockSetupForm({
       setSelectedStocks(newSelectedStocks);
       form.setValue("comparisonStocks", newSelectedStocks);
       setComparisonStockInput("");
+      setShowSuggestions(false);
     }
   };
 
@@ -324,7 +317,7 @@ export function StockSetupForm({
 
   // Filtrar stocks disponíveis com base no input
   const filteredStocks = comparisonStockInput === ""
-    ? availableAssets
+    ? []
     : availableAssets.filter((stock) =>
         stock.code.toLowerCase().includes(comparisonStockInput.toLowerCase()) ||
         (stock.fullName && stock.fullName.toLowerCase().includes(comparisonStockInput.toLowerCase()))
@@ -484,7 +477,7 @@ export function StockSetupForm({
           />
         </div>
 
-        {/* Second row - Reference Price, Period, Entry Percentage, Stop Percentage */}
+        {/* Second row - Reference Price, Period, Entry %, Stop % */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <FormField
             control={form.control}
@@ -621,56 +614,54 @@ export function StockSetupForm({
               <FormItem className="flex flex-col">
                 <FormLabel>Comparison Stocks (optional)</FormLabel>
                 <div className="relative">
-                  <Popover open={openComparisonStocks && isTableValid === true} onOpenChange={setOpenComparisonStocks}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-10 bg-background">
-                          {selectedStocks.map(stock => (
-                            <Badge key={stock} variant="secondary" className="flex items-center gap-1">
-                              {stock}
-                              <button 
-                                type="button" 
-                                className="rounded-full hover:bg-muted"
-                                onClick={() => removeComparisonStock(stock)}
-                              >
-                                <X className="h-3 w-3" />
-                                <span className="sr-only">Remove {stock}</span>
-                              </button>
-                            </Badge>
-                          ))}
-                          <input
-                            className={cn(
-                              "flex-1 bg-transparent outline-none min-w-20",
-                              selectedStocks.length > 0 && "ml-1"
-                            )}
-                            disabled={isLoading || loadingState.assets || !isTableValid}
-                            value={comparisonStockInput}
-                            onChange={(e) => {
-                              setComparisonStockInput(e.target.value);
-                              setOpenComparisonStocks(true);
-                            }}
-                            onFocus={() => setOpenComparisonStocks(true)}
-                            placeholder={selectedStocks.length === 0 ? "E.g. AAPL, MSFT, GOOGL" : ""}
-                          />
-                        </div>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
+                  <FormControl>
+                    <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-10 bg-background">
+                      {selectedStocks.map(stock => (
+                        <Badge key={stock} variant="secondary" className="flex items-center gap-1">
+                          {stock}
+                          <button 
+                            type="button" 
+                            className="rounded-full hover:bg-muted"
+                            onClick={() => removeComparisonStock(stock)}
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Remove {stock}</span>
+                          </button>
+                        </Badge>
+                      ))}
+                      <input
+                        className={cn(
+                          "flex-1 bg-transparent outline-none min-w-20",
+                          selectedStocks.length > 0 && "ml-1"
+                        )}
+                        disabled={isLoading || loadingState.assets || !isTableValid}
+                        value={comparisonStockInput}
+                        onChange={(e) => {
+                          setComparisonStockInput(e.target.value);
+                          setShowSuggestions(true);
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow for clicks
+                          setTimeout(() => setShowSuggestions(false), 200);
+                        }}
+                        placeholder={selectedStocks.length === 0 ? "E.g. AAPL, MSFT, GOOGL" : ""}
+                      />
+                    </div>
+                  </FormControl>
+                  
+                  {showSuggestions && filteredStocks.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg">
                       <Command>
-                        <CommandInput
-                          placeholder="Search stocks..."
-                          value={comparisonStockInput}
-                          onValueChange={setComparisonStockInput}
-                        />
                         <CommandList>
                           <CommandEmpty>No stocks found.</CommandEmpty>
                           <CommandGroup>
                             {filteredStocks.slice(0, 10).map((stock) => (
                               <CommandItem
                                 key={stock.code}
-                                onSelect={() => {
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); // Prevent blur from hiding suggestions
                                   addComparisonStock(stock.code);
-                                  setOpenComparisonStocks(false);
                                 }}
                               >
                                 {formatStockDisplay(stock)}
@@ -679,8 +670,8 @@ export function StockSetupForm({
                           </CommandGroup>
                         </CommandList>
                       </Command>
-                    </PopoverContent>
-                  </Popover>
+                    </div>
+                  )}
                 </div>
                 <FormMessage />
               </FormItem>
