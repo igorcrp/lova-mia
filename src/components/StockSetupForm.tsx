@@ -645,7 +645,10 @@ export function StockSetupForm({
                             )}
                             disabled={isLoading || loadingState.assets || !isTableValid}
                             value={comparisonStockInput}
-                            onChange={(e) => setComparisonStockInput(e.target.value)}
+                            onChange={(e) => {
+                              setComparisonStockInput(e.target.value);
+                              setOpenComparisonStocks(true);
+                            }}
                             onFocus={() => setOpenComparisonStocks(true)}
                             placeholder={selectedStocks.length === 0 ? "E.g. AAPL, MSFT, GOOGL" : ""}
                           />
