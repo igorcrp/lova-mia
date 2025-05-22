@@ -374,6 +374,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
               setRowsPerPage(Number(e.target.value));
               setPage(1);
             }}
+            style={{ backgroundColor: "#0f1729" }}
           >
             <option value={10}>10</option>
             <option value={50}>50</option>
