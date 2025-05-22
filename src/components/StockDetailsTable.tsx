@@ -80,18 +80,37 @@ export function StockDetailsTable({
       return sortDirection === "asc" ? valA - valB : valB - valA;
     });
     
-    // Find the oldest date entry and set its currentCapital to initialCapital
-    if (sorted.length > 0) {
-      // Sort by date ascending to find the oldest entry
-      const dateOrdered = [...sorted].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateA.getTime() - dateB.getTime();
-      });
+    // Sort by date ascending to process capital calculations chronologically
+    const dateOrdered = [...sorted].sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    // Process Current Capital values based on the rules
+    if (dateOrdered.length > 0) {
+      // For the first day (oldest entry)
+      const firstDay = dateOrdered[0];
       
-      // Set the initialCapital to the oldest entry
-      if (dateOrdered[0]) {
-        dateOrdered[0].currentCapital = initialCapital;
+      // Check if trade is executed or not
+      if (firstDay.trade === "-") {
+        // If trade is not executed, use initialCapital directly
+        firstDay.currentCapital = initialCapital;
+      } else if (["Executed", "Buy", "Sell"].includes(firstDay.trade)) {
+        // If trade is executed, add profit/loss to initialCapital
+        firstDay.currentCapital = initialCapital + (firstDay.profitLoss || 0);
+      } else {
+        // Default fallback
+        firstDay.currentCapital = initialCapital;
+      }
+      
+      // For subsequent days, accumulate from previous day
+      for (let i = 1; i < dateOrdered.length; i++) {
+        const currentDay = dateOrdered[i];
+        const previousDay = dateOrdered[i - 1];
+        
+        // Current Capital = Previous day's Current Capital + Profit/Loss of current day
+        currentDay.currentCapital = previousDay.currentCapital + (currentDay.profitLoss || 0);
       }
     }
     
@@ -344,10 +363,23 @@ export function StockDetailsTable({
             
             <div>
               <label className="block text-sm font-medium mb-1">Initial Capital</label>
-              <Input type="text" value={initialCapital} onChange={e => {
-              const value = parseFloat(e.target.value);
-              setInitialCapital(!isNaN(value) ? value : initialCapital);
-            }} disabled={isLoading} />
+              <Input 
+                type="text" 
+                value={initialCapital !== null ? initialCapital.toFixed(2) : ""} 
+                onChange={e => {
+                  const inputValue = e.target.value;
+                  if (inputValue === "") {
+                    setInitialCapital(0);
+                  } else {
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value)) {
+                      setInitialCapital(value);
+                    }
+                  }
+                }} 
+                disabled={isLoading}
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </div>
             
             <Button onClick={handleUpdateResults} className="w-full" disabled={isLoading}>
@@ -523,9 +555,9 @@ export function StockDetailsTable({
               style={{ backgroundColor: "#0f1729" }}
             >
               <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
+              <option value={25}>50</option>
+              <option value={50}>100</option>
+              <option value={100}>500</option>
             </select>
           </div>
           
