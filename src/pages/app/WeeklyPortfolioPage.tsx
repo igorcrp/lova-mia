@@ -52,7 +52,6 @@ export default function WeeklyPortfolioPage() {
     // Processa cada semana
     const processedTrades: TradeHistoryItem[] = [];
     let currentCapital = analysisParams?.initialCapital || 10000;
-    let activeTradeData: TradeHistoryItem | null = null;
     
     Object.keys(tradesByWeek).forEach(weekKey => {
       const weekTrades = tradesByWeek[weekKey];
@@ -72,20 +71,10 @@ export default function WeeklyPortfolioPage() {
         }
       }
       
-      // Se não encontrou segunda-feira, usa o próximo dia disponível
+      // Se não encontrou segunda-feira, usa o primeiro dia disponível
       if (!firstDayTrade && weekTrades.length > 0) {
-        for (let i = 0; i < weekTrades.length; i++) {
-          const trade = weekTrades[i];
-          const tradeDate = new Date(trade.date);
-          const dayOfWeek = tradeDate.getDay();
-          
-          // Procura o próximo dia útil após segunda-feira
-          if (dayOfWeek > 1 && dayOfWeek <= 5) {
-            firstDayTrade = trade;
-            firstDayIndex = i;
-            break;
-          }
-        }
+        firstDayTrade = weekTrades[0];
+        firstDayIndex = 0;
       }
       
       // Se temos um dia para iniciar a operação
@@ -93,63 +82,24 @@ export default function WeeklyPortfolioPage() {
         // Marca todos os dias da semana como parte do histórico
         for (let i = 0; i < weekTrades.length; i++) {
           const currentTrade = { ...weekTrades[i] };
-          const currentDate = new Date(currentTrade.date);
           
           // Para o primeiro dia (abertura da operação)
           if (i === firstDayIndex) {
             // Usa o preço do dia anterior para abertura (se disponível)
             const previousDayIndex = sortedHistory.findIndex(t => t.date === currentTrade.date) - 1;
-            
             if (previousDayIndex >= 0) {
               const previousDay = sortedHistory[previousDayIndex];
-              const refPrice = previousDay[analysisParams?.referencePrice || 'close'] as number;
-              
-              // Calcula o Suggested Entry Price baseado na operação
-              if (analysisParams?.operation === 'buy') {
-                currentTrade.suggestedEntryPrice = refPrice - (refPrice * (analysisParams?.entryPercentage || 1) / 100);
-              } else {
-                currentTrade.suggestedEntryPrice = refPrice + (refPrice * (analysisParams?.entryPercentage || 1) / 100);
-              }
-              
-              // Calcula o Actual Price
-              if (analysisParams?.operation === 'buy') {
-                currentTrade.actualPrice = currentTrade.entryPrice <= currentTrade.suggestedEntryPrice 
-                  ? currentTrade.entryPrice 
-                  : currentTrade.suggestedEntryPrice;
-              } else {
-                currentTrade.actualPrice = currentTrade.entryPrice >= currentTrade.suggestedEntryPrice 
-                  ? currentTrade.entryPrice 
-                  : currentTrade.suggestedEntryPrice;
-              }
-              
-              // Determina se o trade foi executado
-              if (analysisParams?.operation === 'buy') {
-                currentTrade.trade = (currentTrade.actualPrice <= currentTrade.suggestedEntryPrice || 
-                                     currentTrade.low <= currentTrade.suggestedEntryPrice) 
-                  ? 'Buy' 
-                  : '-';
-              } else {
-                currentTrade.trade = (currentTrade.actualPrice >= currentTrade.suggestedEntryPrice || 
-                                     currentTrade.high >= currentTrade.suggestedEntryPrice) 
-                  ? 'Sell' 
-                  : '-';
-              }
-              
-              // Se o trade foi executado
-              if (currentTrade.trade === 'Buy' || currentTrade.trade === 'Sell') {
-                // Calcula o Lot Size
-                currentTrade.lotSize = Math.floor(currentCapital / currentTrade.actualPrice / 10) * 10;
-                
-                // Calcula o Stop Price
-                if (analysisParams?.operation === 'buy') {
-                  currentTrade.stopPrice = currentTrade.actualPrice - (currentTrade.actualPrice * (analysisParams?.stopPercentage || 1) / 100);
-                } else {
-                  currentTrade.stopPrice = currentTrade.actualPrice + (currentTrade.actualPrice * (analysisParams?.stopPercentage || 1) / 100);
-                }
-                
-                // Armazena os dados do trade ativo
-                activeTradeData = { ...currentTrade };
-              }
+              currentTrade.suggestedEntryPrice = previousDay.exitPrice; // Usa o Close do dia anterior
+            }
+            
+            // Marca como "Buy" ou "Sell" dependendo da operação
+            currentTrade.trade = analysisParams?.operation === 'buy' ? 'Buy' : 'Sell';
+            
+            // Calcula o Stop Price
+            if (analysisParams?.operation === 'buy') {
+              currentTrade.stopPrice = currentTrade.suggestedEntryPrice * (1 - (analysisParams?.stopPercentage || 1) / 100);
+            } else {
+              currentTrade.stopPrice = currentTrade.suggestedEntryPrice * (1 + (analysisParams?.stopPercentage || 1) / 100);
             }
             
             // Adiciona ao histórico processado
@@ -157,40 +107,22 @@ export default function WeeklyPortfolioPage() {
             continue;
           }
           
-          // Se não temos um trade ativo, apenas adiciona o dia sem operação
-          if (!activeTradeData || (currentTrade.trade !== 'Buy' && currentTrade.trade !== 'Sell')) {
-            processedTrades.push({ ...currentTrade, trade: '-' });
-            continue;
-          }
-          
-          // Verifica se o Stop Price foi atingido
-          let stopTriggered = false;
-          
-          if (analysisParams?.operation === 'buy' && currentTrade.low <= activeTradeData.stopPrice) {
-            currentTrade.stop = 'Close';
-            stopTriggered = true;
-          } else if (analysisParams?.operation === 'sell' && currentTrade.high >= activeTradeData.stopPrice) {
-            currentTrade.stop = 'Close';
-            stopTriggered = true;
-          } else {
-            currentTrade.stop = '-';
-          }
-          
-          // Se o stop foi acionado ou é o último dia útil da semana
-          if (stopTriggered || isLastBusinessDayOfWeek(currentDate)) {
+          // Verifica se o Stop Price foi atingido em algum dia da semana
+          if (
+            currentTrade.low !== undefined && 
+            firstDayTrade.stopPrice !== undefined && 
+            ((analysisParams?.operation === 'buy' && currentTrade.low <= firstDayTrade.stopPrice) ||
+             (analysisParams?.operation === 'sell' && currentTrade.high >= firstDayTrade.stopPrice))
+          ) {
+            // Stop Price atingido, encerra a operação
             currentTrade.trade = 'Close';
+            currentTrade.stop = 'Executed';
             
             // Calcula o profit/loss
-            if (stopTriggered) {
-              // Se o stop foi acionado, usa o Stop Price
-              currentTrade.profit = analysisParams?.operation === 'buy'
-                ? (activeTradeData.stopPrice - activeTradeData.actualPrice) * activeTradeData.lotSize
-                : (activeTradeData.actualPrice - activeTradeData.stopPrice) * activeTradeData.lotSize;
+            if (analysisParams?.operation === 'buy') {
+              currentTrade.profit = (firstDayTrade.stopPrice - firstDayTrade.suggestedEntryPrice) * (firstDayTrade.volume || 1);
             } else {
-              // Se não, usa o preço de fechamento
-              currentTrade.profit = analysisParams?.operation === 'buy'
-                ? (currentTrade.exitPrice - activeTradeData.actualPrice) * activeTradeData.lotSize
-                : (activeTradeData.actualPrice - currentTrade.exitPrice) * activeTradeData.lotSize;
+              currentTrade.profit = (firstDayTrade.suggestedEntryPrice - firstDayTrade.stopPrice) * (firstDayTrade.volume || 1);
             }
             
             // Atualiza o capital
@@ -200,12 +132,38 @@ export default function WeeklyPortfolioPage() {
             // Adiciona ao histórico processado
             processedTrades.push(currentTrade);
             
-            // Reseta o trade ativo
-            activeTradeData = null;
-            
             // Marca os dias restantes da semana sem operação
             for (let j = i + 1; j < weekTrades.length; j++) {
               processedTrades.push({ ...weekTrades[j], trade: '-' });
+            }
+            
+            break;
+          }
+          
+          // Se for o último dia útil da semana e o Stop não foi atingido
+          if (i === weekTrades.length - 1 || isLastBusinessDayOfWeek(new Date(currentTrade.date))) {
+            // Encerra a operação com o preço de fechamento
+            currentTrade.trade = 'Close';
+            
+            // Calcula o profit/loss
+            if (analysisParams?.operation === 'buy') {
+              currentTrade.profit = (currentTrade.exitPrice - firstDayTrade.suggestedEntryPrice) * (firstDayTrade.volume || 1);
+            } else {
+              currentTrade.profit = (firstDayTrade.suggestedEntryPrice - currentTrade.exitPrice) * (firstDayTrade.volume || 1);
+            }
+            
+            // Atualiza o capital
+            currentCapital += currentTrade.profit;
+            currentTrade.capital = currentCapital;
+            
+            // Adiciona ao histórico processado
+            processedTrades.push(currentTrade);
+            
+            // Se não for o último dia da semana, marca os dias restantes sem operação
+            if (i !== weekTrades.length - 1) {
+              for (let j = i + 1; j < weekTrades.length; j++) {
+                processedTrades.push({ ...weekTrades[j], trade: '-' });
+              }
             }
             
             break;
@@ -295,7 +253,7 @@ export default function WeeklyPortfolioPage() {
               const trades = tradePairs.length;
               const profits = tradePairs.filter(pair => pair.close.profit > 0).length;
               const losses = tradePairs.filter(pair => pair.close.profit < 0).length;
-              const stops = tradePairs.filter(pair => pair.close.stop === 'Close').length;
+              const stops = tradePairs.filter(pair => pair.close.stop === 'Executed').length;
               
               // Calcula o capital final e lucro
               let currentCapital = params.initialCapital;
@@ -528,7 +486,7 @@ export default function WeeklyPortfolioPage() {
               const trades = tradePairs.length;
               const profits = tradePairs.filter(pair => pair.close.profit > 0).length;
               const losses = tradePairs.filter(pair => pair.close.profit < 0).length;
-              const stops = tradePairs.filter(pair => pair.close.stop === 'Close').length;
+              const stops = tradePairs.filter(pair => pair.close.stop === 'Executed').length;
               
               let currentCapital = params.initialCapital;
               tradePairs.forEach(pair => {
