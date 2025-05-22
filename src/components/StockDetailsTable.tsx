@@ -448,6 +448,26 @@ export function StockDetailsTable({
           </Table>
         </div>
         
+        {/* Pagination and Items Per Page */}
+        <div className="flex flex-col sm:flex-row justify-between items-center p-4">
+          <div className="flex items-center mb-4 sm:mb-0">
+            <span className="text-xs md:text-sm mr-2">Items per page:</span>
+            <Select value={String(itemsPerPage)} onValueChange={value => {
+            setItemsPerPage(Number(value));
+            setCurrentPage(1); // Reset to first page when changing items per page
+          }}>
+              <SelectTrigger className="w-[70px] md:w-[80px] h-8 text-xs md:text-sm">
+                <SelectValue placeholder="10" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="500">500</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
         {/* Pagination */}
         {totalPages > 1 && (
           <div className="py-4 px-2">
