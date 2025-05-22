@@ -104,7 +104,7 @@ export function StockDetailsTable({
     }
   };
 
-  // Handle update button click
+  // Handle update button click - Modificado para recalcular apenas Suggested Price e Stop Price
   const handleUpdateResults = () => {
     onUpdateParams({
       ...params,
@@ -382,25 +382,16 @@ export function StockDetailsTable({
                     {getSortIcon("stopPrice")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("stop")}>
-                  <div className="flex flex-col items-center justify-center">
-                    <span>Stop</span>
-                    <span>Trigger</span>
-                    {getSortIcon("stop")}
-                  </div>
-                </TableHead>
                 <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("profit")}>
-                  <div className="flex flex-col items-center justify-center">
-                    <span>Profit/</span>
-                    <span>Loss</span>
-                    {getSortIcon("profit")}
+                  <div className="flex items-center justify-center">
+                    Profit {getSortIcon("profit")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("capital")}>
+                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("currentCapital")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Current</span>
                     <span>Capital</span>
-                    {getSortIcon("capital")}
+                    {getSortIcon("currentCapital")}
                   </div>
                 </TableHead>
               </TableRow>
@@ -408,39 +399,64 @@ export function StockDetailsTable({
             <TableBody>
               {currentData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center py-4 text-muted-foreground">
-                    No data available for the selected period
+                  <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
+                    No data to display
                   </TableCell>
                 </TableRow>
               ) : (
                 currentData.map((item, index) => (
-                  <TableRow key={index} className={index % 2 === 0 ? "bg-muted/30" : ""}>
-                    <TableCell className="text-center">{formatDate(item.date)}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.entryPrice)}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.high)}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.low)}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.exitPrice)}</TableCell>
-                    <TableCell className="text-center">{item.volume?.toLocaleString() || "-"}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.suggestedEntryPrice)}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.actualPrice)}</TableCell>
-                    <TableCell className="text-center">
-                      {item.trade === "Buy" ? (
-                        <span className="text-green-600 font-medium">Buy</span>
-                      ) : item.trade === "Sell" ? (
-                        <span className="text-green-600 font-medium">Sell</span>
-                      ) : item.trade === "Close" ? (
-                        <span className="text-red-600 font-medium">Close</span>
-                      ) : (
-                        "-"
-                      )}
+                  <TableRow key={index} className={item.trade === "Buy" ? "bg-green-50 dark:bg-green-950/20" : item.trade === "Sell" ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                    <TableCell className="text-center whitespace-nowrap">
+                      {formatDate(item.date)}
                     </TableCell>
-                    <TableCell className="text-center">{item.lotSize || "-"}</TableCell>
-                    <TableCell className="text-center">{formatMixedValue(item.stopPrice)}</TableCell>
-                    <TableCell className="text-center">{formatTradeStatus(item.stop || "")}</TableCell>
-                    <TableCell className={`text-center ${item.profit > 0 ? "text-green-600" : item.profit < 0 ? "text-red-600" : ""}`}>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.entryPrice)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.high)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.low)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.exitPrice)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.volume ? item.volume.toLocaleString() : "-"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.suggestedEntryPrice)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.actualPrice)}
+                    </TableCell>
+                    <TableCell className={`text-center font-medium ${
+                      item.trade === "Buy" 
+                        ? "text-green-600 dark:text-green-400" 
+                        : item.trade === "Sell" 
+                          ? "text-red-600 dark:text-red-400" 
+                          : ""
+                    }`}>
+                      {formatTradeStatus(item.trade)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {item.lotSize || "-"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {formatMixedValue(item.stopPrice)}
+                    </TableCell>
+                    <TableCell className={`text-center font-medium ${
+                      (item.profit || 0) > 0 
+                        ? "text-green-600 dark:text-green-400" 
+                        : (item.profit || 0) < 0 
+                          ? "text-red-600 dark:text-red-400" 
+                          : ""
+                    }`}>
                       {item.profit ? formatCurrency(item.profit) : "-"}
                     </TableCell>
-                    <TableCell className="text-center">{item.capital ? formatCurrency(item.capital) : "-"}</TableCell>
+                    <TableCell className="text-center font-medium">
+                      {item.currentCapital ? formatCurrency(item.currentCapital) : "-"}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -448,24 +464,45 @@ export function StockDetailsTable({
           </Table>
         </div>
         
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="py-4 px-2">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
-                </PaginationItem>
-                
-                {paginationLinks()}
-                
-                <PaginationItem>
-                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+        {/* Pagination with Items Per Page Selector */}
+        <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
+          <div className="flex items-center gap-2 mb-4 sm:mb-0">
+            <span className="text-sm text-muted-foreground">Rows per page:</span>
+            <select
+              className="bg-transparent border rounded px-2 py-1 text-sm"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
           </div>
-        )}
+          
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              
+              {paginationLinks()}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
       </div>
     </div>
   );
