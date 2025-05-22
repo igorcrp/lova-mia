@@ -11,19 +11,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Ensure profitLoss is treated as number
-if (result.tradeHistory) {
-  result.tradeHistory.forEach(item => {
-    if (item.profitLoss === undefined || item.profitLoss === null) {
-      item.profitLoss = 0;
-    }
-  });
-}
-interface TradeHistoryItem {
-  profitLoss: number;
-  currentCapital?: number;
-}
-
 interface StockDetailsTableProps {
   result: DetailedResult;
   params: StockAnalysisParams;
@@ -37,6 +24,16 @@ export function StockDetailsTable({
   onUpdateParams,
   isLoading = false
 }: StockDetailsTableProps) {
+    // Adicionar o useEffect aqui
+  useEffect(() => {
+    if (result.tradeHistory) {
+      result.tradeHistory.forEach(item => {
+        item.profitLoss = item.profitLoss || 0;
+        item.trade = item.trade || "-";
+      });
+    }
+  }, [result]);
+  
   // State for sorting
   const [sortField, setSortField] = useState<keyof TradeHistoryItem>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -106,7 +103,7 @@ export function StockDetailsTable({
       const firstDay = dateOrdered[0];
       
       // Check trade status
-      if (firstDay.trade === "-") {
+        if (firstDay.trade === "-") {
         // If trade is not executed, use initialCapital directly
         firstDay.currentCapital = initialCapital;
       } else if (
@@ -116,19 +113,19 @@ export function StockDetailsTable({
         (params.period !== "1d" && ["Buy", "Sell"].includes(firstDay.trade))
       ) {
         // If trade is executed, add profit/loss to initialCapital
-        firstDay.currentCapital = initialCapital + (firstDay.profitLoss || 0);
+        firstDay.currentCapital = initialCapital + firstDay.profitLoss;
       } else {
         // Default fallback
         firstDay.currentCapital = initialCapital;
       }
       
       // For subsequent days, accumulate from previous day
-      for (let i = 1; i < dateOrdered.length; i++) {
-        const currentDay = dateOrdered[i];
-        const previousDay = dateOrdered[i - 1];
+        for (let i = 1; i < dateOrdered.length; i++) {
+          const currentDay = dateOrdered[i];
+          const previousDay = dateOrdered[i - 1];
         
         // Check trade status for current day
-        if (currentDay.trade === "-") {
+         if (currentDay.trade === "-") {
           // No trade executed, carry forward previous capital
           currentDay.currentCapital = previousDay.currentCapital;
         } else if (
@@ -138,7 +135,7 @@ export function StockDetailsTable({
           (params.period !== "1d" && ["Buy", "Sell"].includes(currentDay.trade))
         ) {
           // Trade executed, add profit/loss to previous capital
-          currentDay.currentCapital = previousDay.currentCapital + (currentDay.profitLoss || 0);
+          currentDay.currentCapital = previousDay.currentCapital + currentDay.profitLoss;
         } else {
           // Default fallback
           currentDay.currentCapital = previousDay.currentCapital;
@@ -375,22 +372,24 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" 
-                  value={stopPercentage !== null ? stopPercentage.toString() : ""} 
-                  onChange={e => {
-                    const inputValue = e.target.value;
-                    if (inputValue === "") {
-                      setStopPercentage(0);
-                    } else {
-                      const value = parseFloat(inputValue);
-                      if (!isNaN(value)) {
-                        setStopPercentage(value);
+                    type="text" 
+                    value={stopPercentage !== null && stopPercentage !== undefined ? stopPercentage.toString() : ""} 
+                    onChange={e => {
+                      const inputValue = e.target.value;
+                      if (inputValue === "") {
+                        setStopPercentage(null);
+                      } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
+                        setStopPercentage(parseFloat(inputValue));
                       }
-                    }
-                  }} 
-                  disabled={isLoading} 
-                  className="flex-1" 
-                />
+                    }}
+                    onBlur={() => {
+                      if (stopPercentage === null || stopPercentage === undefined) {
+                        setStopPercentage(0);
+                      }
+                    }}
+                    disabled={isLoading} 
+                    className="flex-1" 
+                  />
                 <span className="ml-2">%</span>
               </div>
             </div>
@@ -399,18 +398,20 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Initial Capital</label>
               <Input 
                 type="text" 
-                value={initialCapital !== null ? initialCapital.toFixed(2) : ""} 
+                value={initialCapital !== null && initialCapital !== undefined ? initialCapital.toString() : ""} 
                 onChange={e => {
                   const inputValue = e.target.value;
                   if (inputValue === "") {
-                    setInitialCapital(0);
-                  } else {
-                    const value = parseFloat(inputValue);
-                    if (!isNaN(value)) {
-                      setInitialCapital(value);
-                    }
+                    setInitialCapital(null);
+                  } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
+                    setInitialCapital(parseFloat(inputValue));
                   }
-                }} 
+                }}
+                onBlur={() => {
+                  if (initialCapital === null || initialCapital === undefined) {
+                    setInitialCapital(0);
+                  }
+                }}
                 disabled={isLoading}
                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
