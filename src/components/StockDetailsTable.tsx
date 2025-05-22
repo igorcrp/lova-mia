@@ -318,18 +318,20 @@ export function StockDetailsTable({
               <div className="flex items-center">
                 <Input 
                   type="text" 
-                  value={entryPercentage !== null ? entryPercentage.toString() : ""} 
+                  value={entryPercentage !== null && entryPercentage !== undefined ? entryPercentage.toString() : ""} 
                   onChange={e => {
                     const inputValue = e.target.value;
                     if (inputValue === "") {
-                      setEntryPercentage(0);
-                    } else {
-                      const value = parseFloat(inputValue);
-                      if (!isNaN(value)) {
-                        setEntryPercentage(value);
-                      }
+                      setEntryPercentage(null);
+                    } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
+                      setEntryPercentage(parseFloat(inputValue));
                     }
-                  }} 
+                  }}
+                  onBlur={() => {
+                    if (entryPercentage === null || entryPercentage === undefined) {
+                      setEntryPercentage(0);
+                    }
+                  }}
                   disabled={isLoading} 
                   className="flex-1" 
                 />
