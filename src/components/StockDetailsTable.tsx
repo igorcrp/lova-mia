@@ -26,10 +26,10 @@ export function StockDetailsTable({
 }: StockDetailsTableProps) {
     // Adicionar o useEffect aqui
   useEffect(() => {
-    if (result.tradeHistory) {
+     if (result?.tradeHistory) {
       result.tradeHistory.forEach(item => {
-        item.profitLoss = item.profitLoss || 0;
-        item.trade = item.trade || "-";
+        item.profitLoss = Number(item.profitLoss) || 0;
+        item.trade = item.trade?.trim() || "-";
       });
     }
   }, [result]);
@@ -44,9 +44,9 @@ export function StockDetailsTable({
 
   // State for stock setup parameters
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  const [entryPercentage, setEntryPercentage] = useState(params.entryPercentage);
-  const [stopPercentage, setStopPercentage] = useState(params.stopPercentage);
-  const [initialCapital, setInitialCapital] = useState(params.initialCapital);
+  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage);
+  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage);
+  const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital);
 
   // Ref for setup panel
   const setupPanelRef = useRef<HTMLDivElement>(null);
@@ -113,7 +113,7 @@ export function StockDetailsTable({
         (params.period !== "1d" && ["Buy", "Sell"].includes(firstDay.trade))
       ) {
         // If trade is executed, add profit/loss to initialCapital
-        firstDay.currentCapital = initialCapital + firstDay.profitLoss;
+        firstDay.currentCapital = initialCapital + (firstDay.profitLoss || 0);
       } else {
         // Default fallback
         firstDay.currentCapital = initialCapital;
@@ -176,9 +176,9 @@ export function StockDetailsTable({
     onUpdateParams({
       ...params,
       referencePrice: refPrice,
-      entryPercentage: entryPercentage,
-      stopPercentage: stopPercentage,
-      initialCapital: initialCapital
+      entryPercentage: entryPercentage || 0, // Garante número
+      stopPercentage: stopPercentage || 0,   // Garante número
+      initialCapital: initialCapital || 0    // Garante número
     });
   };
 
@@ -214,7 +214,7 @@ export function StockDetailsTable({
 
   // Format percentage function
   const formatPercentage = (value: number) => {
-    return `${value.toFixed(2)}%`;
+    return `${(value || 0).toFixed(2)}%`; // Proteção contra null/undefined
   };
 
   // Format date function
@@ -229,12 +229,14 @@ export function StockDetailsTable({
   };
 
   // Format value that could be a string or number
-  const formatMixedValue = (value: string | number | undefined | null): string => {
-    if (value === undefined || value === null) return "-";
-    if (value === '-') return "-";
-    if (typeof value === 'number') return value.toFixed(2);
-    return String(value);
-  };
+    const formatMixedValue = (value: string | number | undefined | null): string => {
+      if (value === undefined || value === null || value === '-') return "-";
+      if (typeof value === 'number') return value.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      return String(value);
+    };
 
   // Get sort icon
   const getSortIcon = (field: keyof TradeHistoryItem) => {
