@@ -467,25 +467,22 @@ export function StockDetailsTable({
               </SelectContent>
             </Select>
           </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="py-4 px-2">
+          
+          {totalPages > 0 && (
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
+                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} className={currentPage === 1 ? "pointer-events-none opacity-50" : ""} />
                 </PaginationItem>
                 
                 {paginationLinks()}
                 
                 <PaginationItem>
-                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
+                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""} />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );
