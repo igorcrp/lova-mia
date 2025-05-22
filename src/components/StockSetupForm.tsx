@@ -545,23 +545,25 @@ export function StockSetupForm({
                 <FormLabel>% Entry Price</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                    <Input 
-                      type="text" 
-                      disabled={isLoading || isOptionsLoading}
-                      value={field.value !== null ? field.value.toFixed(2) : ""}
-                      onChange={(e) => {
-                        const inputValue = e.target.value;
-                        if (inputValue === "") {
-                          field.onChange(0);
-                        } else {
-                          const value = parseFloat(inputValue);
-                          if (!isNaN(value)) {
-                            field.onChange(value);
+                      <Input 
+                        type="text"
+                        disabled={isLoading || isOptionsLoading}
+                        value={field.value !== undefined && field.value !== null ? field.value.toString() : ""}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          if (inputValue === "") {
+                            field.onChange(null); // Permite campo vazio
+                          } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) { // Aceita até 2 casas decimais
+                            field.onChange(parseFloat(inputValue));
                           }
-                        }
-                      }}
-                      className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
+                        }}
+                        onBlur={() => {
+                          if (field.value === null || field.value === undefined) {
+                            field.onChange(0); // Define como 0 se estiver vazio ao sair do campo
+                          }
+                        }}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                     <span className="ml-2">%</span>
                   </div>
                 </FormControl>
