@@ -448,41 +448,24 @@ export function StockDetailsTable({
           </Table>
         </div>
         
-        {/* Pagination and Items Per Page */}
-        <div className="flex flex-col sm:flex-row justify-between items-center p-4">
-          <div className="flex items-center mb-4 sm:mb-0">
-            <span className="text-xs md:text-sm mr-2">Items per page:</span>
-            <Select value={String(itemsPerPage)} onValueChange={value => {
-            setItemsPerPage(Number(value));
-            setCurrentPage(1); // Reset to first page when changing items per page
-          }}>
-              <SelectTrigger className="w-[70px] md:w-[80px] h-8 text-xs md:text-sm">
-                <SelectValue placeholder="10" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="500">500</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {totalPages > 0 && (
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="py-4 px-2">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} className={currentPage === 1 ? "pointer-events-none opacity-50" : ""} />
+                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} />
                 </PaginationItem>
                 
                 {paginationLinks()}
                 
                 <PaginationItem>
-                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""} />
+                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          )}
+          </div>
+        )}
       </div>
     </div>
   );
