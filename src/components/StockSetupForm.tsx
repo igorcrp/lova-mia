@@ -544,16 +544,26 @@ export function StockSetupForm({
               <FormItem>
                 <FormLabel>% Entry Price</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="text" 
-                    disabled={isLoading || isOptionsLoading}
-                    value={field.value ? `${field.value.toFixed(2)}%` : "1.00%"}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value.replace(/%/g, '')) || 0;
-                      field.onChange(value);
-                    }}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="flex items-center">
+                    <Input 
+                      type="text" 
+                      disabled={isLoading || isOptionsLoading}
+                      value={field.value !== null ? field.value.toFixed(2) : ""}
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        if (inputValue === "") {
+                          field.onChange(0);
+                        } else {
+                          const value = parseFloat(inputValue);
+                          if (!isNaN(value)) {
+                            field.onChange(value);
+                          }
+                        }
+                      }}
+                      className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="ml-2">%</span>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -567,16 +577,26 @@ export function StockSetupForm({
               <FormItem>
                 <FormLabel>% Stop</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="text" 
-                    disabled={isLoading || isOptionsLoading}
-                    value={field.value ? `${field.value.toFixed(2)}%` : "1.00%"}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value.replace(/%/g, '')) || 0;
-                      field.onChange(value);
-                    }}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="flex items-center">
+                    <Input 
+                      type="text" 
+                      disabled={isLoading || isOptionsLoading}
+                      value={field.value !== null ? field.value.toFixed(2) : ""}
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        if (inputValue === "") {
+                          field.onChange(0);
+                        } else {
+                          const value = parseFloat(inputValue);
+                          if (!isNaN(value)) {
+                            field.onChange(value);
+                          }
+                        }
+                      }}
+                      className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="ml-2">%</span>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -594,12 +614,21 @@ export function StockSetupForm({
                 <FormLabel>Initial Capital</FormLabel>
                 <FormControl>
                   <Input 
-                    type="number"
-                    step="1"
-                    min="1000"
+                    type="text"
                     disabled={isLoading || isOptionsLoading}
-                    {...field}
-                    onChange={e => field.onChange(parseFloat(e.target.value) || 10000)}
+                    value={field.value !== null ? field.value.toFixed(2) : ""}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      if (inputValue === "") {
+                        field.onChange(0);
+                      } else {
+                        const value = parseFloat(inputValue);
+                        if (!isNaN(value)) {
+                          field.onChange(value);
+                        }
+                      }
+                    }}
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </FormControl>
                 <FormMessage />
