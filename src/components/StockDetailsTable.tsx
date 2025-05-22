@@ -24,9 +24,9 @@ export function StockDetailsTable({
   onUpdateParams,
   isLoading = false
 }: StockDetailsTableProps) {
-    // Adicionar o useEffect aqui
+  // Sanitize data on result change
   useEffect(() => {
-     if (result?.tradeHistory) {
+    if (result?.tradeHistory) {
       result.tradeHistory.forEach(item => {
         item.profitLoss = Number(item.profitLoss) || 0;
         item.trade = item.trade?.trim() || "-";
@@ -84,9 +84,9 @@ export function StockDetailsTable({
         return sortDirection === "asc" ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
       }
 
-      // For numeric fields
-      const valA = a[sortField] as number;
-      const valB = b[sortField] as number;
+      // For numeric fields - Fixed type handling
+      const valA = typeof a[sortField] === 'number' ? a[sortField] : parseFloat(String(a[sortField])) || 0;
+      const valB = typeof b[sortField] === 'number' ? b[sortField] : parseFloat(String(b[sortField])) || 0;
       return sortDirection === "asc" ? valA - valB : valB - valA;
     });
     
@@ -98,12 +98,12 @@ export function StockDetailsTable({
     });
     
     // Process Current Capital values based on the rules
-    if (dateOrdered.length > 0) {
+    if (dateOrdered.length > 0 && initialCapital !== null) {
       // For the first day (oldest entry)
       const firstDay = dateOrdered[0];
       
       // Check trade status
-        if (firstDay.trade === "-") {
+      if (firstDay.trade === "-") {
         // If trade is not executed, use initialCapital directly
         firstDay.currentCapital = initialCapital;
       } else if (
@@ -120,12 +120,12 @@ export function StockDetailsTable({
       }
       
       // For subsequent days, accumulate from previous day
-        for (let i = 1; i < dateOrdered.length; i++) {
-          const currentDay = dateOrdered[i];
-          const previousDay = dateOrdered[i - 1];
-        
+      for (let i = 1; i < dateOrdered.length; i++) {
+        const currentDay = dateOrdered[i];
+        const previousDay = dateOrdered[i - 1];
+      
         // Check trade status for current day
-         if (currentDay.trade === "-") {
+        if (currentDay.trade === "-") {
           // No trade executed, carry forward previous capital
           currentDay.currentCapital = previousDay.currentCapital;
         } else if (
@@ -144,7 +144,7 @@ export function StockDetailsTable({
     }
     
     return sorted;
-  }, [filteredTradeHistory, sortField, sortDirection, initialCapital]);
+  }, [filteredTradeHistory, sortField, sortDirection, initialCapital, params.period]);
 
   // Capital evolution data is already filtered at the API level
   const filteredCapitalEvolution = result.capitalEvolution || [];
@@ -171,21 +171,21 @@ export function StockDetailsTable({
     }
   };
 
-  // Handle update button click - Modificado para recalcular apenas Suggested Price e Stop Price
+  // Handle update button click
   const handleUpdateResults = () => {
     onUpdateParams({
       ...params,
       referencePrice: refPrice,
-      entryPercentage: entryPercentage || 0, // Garante número
-      stopPercentage: stopPercentage || 0,   // Garante número
-      initialCapital: initialCapital || 0    // Garante número
+      entryPercentage: entryPercentage || 0,
+      stopPercentage: stopPercentage || 0,
+      initialCapital: initialCapital || 0
     });
   };
 
   // Generate pagination links
   const paginationLinks = () => {
     const links = [];
-    const maxDisplayLinks = isMobile ? 3 : 5; // Less links on mobile
+    const maxDisplayLinks = isMobile ? 3 : 5;
 
     let startPage = Math.max(1, currentPage - Math.floor(maxDisplayLinks / 2));
     const endPage = Math.min(totalPages, startPage + maxDisplayLinks - 1);
@@ -193,11 +193,13 @@ export function StockDetailsTable({
     // Adjust startPage if needed to ensure we show maxDisplayLinks if possible
     startPage = Math.max(1, endPage - maxDisplayLinks + 1);
     for (let i = startPage; i <= endPage; i++) {
-      links.push(<PaginationItem key={i}>
+      links.push(
+        <PaginationItem key={i}>
           <PaginationLink isActive={i === currentPage} onClick={() => handlePageChange(i)}>
             {i}
           </PaginationLink>
-        </PaginationItem>);
+        </PaginationItem>
+      );
     }
     return links;
   };
@@ -214,7 +216,7 @@ export function StockDetailsTable({
 
   // Format percentage function
   const formatPercentage = (value: number) => {
-    return `${(value || 0).toFixed(2)}%`; // Proteção contra null/undefined
+    return `${(value || 0).toFixed(2)}%`;
   };
 
   // Format date function
@@ -228,15 +230,25 @@ export function StockDetailsTable({
     return status === "Not Executed" ? "-" : status;
   };
 
-  // Format value that could be a string or number
-    const formatMixedValue = (value: string | number | undefined | null): string => {
-      if (value === undefined || value === null || value === '-') return "-";
-      if (typeof value === 'number') return value.toLocaleString('en-US', {
+  // Fixed formatMixedValue function
+  const formatMixedValue = (value: string | number | undefined | null): string => {
+    if (value === undefined || value === null || value === '-' || value === '') return "-";
+    if (typeof value === 'number') {
+      return value.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       });
-      return String(value);
-    };
+    }
+    // Handle string numbers
+    const numValue = parseFloat(String(value));
+    if (!isNaN(numValue)) {
+      return numValue.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+    return String(value);
+  };
 
   // Get sort icon
   const getSortIcon = (field: keyof TradeHistoryItem) => {
@@ -256,6 +268,30 @@ export function StockDetailsTable({
       );
     }
     return null;
+  };
+
+  // Input validation for percentages
+  const handlePercentageInput = (value: string, setter: (val: number | null) => void) => {
+    if (value === "") {
+      setter(null);
+    } else if (/^\d*\.?\d{0,2}$/.test(value)) {
+      const numValue = parseFloat(value);
+      if (numValue >= 0 && numValue <= 100) { // Reasonable percentage range
+        setter(numValue);
+      }
+    }
+  };
+
+  // Input validation for capital
+  const handleCapitalInput = (value: string) => {
+    if (value === "") {
+      setInitialCapital(null);
+    } else if (/^\d*\.?\d{0,2}$/.test(value)) {
+      const numValue = parseFloat(value);
+      if (numValue >= 0) { // Capital should be positive
+        setInitialCapital(numValue);
+      }
+    }
   };
   
   // Check if we have any data to display
@@ -345,19 +381,12 @@ export function StockDetailsTable({
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Entry Price</label>
+              <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
                   type="text" 
                   value={entryPercentage !== null && entryPercentage !== undefined ? entryPercentage.toString() : ""} 
-                  onChange={e => {
-                    const inputValue = e.target.value;
-                    if (inputValue === "") {
-                      setEntryPercentage(null);
-                    } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
-                      setEntryPercentage(parseFloat(inputValue));
-                    }
-                  }}
+                  onChange={e => handlePercentageInput(e.target.value, setEntryPercentage)}
                   onBlur={() => {
                     if (entryPercentage === null || entryPercentage === undefined) {
                       setEntryPercentage(0);
@@ -365,50 +394,38 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading} 
                   className="flex-1" 
+                  placeholder="0.00"
                 />
                 <span className="ml-2">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Stop Price</label>
+              <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                    type="text" 
-                    value={stopPercentage !== null && stopPercentage !== undefined ? stopPercentage.toString() : ""} 
-                    onChange={e => {
-                      const inputValue = e.target.value;
-                      if (inputValue === "") {
-                        setStopPercentage(null);
-                      } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
-                        setStopPercentage(parseFloat(inputValue));
-                      }
-                    }}
-                    onBlur={() => {
-                      if (stopPercentage === null || stopPercentage === undefined) {
-                        setStopPercentage(0);
-                      }
-                    }}
-                    disabled={isLoading} 
-                    className="flex-1" 
-                  />
+                  type="text" 
+                  value={stopPercentage !== null && stopPercentage !== undefined ? stopPercentage.toString() : ""} 
+                  onChange={e => handlePercentageInput(e.target.value, setStopPercentage)}
+                  onBlur={() => {
+                    if (stopPercentage === null || stopPercentage === undefined) {
+                      setStopPercentage(0);
+                    }
+                  }}
+                  disabled={isLoading} 
+                  className="flex-1" 
+                  placeholder="0.00"
+                />
                 <span className="ml-2">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Initial Capital</label>
+              <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
               <Input 
                 type="text" 
                 value={initialCapital !== null && initialCapital !== undefined ? initialCapital.toString() : ""} 
-                onChange={e => {
-                  const inputValue = e.target.value;
-                  if (inputValue === "") {
-                    setInitialCapital(null);
-                  } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) {
-                    setInitialCapital(parseFloat(inputValue));
-                  }
-                }}
+                onChange={e => handleCapitalInput(e.target.value)}
                 onBlur={() => {
                   if (initialCapital === null || initialCapital === undefined) {
                     setInitialCapital(0);
@@ -416,6 +433,7 @@ export function StockDetailsTable({
                 }}
                 disabled={isLoading}
                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                placeholder="0.00"
               />
             </div>
             
@@ -437,7 +455,6 @@ export function StockDetailsTable({
                     Date {getSortIcon("date")}
                   </div>
                 </TableHead>
-                {/* Reordered columns with line breaks for two-word headers */}
                 <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("entryPrice")}>
                   <div className="flex items-center justify-center">
                     Open {getSortIcon("entryPrice")}
@@ -513,7 +530,7 @@ export function StockDetailsTable({
             <TableBody>
               {currentData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={13} className="text-center py-6 text-muted-foreground">
                     No data to display
                   </TableCell>
                 </TableRow>
@@ -578,23 +595,22 @@ export function StockDetailsTable({
           </Table>
         </div>
         
-        {/* Pagination with Items Per Page Selector */}
+        {/* Fixed Pagination with Items Per Page Selector */}
         <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
           <div className="flex items-center gap-2 mb-4 sm:mb-0">
             <span className="text-sm text-muted-foreground">Rows per page:</span>
             <select
-              className="bg-transparent border rounded px-2 py-1 text-sm"
+              className="bg-card border rounded px-2 py-1 text-sm text-foreground"
               value={itemsPerPage}
               onChange={(e) => {
                 setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              style={{ backgroundColor: "#0f1729" }}
             >
               <option value={10}>10</option>
-              <option value={25}>50</option>
-              <option value={50}>100</option>
-              <option value={100}>500</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
           </div>
           
