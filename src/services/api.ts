@@ -484,6 +484,10 @@ const analysis = {
           
           // Calculate capital evolution based on the trade history
           const capitalEvolution = this.calculateCapitalEvolution(tradeHistory, params.initialCapital);
+
+          const lastCurrentCapital = tradeHistory.length > 0 
+            ? tradeHistory[tradeHistory.length - 1].currentCapital 
+            : params.initialCapital;
           
           // Calculate detailed metrics for the stock
           const metrics = this.calculateDetailedMetrics(stockData, tradeHistory, capitalEvolution, params);
