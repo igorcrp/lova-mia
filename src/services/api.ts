@@ -496,6 +496,9 @@ const analysis = {
           results.push({
             assetCode: stock.code,
             assetName: stock.name || stock.code,
+            lastCurrentCapital: capitalEvolution.length > 0 
+              ? capitalEvolution[capitalEvolution.length - 1].capital 
+              : params.initialCapital,
             ...metrics
           });
           
