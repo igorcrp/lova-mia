@@ -178,6 +178,18 @@ export function StockDetailsTable({
     return finalSorted;
   }, [result.tradeHistory, initialCapital, params.interval, params.operation, sortField, sortDirection]); 
 
+  // Extrai o último currentCapital da tabela de detalhes (dado mais recente)
+const latestCapital = useMemo(() => {
+  if (!processedData?.length) return null;
+  
+  // Ordena por data DESC e pega o primeiro item (mais recente)
+  const [latestItem] = [...processedData].sort((a, b) => 
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+  
+  return latestItem?.currentCapital ?? null;
+}, [processedData]); // <- Só depende de processedData
+  
   // Capital evolution data (assuming it's calculated correctly elsewhere or uses the processed data)
   const filteredCapitalEvolution = useMemo(() => {
       if (!processedData || processedData.length === 0) return [];
