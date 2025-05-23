@@ -668,4 +668,3 @@ export function StockDetailsTable({
     </div>
   );
 }
-
