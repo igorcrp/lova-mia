@@ -66,6 +66,7 @@ export interface AnalysisResult {
   recoveryFactor: number;
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
+  tradeDetails?: TradeDetail[]; // Add tradeDetails property
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -102,4 +103,11 @@ export interface StockInfo {
   code: string;
   name: string;
   fullName?: string;
+}
+
+// Add TradeDetail interface for ResultsTable
+export interface TradeDetail {
+  profitLoss: number;
+  trade: string;
+  stop: string;
 }
