@@ -179,7 +179,6 @@ export function StockDetailsTable({
   }, [result.tradeHistory, initialCapital, params.interval, params.operation, sortField, sortDirection]); 
 
   // Capital evolution data (assuming it's calculated correctly elsewhere or uses the processed data)
-  // If capitalEvolution also needs recalculation based on the new profit/loss, it should be done here too.
   const filteredCapitalEvolution = useMemo(() => {
       if (!processedData || processedData.length === 0) return [];
       // Assuming processedData is already sorted chronologically ASC for chart
@@ -526,52 +525,50 @@ export function StockDetailsTable({
       
       {/* Stock Details Table */}
       <div className="bg-card rounded-lg border overflow-hidden">
+        {/* Apply overflow-x-auto to this container */}
         <div className="overflow-x-auto relative">
-          <Table>
+          <Table className="min-w-full"> {/* Ensure table takes minimum full width if needed */}
             <TableHeader className="sticky top-0 bg-card z-20">
               <TableRow>
-                {/* Cabeçalhos da Tabela */} 
-                <TableHead className="cursor-pointer text-center whitespace-nowrap sticky left-0 bg-inherit z-10 min-w-[100px]" onClick={() => handleSortChange("date")}>
+                {/* Cabeçalhos da Tabela - Aplicando flex-col e text-center onde necessário */} 
+                <TableHead className="cursor-pointer text-center whitespace-nowrap sticky left-0 bg-inherit z-10 min-w-[100px] px-2 py-3" onClick={() => handleSortChange("date")}>
                   <div className="flex items-center justify-center">Date {getSortIcon("date")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("entryPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("entryPrice")}>
                   <div className="flex items-center justify-center">Open {getSortIcon("entryPrice")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("high")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("high")}>
                   <div className="flex items-center justify-center">High {getSortIcon("high")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("low")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("low")}>
                   <div className="flex items-center justify-center">Low {getSortIcon("low")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("exitPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("exitPrice")}>
                   <div className="flex items-center justify-center">Close {getSortIcon("exitPrice")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("volume")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px] px-2 py-3" onClick={() => handleSortChange("volume")}>
                   <div className="flex items-center justify-center">Volume {getSortIcon("volume")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("suggestedEntryPrice")}>
+                {/* Cabeçalhos com quebra de linha */} 
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px] px-2 py-3" onClick={() => handleSortChange("suggestedEntryPrice")}>
                   <div className="flex flex-col items-center justify-center"><span>Suggested</span><span>Entry {getSortIcon("suggestedEntryPrice")}</span></div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("actualPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px] px-2 py-3" onClick={() => handleSortChange("actualPrice")}>
                   <div className="flex flex-col items-center justify-center"><span>Actual</span><span>Price {getSortIcon("actualPrice")}</span></div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("trade")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("trade")}>
                   <div className="flex items-center justify-center">Trade {getSortIcon("trade")}</div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px]" onClick={() => handleSortChange("lotSize")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[100px] px-2 py-3" onClick={() => handleSortChange("lotSize")}>
                   <div className="flex flex-col items-center justify-center"><span>Lot</span><span>Size {getSortIcon("lotSize")}</span></div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("stopPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px] px-2 py-3" onClick={() => handleSortChange("stopPrice")}>
                   <div className="flex flex-col items-center justify-center"><span>Stop</span><span>Price {getSortIcon("stopPrice")}</span></div>
                 </TableHead>
-                {/* Adicionando Stop Trigger Header (opcional, se quiser exibir) */} 
-                {/* <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("stopTrigger")}>
-                  <div className="flex flex-col items-center justify-center"><span>Stop</span><span>Trigger {getSortIcon("stopTrigger")}</span></div>
-                </TableHead> */} 
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px]" onClick={() => handleSortChange("profitLoss")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[120px] px-2 py-3" onClick={() => handleSortChange("profitLoss")}>
                    <div className="flex flex-col items-center justify-center"><span>Profit/</span><span>Loss {getSortIcon("profitLoss")}</span></div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[150px]" onClick={() => handleSortChange("currentCapital")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap min-w-[150px] px-2 py-3" onClick={() => handleSortChange("currentCapital")}>
                   <div className="flex flex-col items-center justify-center"><span>Current</span><span>Capital {getSortIcon("currentCapital")}</span></div>
                 </TableHead>
               </TableRow>
@@ -596,27 +593,25 @@ export function StockDetailsTable({
                     className={`hover:bg-muted/50 ${formatTradeStatus(item.trade) === "Buy" ? "bg-green-50 dark:bg-green-950/20" : formatTradeStatus(item.trade) === "Sell" ? "bg-red-50 dark:bg-red-950/20" : ""}`}
                   >
                     {/* Células da Tabela */} 
-                    <TableCell className="text-center whitespace-nowrap sticky left-0 bg-inherit z-10">
+                    <TableCell className="text-center whitespace-nowrap sticky left-0 bg-inherit z-10 px-2 py-2">
                       {formatDate(item.date)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.entryPrice)}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.high)}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.low)}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.exitPrice)}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{item.volume ? safeNumber(item.volume).toLocaleString('en-US') : "-"}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.suggestedEntryPrice)}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.actualPrice)}</TableCell>
-                    <TableCell className={`text-center font-medium whitespace-nowrap ${formatTradeStatus(item.trade) === "Buy" ? "text-green-600 dark:text-green-400" : formatTradeStatus(item.trade) === "Sell" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.entryPrice)}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.high)}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.low)}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.exitPrice)}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{item.volume ? safeNumber(item.volume).toLocaleString('en-US') : "-"}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.suggestedEntryPrice)}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.actualPrice)}</TableCell>
+                    <TableCell className={`text-center font-medium whitespace-nowrap px-2 py-2 ${formatTradeStatus(item.trade) === "Buy" ? "text-green-600 dark:text-green-400" : formatTradeStatus(item.trade) === "Sell" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
                       {formatTradeStatus(item.trade)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{item.lotSize ? safeNumber(item.lotSize).toLocaleString('en-US') : "-"}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">{formatMixedValue(item.stopPrice)}</TableCell>
-                     {/* Adicionando Stop Trigger Cell (opcional, se quiser exibir) */} 
-                    {/* <TableCell className="text-center whitespace-nowrap">{item.stopTrigger || '-'}</TableCell> */} 
-                    <TableCell className={`text-center font-medium whitespace-nowrap ${(safeNumber(item.profitLoss) || 0) > 0 ? "text-green-600 dark:text-green-400" : (safeNumber(item.profitLoss) || 0) < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{item.lotSize ? safeNumber(item.lotSize).toLocaleString('en-US') : "-"}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap px-2 py-2">{formatMixedValue(item.stopPrice)}</TableCell>
+                    <TableCell className={`text-center font-medium whitespace-nowrap px-2 py-2 ${(safeNumber(item.profitLoss) || 0) > 0 ? "text-green-600 dark:text-green-400" : (safeNumber(item.profitLoss) || 0) < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
                       {formatCurrency(item.profitLoss)} 
                     </TableCell>
-                    <TableCell className="text-center font-medium whitespace-nowrap">
+                    <TableCell className="text-center font-medium whitespace-nowrap px-2 py-2">
                       {formatCurrency(item.currentCapital)}
                     </TableCell>
                   </TableRow>
