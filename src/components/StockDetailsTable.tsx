@@ -16,6 +16,8 @@ interface StockDetailsTableProps {
   params: StockAnalysisParams & { interval?: string }; // Adicionando 'interval' opcional aos params para clareza
   onUpdateParams: (params: StockAnalysisParams) => void;
   isLoading?: boolean;
+  onCapitalUpdate?: (latestCapital: number) => void; // Nova prop
+}
 }
 
 // Helper function to safely convert value to number, defaulting to 0
@@ -57,6 +59,11 @@ export function StockDetailsTable({
         setChartHeight(setupPanelRef.current.clientHeight);
       }
     };
+  useEffect(() => {
+    if (latestCapital !== null && typeof onCapitalUpdate === 'function') {
+      onCapitalUpdate(latestCapital);
+    }
+  }, [latestCapital, onCapitalUpdate]);
 
     const timer = setTimeout(updateHeight, 100);
     window.addEventListener('resize', updateHeight);
