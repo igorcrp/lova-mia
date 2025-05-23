@@ -59,9 +59,17 @@ interface SortConfig {
 // It requires initialCapital and the correct profit/loss calculation within tradeHistory items
 const calculateFinalCapitalFromHistory = (result: AnalysisResult): number => {
   // Use pre-calculated finalCapital if history/initialCapital is missing
-  return result.finalCapital;
+  if (result.finalCapital !== undefined) {
+    return result.finalCapital;
+  }
+    if (result.tradeHistory?.length > 0 && result.initialCapital !== undefined) {
+    const lastTrade = result.tradeHistory.reduce((latest, trade) => 
+      new Date(trade.date) > new Date(latest.date) ? trade : latest
+    );
+    return lastTrade.currentCapital ?? result.initialCapital;
+  }
+    return result.initialCapital ?? 0;
 };
-
   try {
     // Sort trade history chronologically (ascending)
     const dateOrderedHistory = [...result.tradeHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
