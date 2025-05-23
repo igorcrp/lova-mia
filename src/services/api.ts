@@ -578,13 +578,13 @@ const analysis = {
       const lotSize = actualPrice !== '-' ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 : 0;
       
       // Determine if trade is executed
-      let trade = "Not Executed";
+      let trade = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Executed" : "Not Executed";
+        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Executed" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Executed" : "Not Executed";
+        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Executed" : "-";
       }
       
       // Calculate stop price
