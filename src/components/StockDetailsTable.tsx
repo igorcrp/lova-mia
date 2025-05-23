@@ -13,7 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StockDetailsTableProps {
   result: DetailedResult;
-  params: StockAnalysisParams;
+  params: StockAnalysisParams & { interval?: string }; // Adicionando 'interval' opcional aos params para clareza
   onUpdateParams: (params: StockAnalysisParams) => void;
   isLoading?: boolean;
 }
@@ -24,12 +24,17 @@ export function StockDetailsTable({
   onUpdateParams,
   isLoading = false
 }: StockDetailsTableProps) {
+
   // Sanitize data on result change
   useEffect(() => {
     if (result?.tradeHistory) {
       result.tradeHistory.forEach(item => {
+        // Garante que profitLoss seja número, default 0
         item.profitLoss = Number(item.profitLoss) || 0;
-        item.trade = item.trade?.trim() || "-";
+        // Garante que currentCapital seja número ou null/undefined inicialmente
+        item.currentCapital = item.currentCapital !== undefined && item.currentCapital !== null ? Number(item.currentCapital) : undefined;
+        // Garante que trade seja string, default "-"
+        item.trade = typeof item.trade === 'string' ? item.trade.trim() || "-" : "-";
       });
     }
   }, [result]);
@@ -42,11 +47,11 @@ export function StockDetailsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // State for stock setup parameters
+  // State for stock setup parameters - Inicializa com valores formatados se possível
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage);
-  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage);
-  const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital);
+  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage !== null && params.entryPercentage !== undefined ? parseFloat(params.entryPercentage.toFixed(2)) : null);
+  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage !== null && params.stopPercentage !== undefined ? parseFloat(params.stopPercentage.toFixed(2)) : null);
+  const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital !== null && params.initialCapital !== undefined ? parseFloat(params.initialCapital.toFixed(2)) : null);
 
   // Ref for setup panel
   const setupPanelRef = useRef<HTMLDivElement>(null);
@@ -61,10 +66,12 @@ export function StockDetailsTable({
       }
     };
 
-    updateHeight();
+    // Timeout para garantir que o painel tenha renderizado
+    const timer = setTimeout(updateHeight, 100);
     window.addEventListener('resize', updateHeight);
     
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('resize', updateHeight);
     };
   }, []);
@@ -72,87 +79,99 @@ export function StockDetailsTable({
   // Data is already filtered at the API level, no need to filter again
   const filteredTradeHistory = result.tradeHistory || [];
 
-  // Calculate sorted data
-  const sortedData = useMemo(() => {
-    if (filteredTradeHistory.length === 0) return [];
+  // Calculate sorted data and Current Capital
+  const processedData = useMemo(() => {
+    if (filteredTradeHistory.length === 0 || initialCapital === null) return [];
     
-    // Sort the data
-    const sorted = [...filteredTradeHistory].sort((a, b) => {
-      if (sortField === "date") {
-        const dateA = new Date(a[sortField]);
-        const dateB = new Date(b[sortField]);
-        return sortDirection === "asc" ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
-      }
-
-      // For numeric fields - Fixed type handling
-      const valA = typeof a[sortField] === 'number' ? a[sortField] : parseFloat(String(a[sortField])) || 0;
-      const valB = typeof b[sortField] === 'number' ? b[sortField] : parseFloat(String(b[sortField])) || 0;
-      return sortDirection === "asc" ? valA - valB : valB - valA;
-    });
-    
-    // Sort by date ascending to process capital calculations chronologically
-    const dateOrdered = [...sorted].sort((a, b) => {
+    // 1. Sort by date ascending to process capital calculations chronologically
+    const dateOrdered = [...filteredTradeHistory].sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       return dateA.getTime() - dateB.getTime();
     });
     
-    // Process Current Capital values based on the rules
-    if (dateOrdered.length > 0 && initialCapital !== null) {
-      // For the first day (oldest entry)
-      const firstDay = dateOrdered[0];
-      
-      // Check trade status
-      if (firstDay.trade === "-") {
-        // If trade is not executed, use initialCapital directly
-        firstDay.currentCapital = initialCapital;
-      } else if (
-        // For Daytrade interval
-        (params.period === "1d" && firstDay.trade === "Executed") ||
-        // For other intervals (Weekly, Monthly, Annual)
-        (params.period !== "1d" && ["Buy", "Sell"].includes(firstDay.trade))
-      ) {
-        // If trade is executed, add profit/loss to initialCapital
-        firstDay.currentCapital = initialCapital + (firstDay.profitLoss || 0);
-      } else {
-        // Default fallback
-        firstDay.currentCapital = initialCapital;
-      }
-      
-      // For subsequent days, accumulate from previous day
-      for (let i = 1; i < dateOrdered.length; i++) {
-        const currentDay = dateOrdered[i];
-        const previousDay = dateOrdered[i - 1];
-      
-        // Check trade status for current day
-        if (currentDay.trade === "-") {
-          // No trade executed, carry forward previous capital
-          currentDay.currentCapital = previousDay.currentCapital;
-        } else if (
-          // For Daytrade interval
-          (params.period === "1d" && currentDay.trade === "Executed") ||
-          // For other intervals
-          (params.period !== "1d" && ["Buy", "Sell"].includes(currentDay.trade))
-        ) {
-          // Trade executed, add profit/loss to previous capital
-          currentDay.currentCapital = previousDay.currentCapital + currentDay.profitLoss;
+    // 2. Process Current Capital values based on the rules
+    // ** IMPORTANTE: A lógica abaixo assume que 'params.interval' contém "Daytrade", "Weekly", "Monthly" ou "Annual". **
+    // ** Verifique se este é o parâmetro correto que define o intervalo/estratégia. **
+    const analysisInterval = params.interval || "Daytrade"; // Default para Daytrade se não especificado
+    const isDaytrade = analysisInterval === "Daytrade";
+    const isWeeklyMonthlyAnnual = ["Weekly", "Monthly", "Annual"].includes(analysisInterval);
+
+    dateOrdered.forEach((item, index) => {
+      const currentProfitLoss = Number(item.profitLoss) || 0;
+      const tradeStatus = typeof item.trade === 'string' ? item.trade.trim() : "-";
+
+      if (index === 0) {
+        // Primeiro dia (mais antigo)
+        let firstDayCapital = initialCapital;
+        if (tradeStatus === "-") {
+          // Regra 1: Se Trade é "-", Capital = Initial Capital
+          firstDayCapital = initialCapital;
+        } else if (isDaytrade && tradeStatus === "Executed") {
+          // Regra 1: Intervalo Daytrade e Trade é "Executed"
+          firstDayCapital = initialCapital + currentProfitLoss;
+        } else if (isWeeklyMonthlyAnnual && ["Buy", "Sell"].includes(tradeStatus)) {
+          // Regra 1: Intervalo Weekly/Monthly/Annual e Trade é "Buy" ou "Sell"
+          firstDayCapital = initialCapital + currentProfitLoss;
         } else {
-          // Default fallback
-          currentDay.currentCapital = previousDay.currentCapital;
+          // Fallback (nenhuma das condições de soma/subtração atendida)
+          firstDayCapital = initialCapital;
         }
+        item.currentCapital = firstDayCapital;
+      } else {
+        // Dias subsequentes
+        const previousDayCapital = dateOrdered[index - 1].currentCapital;
+        // Regra 2: Capital Atual = Capital Dia Anterior + Lucro/Perda Dia Atual
+        // Garante que previousDayCapital é um número antes de somar
+        item.currentCapital = (Number(previousDayCapital) || initialCapital) + currentProfitLoss;
       }
-    }
+    });
+
+    // 3. Sort the data based on user's current selection (sortField, sortDirection)
+    const finalSorted = [...dateOrdered].sort((a, b) => {
+      const valA = a[sortField];
+      const valB = b[sortField];
+
+      if (sortField === "date") {
+        const dateA = new Date(valA as string);
+        const dateB = new Date(valB as string);
+        return sortDirection === "asc" ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+      }
+
+      // Tratamento para outros campos (assumindo que podem ser numéricos ou strings)
+      let numA = NaN;
+      let numB = NaN;
+
+      if (typeof valA === 'number') numA = valA;
+      else if (typeof valA === 'string') numA = parseFloat(valA);
+      
+      if (typeof valB === 'number') numB = valB;
+      else if (typeof valB === 'string') numB = parseFloat(valB);
+
+      // Se ambos são números válidos, compara numericamente
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return sortDirection === "asc" ? numA - numB : numB - numA;
+      }
+
+      // Fallback para comparação de strings se não forem números comparáveis
+      const strA = String(valA ?? '').toLowerCase();
+      const strB = String(valB ?? '').toLowerCase();
+      if (strA < strB) return sortDirection === "asc" ? -1 : 1;
+      if (strA > strB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
     
-    return sorted;
-  }, [filteredTradeHistory, sortField, sortDirection, initialCapital, params.period]);
+    return finalSorted;
+  // Adiciona params.interval às dependências se ele for usado
+  }, [filteredTradeHistory, sortField, sortDirection, initialCapital, params.interval]); 
 
   // Capital evolution data is already filtered at the API level
   const filteredCapitalEvolution = result.capitalEvolution || [];
 
   // Calculate pagination
-  const totalItems = sortedData.length;
+  const totalItems = processedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const currentData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentData = processedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // Handle pagination change
   const handlePageChange = (page: number) => {
@@ -169,17 +188,22 @@ export function StockDetailsTable({
       setSortField(field);
       setSortDirection("desc"); // Default to descending when changing fields
     }
+    setCurrentPage(1); // Reset page when sorting changes
   };
 
   // Handle update button click
   const handleUpdateResults = () => {
-    onUpdateParams({
+    // Garante que os valores sejam números antes de enviar
+    const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: entryPercentage || 0,
-      stopPercentage: stopPercentage || 0,
-      initialCapital: initialCapital || 0
-    });
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+    };
+    // Remove a propriedade 'interval' se ela foi adicionada apenas para o cálculo interno
+    // delete cleanParams.interval; 
+    onUpdateParams(cleanParams);
   };
 
   // Generate pagination links
@@ -195,7 +219,7 @@ export function StockDetailsTable({
     for (let i = startPage; i <= endPage; i++) {
       links.push(
         <PaginationItem key={i}>
-          <PaginationLink isActive={i === currentPage} onClick={() => handlePageChange(i)}>
+          <PaginationLink href="#" isActive={i === currentPage} onClick={(e) => {e.preventDefault(); handlePageChange(i);}}>
             {i}
           </PaginationLink>
         </PaginationItem>
@@ -205,48 +229,57 @@ export function StockDetailsTable({
   };
 
   // Format currency function
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null): string => {
+    if (amount === undefined || amount === null) return "-";
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'USD', // TODO: Considerar a moeda dinamicamente se necessário
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
   };
 
-  // Format percentage function
-  const formatPercentage = (value: number) => {
-    return `${(value || 0).toFixed(2)}%`;
+  // Format percentage function (usado nos cabeçalhos ou onde for preciso exibir %)
+  const formatPercentageDisplay = (value: number | undefined | null): string => {
+    if (value === undefined || value === null) return "-";
+    return `${value.toFixed(2)}%`;
   };
 
   // Format date function
-  const formatDate = (dateString: string) => {
-    const [year, month, day] = dateString.split("-");
-    return `${day}/${month}/${year}`;
+  const formatDate = (dateString: string | undefined | null): string => {
+    if (!dateString) return "-";
+    try {
+      // Tenta criar data, pode ser YYYY-MM-DD ou outro formato ISO
+      const date = new Date(dateString + 'T00:00:00'); // Adiciona T00:00:00 para evitar problemas de fuso horário
+      if (isNaN(date.getTime())) return dateString; // Retorna original se inválida
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return dateString; // Retorna original em caso de erro
+    }
   };
   
-  // Format trade status - replace "Not Executed" with "-"
-  const formatTradeStatus = (status: string) => {
-    return status === "Not Executed" ? "-" : status;
+  // Format trade status - Garante que seja string e faz trim
+  const formatTradeStatus = (status: string | undefined | null): string => {
+    if (status === undefined || status === null) return "-";
+    const trimmedStatus = String(status).trim();
+    return trimmedStatus === "Not Executed" ? "-" : trimmedStatus || "-";
   };
 
-  // Fixed formatMixedValue function
+  // Format values that might be numbers or strings like "-"
   const formatMixedValue = (value: string | number | undefined | null): string => {
-    if (value === undefined || value === null || value === '-' || value === '') return "-";
-    if (typeof value === 'number') {
-      return value.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
-    }
-    // Handle string numbers
-    const numValue = parseFloat(String(value));
+    if (value === undefined || value === null || String(value).trim() === "-" || String(value).trim() === "") return "-";
+    
+    const numValue = Number(value);
     if (!isNaN(numValue)) {
-      return numValue.toLocaleString('en-US', {
+      return numValue.toLocaleString('en-US', { // Usar 'pt-BR' se preferir formato brasileiro
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       });
     }
+    // Se não for número nem "-", retorna como string
     return String(value);
   };
 
@@ -263,6 +296,7 @@ export function StockDetailsTable({
       return (
         <div className="bg-background border rounded-md p-3 shadow-lg">
           <p className="text-sm font-medium">{formatDate(data.date)}</p>
+          {/* Usa a formatação de moeda para o tooltip também */}
           <p className="text-sm font-medium text-alphaquant-500">Capital: {formatCurrency(data.capital)}</p>
         </div>
       );
@@ -270,32 +304,67 @@ export function StockDetailsTable({
     return null;
   };
 
-  // Input validation for percentages
+  // Input validation/handling for percentages in setup panel
   const handlePercentageInput = (value: string, setter: (val: number | null) => void) => {
     if (value === "") {
       setter(null);
-    } else if (/^\d*\.?\d{0,2}$/.test(value)) {
-      const numValue = parseFloat(value);
-      if (numValue >= 0 && numValue <= 100) { // Reasonable percentage range
-        setter(numValue);
+      return;
+    }
+    // Regex para permitir números positivos com até 2 casas decimais
+    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+    if (regex.test(value)) {
+      // Permite digitar '.' ou '0.' sem converter imediatamente
+      if (value === '.' || value.endsWith('.')) {
+        setter(value as any); // Mantém como string temporariamente
+      } else {
+        const numValue = parseFloat(value);
+        // Valida se é número positivo (poderia adicionar max 100 se fizesse sentido)
+        if (!isNaN(numValue) && numValue >= 0) {
+          setter(numValue);
+        }
       }
+    } else if (value === '-') {
+      // Impede digitar negativo
     }
   };
 
-  // Input validation for capital
+  // Input validation/handling for capital in setup panel
   const handleCapitalInput = (value: string) => {
     if (value === "") {
       setInitialCapital(null);
-    } else if (/^\d*\.?\d{0,2}$/.test(value)) {
-      const numValue = parseFloat(value);
-      if (numValue >= 0) { // Capital should be positive
-        setInitialCapital(numValue);
-      }
+      return;
     }
+    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+    if (regex.test(value)) {
+      if (value === '.' || value.endsWith('.')) {
+        setInitialCapital(value as any);
+      } else {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue >= 0) {
+          setInitialCapital(numValue);
+        }
+      }
+    } else if (value === '-') {
+      // Impede digitar negativo
+    }
+  };
+
+  // Format value on blur for percentage and capital inputs
+  const handleBlurFormatting = (currentValue: string | number | null, setter: (val: number | null) => void) => {
+    let numValue = 0;
+    if (typeof currentValue === 'string') {
+      numValue = parseFloat(currentValue) || 0;
+    } else if (typeof currentValue === 'number') {
+      numValue = currentValue;
+    }
+    
+    // Garante que seja positivo e formata para 2 casas decimais
+    const formattedValue = Math.max(0, parseFloat(numValue.toFixed(2)));
+    setter(formattedValue);
   };
   
   // Check if we have any data to display
-  const hasData = filteredTradeHistory.length > 0;
+  const hasData = processedData.length > 0;
   
   // Show a message if no data is available for the selected period
   if (!hasData && !isLoading) {
@@ -304,8 +373,8 @@ export function StockDetailsTable({
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>No data available</AlertTitle>
         <AlertDescription>
-          No trade history data is available for the selected stock in the {params.period} period. 
-          Try selecting a different time period or asset.
+          No trade history data is available for the selected stock with the current parameters. 
+          Try selecting a different time period, asset, or adjusting setup parameters.
         </AlertDescription>
       </Alert>
     );
@@ -319,44 +388,51 @@ export function StockDetailsTable({
           <h3 className="text-base md:text-lg font-medium mb-4">Capital Evolution</h3>
           <div className={isMobile ? 'h-[300px]' : 'h-[calc(100%-40px)]'}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={filteredCapitalEvolution} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="capitalColor" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={date => new Date(date).toLocaleDateString()} 
-                  stroke="#64748b"
-                  axisLine={false}
-                  tickLine={false}
-                  padding={{ left: 10, right: 10 }}
-                  fontSize={12}
-                  tick={{ fontSize: isMobile ? 10 : 12 }}
-                />
-                <YAxis 
-                  tickFormatter={value => isMobile ? `$${Math.round(value)}` : `$${value.toLocaleString()}`} 
-                  stroke="#64748b"
-                  axisLine={false}
-                  tickLine={false}
-                  fontSize={12}
-                  width={isMobile ? 60 : 80}
-                  tick={{ fontSize: isMobile ? 10 : 12 }}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Line 
-                  type="monotone" 
-                  dataKey="capital" 
-                  stroke="#8b5cf6" 
-                  strokeWidth={2} 
-                  dot={false}
-                  activeDot={{ r: 6, stroke: "#8b5cf6", strokeWidth: 2, fill: "white" }}
-                  fillOpacity={1}
-                  fill="url(#capitalColor)"
-                />
-              </LineChart>
+              {/* Adiciona verificação se filteredCapitalEvolution tem dados */} 
+              {filteredCapitalEvolution.length > 0 ? (
+                <LineChart data={filteredCapitalEvolution} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="capitalColor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={date => formatDate(date)} // Usa a função formatDate
+                    stroke="#64748b"
+                    axisLine={false}
+                    tickLine={false}
+                    padding={{ left: 10, right: 10 }}
+                    fontSize={12}
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                  />
+                  <YAxis 
+                    tickFormatter={value => formatCurrency(value)} // Usa formatCurrency
+                    stroke="#64748b"
+                    axisLine={false}
+                    tickLine={false}
+                    fontSize={12}
+                    width={isMobile ? 70 : 80} // Aumenta um pouco a largura para caber a formatação
+                    tick={{ fontSize: isMobile ? 10 : 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="capital" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2} 
+                    dot={false}
+                    activeDot={{ r: 6, stroke: "#8b5cf6", strokeWidth: 2, fill: "white" }}
+                    fillOpacity={1}
+                    fill="url(#capitalColor)"
+                  />
+                </LineChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No capital evolution data available.
+                </div>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
@@ -366,9 +442,9 @@ export function StockDetailsTable({
           <h3 className="text-base md:text-lg font-medium mb-4">Stock Setup</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Reference Price</label>
+              <label htmlFor="refPriceSelect" className="block text-sm font-medium mb-1">Reference Price</label>
               <Select value={refPrice} onValueChange={value => setRefPrice(value as "open" | "high" | "low" | "close")} disabled={isLoading}>
-                <SelectTrigger>
+                <SelectTrigger id="refPriceSelect">
                   <SelectValue placeholder="Select reference price" />
                 </SelectTrigger>
                 <SelectContent>
@@ -381,64 +457,61 @@ export function StockDetailsTable({
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
+              <label htmlFor="entryPercentageInput" className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
+                  id="entryPercentageInput"
                   type="text" 
-                  value={entryPercentage !== null && entryPercentage !== undefined ? entryPercentage.toString() : ""} 
+                  inputMode="decimal"
+                  value={entryPercentage !== null && entryPercentage !== undefined ? String(entryPercentage) : ""} 
                   onChange={e => handlePercentageInput(e.target.value, setEntryPercentage)}
-                  onBlur={() => {
-                    if (entryPercentage === null || entryPercentage === undefined) {
-                      setEntryPercentage(0);
-                    }
-                  }}
+                  onBlur={() => handleBlurFormatting(entryPercentage, setEntryPercentage)}
                   disabled={isLoading} 
-                  className="flex-1" 
-                  placeholder="0.00"
+                  className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="e.g. 1.50"
+                  min="0"
                 />
-                <span className="ml-2">%</span>
+                <span className="ml-2 text-muted-foreground">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
+              <label htmlFor="stopPercentageInput" className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
+                  id="stopPercentageInput"
                   type="text" 
-                  value={stopPercentage !== null && stopPercentage !== undefined ? stopPercentage.toString() : ""} 
+                  inputMode="decimal"
+                  value={stopPercentage !== null && stopPercentage !== undefined ? String(stopPercentage) : ""} 
                   onChange={e => handlePercentageInput(e.target.value, setStopPercentage)}
-                  onBlur={() => {
-                    if (stopPercentage === null || stopPercentage === undefined) {
-                      setStopPercentage(0);
-                    }
-                  }}
+                  onBlur={() => handleBlurFormatting(stopPercentage, setStopPercentage)}
                   disabled={isLoading} 
-                  className="flex-1" 
-                  placeholder="0.00"
+                  className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="e.g. 2.00"
+                  min="0"
                 />
-                <span className="ml-2">%</span>
+                <span className="ml-2 text-muted-foreground">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
+              <label htmlFor="initialCapitalInput" className="block text-sm font-medium mb-1">Initial Capital ($)</label>
               <Input 
+                id="initialCapitalInput"
                 type="text" 
-                value={initialCapital !== null && initialCapital !== undefined ? initialCapital.toString() : ""} 
+                inputMode="decimal"
+                value={initialCapital !== null && initialCapital !== undefined ? String(initialCapital) : ""} 
                 onChange={e => handleCapitalInput(e.target.value)}
-                onBlur={() => {
-                  if (initialCapital === null || initialCapital === undefined) {
-                    setInitialCapital(0);
-                  }
-                }}
+                onBlur={() => handleBlurFormatting(initialCapital, setInitialCapital)}
                 disabled={isLoading}
                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                placeholder="0.00"
+                placeholder="e.g. 10000.00"
+                min="0"
               />
             </div>
             
             <Button onClick={handleUpdateResults} className="w-full" disabled={isLoading}>
-              Update Results
+              {isLoading ? 'Updating...' : 'Update Results'}
             </Button>
           </div>
         </div>
@@ -450,143 +523,151 @@ export function StockDetailsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("date")}>
+                {/* Cabeçalhos da Tabela - Adiciona whitespace-nowrap onde necessário */} 
+                <TableHead className="cursor-pointer text-center whitespace-nowrap sticky left-0 bg-card z-10" onClick={() => handleSortChange("date")}>
                   <div className="flex items-center justify-center">
                     Date {getSortIcon("date")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("entryPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("entryPrice")}>
                   <div className="flex items-center justify-center">
                     Open {getSortIcon("entryPrice")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("high")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("high")}>
                   <div className="flex items-center justify-center">
                     High {getSortIcon("high")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("low")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("low")}>
                   <div className="flex items-center justify-center">
                     Low {getSortIcon("low")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("exitPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("exitPrice")}>
                   <div className="flex items-center justify-center">
                     Close {getSortIcon("exitPrice")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("volume")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("volume")}>
                   <div className="flex items-center justify-center">
                     Volume {getSortIcon("volume")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("suggestedEntryPrice")}>
+                {/* Ajuste nos cabeçalhos com duas linhas para melhor leitura */}
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("suggestedEntryPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Suggested</span>
-                    <span>Entry</span>
-                    {getSortIcon("suggestedEntryPrice")}
+                    <span>Entry {getSortIcon("suggestedEntryPrice")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("actualPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("actualPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Actual</span>
-                    <span>Price</span>
-                    {getSortIcon("actualPrice")}
+                    <span>Price {getSortIcon("actualPrice")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("trade")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("trade")}>
                   <div className="flex items-center justify-center">
                     Trade {getSortIcon("trade")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("lotSize")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("lotSize")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Lot</span>
-                    <span>Size</span>
-                    {getSortIcon("lotSize")}
+                    <span>Size {getSortIcon("lotSize")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("stopPrice")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("stopPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Stop</span>
-                    <span>Price</span>
-                    {getSortIcon("stopPrice")}
+                    <span>Price {getSortIcon("stopPrice")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("profit")}>
-                  <div className="flex items-center justify-center">
-                    Profit {getSortIcon("profit")}
+                {/* Renomeado para Profit/Loss e ajustado */} 
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("profitLoss")}>
+                   <div className="flex flex-col items-center justify-center">
+                    <span>Profit/</span>
+                    <span>Loss {getSortIcon("profitLoss")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("currentCapital")}>
+                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("currentCapital")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Current</span>
-                    <span>Capital</span>
-                    {getSortIcon("currentCapital")}
+                    <span>Capital {getSortIcon("currentCapital")}</span>
                   </div>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentData.length === 0 ? (
+              {currentData.length === 0 && !isLoading ? (
                 <TableRow>
                   <TableCell colSpan={13} className="text-center py-6 text-muted-foreground">
-                    No data to display
+                    No data to display for the current page.
+                  </TableCell>
+                </TableRow>
+              ) : isLoading ? (
+                 <TableRow>
+                  <TableCell colSpan={13} className="text-center py-6 text-muted-foreground">
+                    Loading data...
                   </TableCell>
                 </TableRow>
               ) : (
                 currentData.map((item, index) => (
-                  <TableRow key={index} className={item.trade === "Buy" ? "bg-green-50 dark:bg-green-950/20" : item.trade === "Sell" ? "bg-red-50 dark:bg-red-950/20" : ""}>
-                    <TableCell className="text-center whitespace-nowrap">
+                  <TableRow key={`${item.date}-${index}`} className={formatTradeStatus(item.trade) === "Buy" ? "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30" : formatTradeStatus(item.trade) === "Sell" ? "bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30" : "hover:bg-muted/50"}>
+                    {/* Células da Tabela - Adiciona sticky left na data */} 
+                    <TableCell className="text-center whitespace-nowrap sticky left-0 bg-inherit z-10">
                       {formatDate(item.date)}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {formatMixedValue(item.entryPrice)}
+                    <TableCell className="text-center whitespace-nowrap">
+                      {formatMixedValue(item.entryPrice)} 
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.high)}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.low)}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.exitPrice)}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {item.volume ? item.volume.toLocaleString() : "-"}
+                    <TableCell className="text-center whitespace-nowrap">
+                      {item.volume ? item.volume.toLocaleString('en-US') : "-"} 
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.suggestedEntryPrice)}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.actualPrice)}
                     </TableCell>
-                    <TableCell className={`text-center font-medium ${
-                      item.trade === "Buy" 
+                    <TableCell className={`text-center font-medium whitespace-nowrap ${
+                      formatTradeStatus(item.trade) === "Buy" 
                         ? "text-green-600 dark:text-green-400" 
-                        : item.trade === "Sell" 
+                        : formatTradeStatus(item.trade) === "Sell" 
                           ? "text-red-600 dark:text-red-400" 
-                          : ""
+                          : "text-muted-foreground"
                     }`}>
                       {formatTradeStatus(item.trade)}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {item.lotSize || "-"}
+                    <TableCell className="text-center whitespace-nowrap">
+                      {item.lotSize ? Number(item.lotSize).toLocaleString('en-US') : "-"} 
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center whitespace-nowrap">
                       {formatMixedValue(item.stopPrice)}
                     </TableCell>
-                    <TableCell className={`text-center font-medium ${
-                      (item.profit || 0) > 0 
+                    {/* Usa profitLoss e formatação de moeda */} 
+                    <TableCell className={`text-center font-medium whitespace-nowrap ${
+                      (Number(item.profitLoss) || 0) > 0 
                         ? "text-green-600 dark:text-green-400" 
-                        : (item.profit || 0) < 0 
+                        : (Number(item.profitLoss) || 0) < 0 
                           ? "text-red-600 dark:text-red-400" 
-                          : ""
+                          : "text-muted-foreground"
                     }`}>
-                      {item.profit ? formatCurrency(item.profit) : "-"}
+                      {formatCurrency(item.profitLoss)}
                     </TableCell>
-                    <TableCell className="text-center font-medium">
-                      {item.currentCapital ? formatCurrency(item.currentCapital) : "-"}
+                    {/* Usa currentCapital e formatação de moeda */} 
+                    <TableCell className="text-center font-medium whitespace-nowrap">
+                      {formatCurrency(item.currentCapital)}
                     </TableCell>
                   </TableRow>
                 ))
@@ -596,44 +677,50 @@ export function StockDetailsTable({
         </div>
         
         {/* Fixed Pagination with Items Per Page Selector */}
-        <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
-          <div className="flex items-center gap-2 mb-4 sm:mb-0">
-            <span className="text-sm text-muted-foreground">Rows per page:</span>
-            <select
-              className="bg-card border rounded px-2 py-1 text-sm text-foreground"
-              value={itemsPerPage}
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
+        { totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t bg-card">
+            <div className="flex items-center gap-2 mb-4 sm:mb-0">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <select
+                className="bg-card border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {e.preventDefault(); handlePageChange(currentPage - 1);}}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                
+                {paginationLinks()}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {e.preventDefault(); handlePageChange(currentPage + 1);}}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
-          
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-              
-              {paginationLinks()}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
+        )}
       </div>
     </div>
   );
