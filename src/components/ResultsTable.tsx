@@ -27,16 +27,6 @@ interface TradeDetail {
   stop: string;
 }
 
-interface AnalysisResult {
-  assetCode: string;
-  tradingDays: number;
-  trades: number;
-  tradePercentage: number;
-  finalCapital: number;
-  lastCurrentCapital?: number;
-  tradeDetails?: TradeDetail[]; // Make tradeDetails optional
-}
-
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
@@ -377,7 +367,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${result.lastCurrentCapital ? result.lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
+                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 

@@ -77,10 +77,11 @@ export interface TradeHistoryItem {
   date: string;
   entryPrice: number;
   exitPrice: number;
-  profit: number;
+  profit?: number;
+  profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed';
-  stop?: 'Executed';
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
+  stop?: 'Executed' | '-';
   volume?: number;
   high?: number;
   low?: number;
@@ -89,6 +90,7 @@ export interface TradeHistoryItem {
   lotSize?: number;
   stopPrice?: number;
   capital?: number; // Current capital after this trade
+  currentCapital?: number; // Add currentCapital property
 }
 
 export interface CapitalPoint {
