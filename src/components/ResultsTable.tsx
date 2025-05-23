@@ -34,7 +34,7 @@ interface AnalysisResult {
   tradePercentage: number;
   finalCapital: number;
   lastCurrentCapital?: number;
-  tradeDetails: TradeDetail[];
+  tradeDetails?: TradeDetail[]; // Make tradeDetails optional
 }
 
 interface ResultsTableProps {
@@ -68,17 +68,20 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Função para calcular todas as métricas baseadas nos tradeDetails
+  // Function to calculate all metrics based on tradeDetails
   const calculateMetrics = (result: AnalysisResult) => {
-    const profits = result.tradeDetails.filter(
+    // Add null check for tradeDetails
+    const tradeDetails = result.tradeDetails || [];
+    
+    const profits = tradeDetails.filter(
       detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
     ).length;
     
-    const losses = result.tradeDetails.filter(
+    const losses = tradeDetails.filter(
       detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
     ).length;
     
-    const stops = result.tradeDetails.filter(
+    const stops = tradeDetails.filter(
       detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
     ).length;
     
@@ -96,7 +99,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
     };
   };
 
-  // Adiciona as métricas calculadas aos resultados para ordenação
+  // Add metrics to results for sorting
   const resultsWithMetrics = results.map(result => ({
     ...result,
     ...calculateMetrics(result)
