@@ -632,7 +632,7 @@ const analysis = {
         high: currentData.high,
         low: currentData.low,
         volume: currentData.volume,
-        profit,
+        profitLoss: profit, // Garantir que este campo está sendo passado
         profitPercentage: previousCapital > 0 ? (profit / previousCapital) * 100 : 0,
         trade,
         stop,
@@ -640,8 +640,9 @@ const analysis = {
         actualPrice,
         lotSize,
         stopPrice,
-        capital
-      });
+        capital,
+        currentCapital: capital // Adicionar currentCapital aqui também
+        });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
