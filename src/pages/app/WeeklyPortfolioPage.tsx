@@ -23,6 +23,11 @@ export default function WeeklyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
+  // Helper function to check if it's Friday or last business day of the week
+  const isFridayOrLastBusinessDay = (date: Date): boolean => {
+    return date.getDay() === 5 || isLastBusinessDayOfWeek(date);
+  };
+
   // Função para processar operações semanais
   const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };

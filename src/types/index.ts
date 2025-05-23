@@ -1,4 +1,5 @@
 
+
 export interface User {
   id: string;
   email: string;
@@ -82,7 +83,7 @@ export interface TradeHistoryItem {
   profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
   trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
-  stop?: 'Executed' | '-';
+  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
   volume?: number;
   high?: number;
   low?: number;
@@ -111,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+
