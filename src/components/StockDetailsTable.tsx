@@ -81,13 +81,17 @@ export function StockDetailsTable({
 
   // Calculate sorted data and Current Capital
   const processedData = useMemo(() => {
-    if (filteredTradeHistory.length === 0 || initialCapital === null) return [];
+    if (!result?.tradeHistory?.length) return [];
     
     // 1. Sort by date ascending to process capital calculations chronologically
-    const dateOrdered = [...filteredTradeHistory].sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      return dateA.getTime() - dateB.getTime();
+    const sorted = [...result.tradeHistory].sort((a, b) => {
+      if (sortField === "date") {
+        return sortDirection === "asc"
+          ? new Date(a.date).getTime() - new Date(b.date).getTime()
+          : new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+    return sorted;
+    }, [result, sortField, sortDirection]);
     });
     
     // 2. Process Current Capital values based on the rules
@@ -171,7 +175,10 @@ export function StockDetailsTable({
   // Calculate pagination
   const totalItems = processedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const currentData = processedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentData = processedData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Handle pagination change
   const handlePageChange = (page: number) => {
@@ -233,7 +240,7 @@ export function StockDetailsTable({
     if (amount === undefined || amount === null) return "-";
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD', // TODO: Considerar a moeda dinamicamente se necessário
+      currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
@@ -250,14 +257,10 @@ export function StockDetailsTable({
     if (!dateString) return "-";
     try {
       // Tenta criar data, pode ser YYYY-MM-DD ou outro formato ISO
-      const date = new Date(dateString + 'T00:00:00'); // Adiciona T00:00:00 para evitar problemas de fuso horário
-      if (isNaN(date.getTime())) return dateString; // Retorna original se inválida
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
-      const year = date.getFullYear();
-      return `${day}/${month}/${year}`;
-    } catch (e) {
-      return dateString; // Retorna original em caso de erro
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US');
+    } catch {
+      return dateString;
     }
   };
   
@@ -384,10 +387,13 @@ export function StockDetailsTable({
     <div className="w-full flex flex-col gap-6">
       <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
         {/* Capital Evolution Chart (3/4 width) */}
-        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`} style={{ height: isMobile ? 'auto' : `${chartHeight}px` }}>
-          <h3 className="text-base md:text-lg font-medium mb-4">Capital Evolution</h3>
-          <div className={isMobile ? 'h-[300px]' : 'h-[calc(100%-40px)]'}>
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
+          <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
+            </ResponsiveContainer>
+          </div>
+        </div>
               {/* Adiciona verificação se filteredCapitalEvolution tem dados */} 
               {filteredCapitalEvolution.length > 0 ? (
                 <LineChart data={filteredCapitalEvolution} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
