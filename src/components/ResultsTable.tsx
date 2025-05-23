@@ -22,6 +22,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+interface AnalysisResult {
+  lastCurrentCapital?: number;
+}
+
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
@@ -343,7 +347,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${result.lastCurrentCapital?.toFixed(2) || result.finalCapital.toFixed(2)}
+                      ${result.lastCurrentCapital ? result.lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 
