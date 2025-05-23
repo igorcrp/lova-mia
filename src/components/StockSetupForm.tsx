@@ -56,9 +56,9 @@ export function StockSetupForm({
       assetClass: "",
       referencePrice: "close",
       period: "1m",
-      entryPercentage: 1,
-      stopPercentage: 1,
-      initialCapital: 10000,
+      entryPercentage: 1.00, // Default com 2 casas decimais
+      stopPercentage: 1.00,  // Default com 2 casas decimais
+      initialCapital: 10000.00,
       comparisonStocks: []
     }
   });
@@ -138,6 +138,7 @@ export function StockSetupForm({
       }
     }
     loadStockMarkets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("country")]);
 
   // Load asset classes when stock market changes
@@ -183,6 +184,7 @@ export function StockSetupForm({
       }
     }
     loadAssetClasses();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("country"), form.watch("stockMarket")]);
 
   // Load assets when asset class changes
@@ -262,12 +264,17 @@ export function StockSetupForm({
       }
     }
     loadAssets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("country"), form.watch("stockMarket"), form.watch("assetClass")]);
 
   // Handle form submission
   const handleSubmit = form.handleSubmit(data => {
     if (dataTableName) {
       data.dataTableName = dataTableName;
+      // Garante que os valores percentuais sejam números antes de enviar
+      data.entryPercentage = Number(data.entryPercentage) || 0;
+      data.stopPercentage = Number(data.stopPercentage) || 0;
+      data.initialCapital = Number(data.initialCapital) || 0;
       onSubmit(data);
     } else {
       // If we don't have the table name, try to get it again
@@ -280,6 +287,10 @@ export function StockSetupForm({
         
         if (tableName) {
           data.dataTableName = tableName;
+          // Garante que os valores percentuais sejam números antes de enviar
+          data.entryPercentage = Number(data.entryPercentage) || 0;
+          data.stopPercentage = Number(data.stopPercentage) || 0;
+          data.initialCapital = Number(data.initialCapital) || 0;
           onSubmit(data);
         } else {
           toast({
@@ -329,6 +340,7 @@ export function StockSetupForm({
     if (stocks && Array.isArray(stocks)) {
       setSelectedStocks(stocks);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.watch("comparisonStocks")]);
   
   // Check if any options are loading
@@ -336,6 +348,51 @@ export function StockSetupForm({
                            loadingState.stockMarkets || 
                            loadingState.assetClasses || 
                            loadingState.assets;
+
+  // Função auxiliar para lidar com a entrada de números decimais positivos
+  const handleDecimalInputChange = (value: string, onChange: (val: number | null) => void) => {
+    if (value === "") {
+      onChange(null); // Permite campo vazio temporariamente
+      return;
+    }
+    // Regex para permitir números positivos com até 2 casas decimais
+    // Permite iniciar com '.' ou '0.'
+    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+    if (regex.test(value)) {
+      // Se o valor for apenas '.', ou terminar com '.', não converte para float ainda
+      if (value === '.' || value.endsWith('.')) {
+         onChange(value as any); // Mantém como string temporariamente para permitir digitação
+      } else {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue >= 0) {
+          onChange(numValue);
+        }
+      }
+    } else if (value === '-') { // Impede digitar negativo
+      // Não faz nada se tentar digitar '-' 
+    } else {
+      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+         // Formata para 2 casas decimais se for um número válido colado
+         onChange(parseFloat(numValue.toFixed(2)));
+      } else if (value === '') {
+         onChange(null);
+      }
+    }
+  };
+
+  // Função auxiliar para formatar no blur
+  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number) => void) => {
+    let numValue = 0;
+    if (typeof value === 'string') {
+      numValue = parseFloat(value) || 0;
+    } else if (typeof value === 'number') {
+      numValue = value;
+    }
+    // Garante que seja positivo e formata
+    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+  };
   
   return (
     <Form {...form}>
@@ -537,6 +594,7 @@ export function StockSetupForm({
             )}
           />
 
+          {/* Campo % Entry Price Corrigido */}
           <FormField
             control={form.control}
             name="entryPercentage"
@@ -545,25 +603,16 @@ export function StockSetupForm({
                 <FormLabel>% Entry Price</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                      <Input 
-                        type="text"
-                        disabled={isLoading || isOptionsLoading}
-                        value={field.value !== undefined && field.value !== null ? field.value.toString() : ""}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          if (inputValue === "") {
-                            field.onChange(null); // Permite campo vazio
-                          } else if (/^\d*\.?\d{0,2}$/.test(inputValue)) { // Aceita até 2 casas decimais
-                            field.onChange(parseFloat(inputValue));
-                          }
-                        }}
-                        onBlur={() => {
-                          if (field.value === null || field.value === undefined) {
-                            field.onChange(0); // Define como 0 se estiver vazio ao sair do campo
-                          }
-                        }}
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
+                    <Input 
+                      type="text" // Usar text para controle manual
+                      inputMode="decimal" // Ajuda teclados mobile
+                      disabled={isLoading || isOptionsLoading}
+                      value={field.value === null || field.value === undefined ? '' : String(field.value)} // Mostra o valor atual ou vazio
+                      onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
+                      onBlur={() => handleBlurFormatting(field.value, field.onChange)}
+                      className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="0" // Atributo HTML para semântica e validação básica
+                    />
                     <span className="ml-2">%</span>
                   </div>
                 </FormControl>
@@ -572,6 +621,7 @@ export function StockSetupForm({
             )}
           />
 
+          {/* Campo % Stop Corrigido */}
           <FormField
             control={form.control}
             name="stopPercentage"
@@ -581,21 +631,14 @@ export function StockSetupForm({
                 <FormControl>
                   <div className="flex items-center">
                     <Input 
-                      type="text" 
+                      type="text" // Usar text para controle manual
+                      inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
-                      value={field.value !== null ? field.value.toFixed(2) : ""}
-                      onChange={(e) => {
-                        const inputValue = e.target.value;
-                        if (inputValue === "") {
-                          field.onChange(0);
-                        } else {
-                          const value = parseFloat(inputValue);
-                          if (!isNaN(value)) {
-                            field.onChange(value);
-                          }
-                        }
-                      }}
-                      className="flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={field.value === null || field.value === undefined ? '' : String(field.value)} // Mostra o valor atual ou vazio
+                      onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
+                      onBlur={() => handleBlurFormatting(field.value, field.onChange)}
+                      className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      min="0" // Atributo HTML para semântica e validação básica
                     />
                     <span className="ml-2">%</span>
                   </div>
@@ -608,6 +651,7 @@ export function StockSetupForm({
 
         {/* Third row - Initial Capital, Comparison Stocks */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Campo Initial Capital Corrigido (similar aos percentuais) */}
           <FormField
             control={form.control}
             name="initialCapital"
@@ -617,20 +661,13 @@ export function StockSetupForm({
                 <FormControl>
                   <Input 
                     type="text"
+                    inputMode="decimal"
                     disabled={isLoading || isOptionsLoading}
-                    value={field.value !== null ? field.value.toFixed(2) : ""}
-                    onChange={(e) => {
-                      const inputValue = e.target.value;
-                      if (inputValue === "") {
-                        field.onChange(0);
-                      } else {
-                        const value = parseFloat(inputValue);
-                        if (!isNaN(value)) {
-                          field.onChange(value);
-                        }
-                      }
-                    }}
+                    value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                    onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
+                    onBlur={() => handleBlurFormatting(field.value, field.onChange)}
                     className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    min="0"
                   />
                 </FormControl>
                 <FormMessage />
@@ -646,23 +683,23 @@ export function StockSetupForm({
                 <FormLabel>Comparison Stocks (optional)</FormLabel>
                 <div className="relative">
                   <FormControl>
-                    <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-10 bg-background">
+                    <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-10 bg-background items-center">
                       {selectedStocks.map(stock => (
                         <Badge key={stock} variant="secondary" className="flex items-center gap-1">
                           {stock}
                           <button 
                             type="button" 
-                            className="rounded-full hover:bg-muted"
+                            className="rounded-full hover:bg-muted p-0.5"
                             onClick={() => removeComparisonStock(stock)}
+                            aria-label={`Remove ${stock}`}
                           >
                             <X className="h-3 w-3" />
-                            <span className="sr-only">Remove {stock}</span>
                           </button>
                         </Badge>
                       ))}
                       <input
                         className={cn(
-                          "flex-1 bg-transparent outline-none min-w-20",
+                          "flex-1 bg-transparent outline-none min-w-20 h-full",
                           selectedStocks.length > 0 && "ml-1"
                         )}
                         disabled={isLoading || loadingState.assets || !isTableValid}
@@ -682,7 +719,7 @@ export function StockSetupForm({
                   </FormControl>
                   
                   {showSuggestions && filteredStocks.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg">
+                    <div className="absolute z-10 w-full mt-1 bg-popover border rounded-md shadow-lg">
                       <Command>
                         <CommandList>
                           <CommandEmpty>No stocks found.</CommandEmpty>
@@ -694,6 +731,7 @@ export function StockSetupForm({
                                   e.preventDefault(); // Prevent blur from hiding suggestions
                                   addComparisonStock(stock.code);
                                 }}
+                                className="cursor-pointer"
                               >
                                 {formatStockDisplay(stock)}
                               </CommandItem>
@@ -740,3 +778,4 @@ export function StockSetupForm({
     </Form>
   );
 }
+
