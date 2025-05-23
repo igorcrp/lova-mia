@@ -343,7 +343,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${result.finalCapital.toFixed(2)}
+                      ${result.lastCurrentCapital?.toFixed(2) || result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 
