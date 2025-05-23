@@ -524,74 +524,74 @@ export function StockDetailsTable({
             <TableHeader>
               <TableRow>
                 {/* Cabeçalhos da Tabela - Adiciona whitespace-nowrap onde necessário */} 
-                <TableHead className="cursor-pointer text-center whitespace-nowrap sticky left-0 bg-card z-10" onClick={() => handleSortChange("date")}>
+                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("date")}>
                   <div className="flex items-center justify-center">
                     Date {getSortIcon("date")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("entryPrice")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("entryPrice")}>
                   <div className="flex items-center justify-center">
                     Open {getSortIcon("entryPrice")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("high")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("high")}>
                   <div className="flex items-center justify-center">
                     High {getSortIcon("high")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("low")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("low")}>
                   <div className="flex items-center justify-center">
                     Low {getSortIcon("low")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("exitPrice")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("exitPrice")}>
                   <div className="flex items-center justify-center">
                     Close {getSortIcon("exitPrice")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("volume")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("volume")}>
                   <div className="flex items-center justify-center">
                     Volume {getSortIcon("volume")}
                   </div>
                 </TableHead>
                 {/* Ajuste nos cabeçalhos com duas linhas para melhor leitura */}
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("suggestedEntryPrice")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("suggestedEntryPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Suggested</span>
                     <span>Entry {getSortIcon("suggestedEntryPrice")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("actualPrice")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("actualPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Actual</span>
                     <span>Price {getSortIcon("actualPrice")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("trade")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("trade")}>
                   <div className="flex items-center justify-center">
                     Trade {getSortIcon("trade")}
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("lotSize")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("lotSize")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Lot</span>
                     <span>Size {getSortIcon("lotSize")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("stopPrice")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("stopPrice")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Stop</span>
                     <span>Price {getSortIcon("stopPrice")}</span>
                   </div>
                 </TableHead>
                 {/* Renomeado para Profit/Loss e ajustado */} 
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("profitLoss")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("profitLoss")}>
                    <div className="flex flex-col items-center justify-center">
                     <span>Profit/</span>
                     <span>Loss {getSortIcon("profitLoss")}</span>
                   </div>
                 </TableHead>
-                <TableHead className="cursor-pointer text-center whitespace-nowrap" onClick={() => handleSortChange("currentCapital")}>
+                <TableHead className="cursor-pointer text-center px-2 text-sm" onClick={() => handleSortChange("currentCapital")}>
                   <div className="flex flex-col items-center justify-center">
                     <span>Current</span>
                     <span>Capital {getSortIcon("currentCapital")}</span>
@@ -616,28 +616,28 @@ export function StockDetailsTable({
                 currentData.map((item, index) => (
                   <TableRow key={`${item.date}-${index}`} className={formatTradeStatus(item.trade) === "Buy" ? "bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-900/30" : formatTradeStatus(item.trade) === "Sell" ? "bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30" : "hover:bg-muted/50"}>
                     {/* Células da Tabela - Adiciona sticky left na data */} 
-                    <TableCell className="text-center whitespace-nowrap sticky left-0 bg-inherit z-10">
+                    <TableCell className="text-center">
                       {formatDate(item.date)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.entryPrice)} 
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.high)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.low)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.exitPrice)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {item.volume ? item.volume.toLocaleString('en-US') : "-"} 
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.suggestedEntryPrice)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.actualPrice)}
                     </TableCell>
                     <TableCell className={`text-center font-medium whitespace-nowrap ${
@@ -649,10 +649,10 @@ export function StockDetailsTable({
                     }`}>
                       {formatTradeStatus(item.trade)}
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {item.lotSize ? Number(item.lotSize).toLocaleString('en-US') : "-"} 
                     </TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
+                    <TableCell className="text-center px-2 py-1 text-sm">
                       {formatMixedValue(item.stopPrice)}
                     </TableCell>
                     {/* Usa profitLoss e formatação de moeda */} 
