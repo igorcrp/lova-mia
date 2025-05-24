@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   email: string;
@@ -67,7 +66,6 @@ export interface AnalysisResult {
   recoveryFactor: number;
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
-  tradeDetails?: TradeDetail[]; // Add tradeDetails property
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -79,11 +77,10 @@ export interface TradeHistoryItem {
   date: string;
   entryPrice: number;
   exitPrice: number;
-  profit?: number;
-  profitLoss?: number; // Add profitLoss property
+  profit: number;
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
-  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  trade: 'Executed' | 'Not Executed';
+  stop?: 'Executed';
   volume?: number;
   high?: number;
   low?: number;
@@ -92,7 +89,6 @@ export interface TradeHistoryItem {
   lotSize?: number;
   stopPrice?: number;
   capital?: number; // Current capital after this trade
-  currentCapital?: number; // Add currentCapital property
 }
 
 export interface CapitalPoint {
@@ -105,11 +101,3 @@ export interface StockInfo {
   name: string;
   fullName?: string;
 }
-
-// Add TradeDetail interface for ResultsTable
-export interface TradeDetail {
-  profitLoss: number;
-  trade: string;
-  stop: string;
-}
-

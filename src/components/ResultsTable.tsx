@@ -27,6 +27,16 @@ interface TradeDetail {
   stop: string;
 }
 
+interface AnalysisResult {
+  assetCode: string;
+  tradingDays: number;
+  trades: number;
+  tradePercentage: number;
+  finalCapital: number;
+  lastCurrentCapital?: number;
+  tradeDetails: TradeDetail[];
+}
+
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
@@ -58,20 +68,17 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Function to calculate all metrics based on tradeDetails
+  // Função para calcular todas as métricas baseadas nos tradeDetails
   const calculateMetrics = (result: AnalysisResult) => {
-    // Add null check for tradeDetails
-    const tradeDetails = result.tradeDetails || [];
-    
-    const profits = tradeDetails.filter(
+    const profits = result.tradeDetails.filter(
       detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
     ).length;
     
-    const losses = tradeDetails.filter(
+    const losses = result.tradeDetails.filter(
       detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
     ).length;
     
-    const stops = tradeDetails.filter(
+    const stops = result.tradeDetails.filter(
       detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
     ).length;
     
@@ -89,7 +96,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
     };
   };
 
-  // Add metrics to results for sorting
+  // Adiciona as métricas calculadas aos resultados para ordenação
   const resultsWithMetrics = results.map(result => ({
     ...result,
     ...calculateMetrics(result)
@@ -367,7 +374,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
+                      ${result.lastCurrentCapital ? result.lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 

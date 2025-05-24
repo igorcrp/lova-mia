@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -86,7 +85,7 @@ export default function MonthlyPortfolioPage() {
 
       for (let i = 0; i < monthTrades.length; i++) {
         const currentDayData = monthTrades[i];
-        const currentDay = { ...currentDayData, trade: '-' as TradeHistoryItem['trade'], profit: undefined, capital: undefined, stop: '-' as TradeHistoryItem['stop'] }; // Default state
+        const currentDay = { ...currentDayData, trade: '-', profit: undefined, capital: undefined, stop: '-' }; // Default state
         const currentDate = new Date(currentDay.date);
 
         // Tenta abrir operação no primeiro dia útil
@@ -96,7 +95,7 @@ export default function MonthlyPortfolioPage() {
             const entryPrice = previousDay.exitPrice;
             activeTrade = { ...currentDay }; // Store entry details
             activeTrade.suggestedEntryPrice = entryPrice;
-            activeTrade.trade = (params.operation === 'buy' ? 'Buy' : 'Sell') as TradeHistoryItem['trade'];
+            activeTrade.trade = params.operation === 'buy' ? 'Buy' : 'Sell';
             stopPriceCalculated = calculateStopPrice(entryPrice, params);
             activeTrade.stopPrice = stopPriceCalculated;
             
@@ -113,8 +112,8 @@ export default function MonthlyPortfolioPage() {
           const stopHit = checkStopLoss(currentDay, stopPriceCalculated, params.operation);
           if (stopHit) {
             const exitPrice = stopPriceCalculated;
-            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
-            currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
+            currentDay.trade = 'Close';
+            currentDay.stop = 'Executed';
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
@@ -124,7 +123,7 @@ export default function MonthlyPortfolioPage() {
           } else if (isLastBusinessDayOfMonth(currentDate)) {
             // Verifica Fim do Mês
             const exitPrice = currentDay.exitPrice;
-            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
+            currentDay.trade = 'Close';
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
@@ -654,4 +653,3 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
-
