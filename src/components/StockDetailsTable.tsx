@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -66,9 +67,7 @@ export function StockDetailsTable({
       currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
         ? Number(item.currentCapital) 
         : undefined,
-      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-      // Calculate stop trigger here for consistency
-      stopTrigger: calculateStopTrigger(item, params.operation)
+      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-"
     }));
 
     // Sort data
@@ -89,28 +88,7 @@ export function StockDetailsTable({
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
-  }, [result, sortField, sortDirection, params.operation]);
-
-  // Function to calculate stop trigger
-  function calculateStopTrigger(item: any, operation: string): string {
-    if (item.trade !== "Executed" || item.stopPrice === '-') {
-      return "-";
-    }
-
-    const stopPrice = Number(item.stopPrice);
-    const low = Number(item.low);
-    const high = Number(item.high);
-
-    if (isNaN(stopPrice) {
-      return "-";
-    }
-
-    if (operation === 'buy') {
-      return low < stopPrice ? "Executed" : "-";
-    } else {
-      return high > stopPrice ? "Executed" : "-";
-    }
-  }
+  }, [result, sortField, sortDirection]);
 
   // Pagination
   const totalItems = processedData.length;
@@ -162,17 +140,26 @@ export function StockDetailsTable({
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return "-";
     try {
+      // Parse the date string as UTC
       const date = new Date(`${dateString}T00:00:00Z`);
+      // Get UTC components
       const day = String(date.getUTCDate()).padStart(2, '0');
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
       const year = date.getUTCFullYear();
+      // Check for invalid date after parsing
       if (isNaN(date.getTime())) {
-          return dateString;
+          return dateString; // Return original string if date is invalid
       }
       return `${day}/${month}/${year}`;
     } catch {
+        // In case of any error during parsing or formatting
         return dateString;
     }
+  };
+
+  const formatTradeStatus = (status: string | undefined | null): string => {
+    if (status === undefined || status === null) return "-";
+    return String(status).trim() || "-";
   };
 
   const getSortIcon = (field: keyof TradeHistoryItem) => {
@@ -195,7 +182,7 @@ export function StockDetailsTable({
     { id: "trade", label: "Trade", width: "w-20" },
     { id: "lotSize", label: "Lot Size", width: "w-20" },
     { id: "stopPrice", label: "Stop Price", width: "w-24" },
-    { id: "stopTrigger", label: "Stop Trigger", width: "w-24" },
+    { id: "stopTrigger", label: "Stop Trigger", width: "w-24" }, // Added column
     { id: "profitLoss", label: "Profit/Loss", width: "w-28" },
     { id: "currentCapital", label: "Current Capital", width: "w-32" }
   ];
@@ -384,10 +371,10 @@ export function StockDetailsTable({
                           formattedValue = formatCurrency(value as number);
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
-                        else if (column.id === "stopTrigger") {
-                          const stop = item.stop;
-                          formattedValue = stop === "Executed" ? "Executed" : "-";
-                        } else if (typeof value === "number") {
+                        } else if (column.id === "stopTrigger") {
+							const stop = item.stop;
+							formattedValue = stop === "Executed" ? "Executed" : "-";
+						} else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
                           formattedValue = String(value);
