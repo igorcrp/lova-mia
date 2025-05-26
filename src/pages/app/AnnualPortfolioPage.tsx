@@ -53,6 +53,15 @@ export default function AnnualPortfolioPage() {
       : (entryPrice - exitPrice) * volume;
   };
 
+  // Helper function to create a properly typed TradeHistoryItem
+  const createTradeHistoryItem = (baseItem: any, trade: string, stop: string = '-'): TradeHistoryItem => {
+    return {
+      ...baseItem,
+      trade: trade as TradeHistoryItem['trade'],
+      stop: stop as TradeHistoryItem['stop']
+    };
+  };
+
   // Função para processar operações anuais
   const processAnnualTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
@@ -85,7 +94,7 @@ export default function AnnualPortfolioPage() {
 
       for (let i = 0; i < yearTrades.length; i++) {
         const currentDayData = yearTrades[i];
-        const currentDay = { ...currentDayData, trade: '-', profit: undefined, capital: undefined, stop: '-' }; // Default state
+        const currentDay = createTradeHistoryItem(currentDayData, '-', '-'); // Default state
         const currentDate = new Date(currentDay.date);
 
         // Tenta abrir operação no primeiro dia útil do ano
@@ -93,9 +102,8 @@ export default function AnnualPortfolioPage() {
           const previousDay = findPreviousDay(sortedHistory, currentDay.date);
           if (previousDay && previousDay.exitPrice !== undefined) {
             const entryPrice = previousDay.exitPrice;
-            activeTrade = { ...currentDay }; // Store entry details
+            activeTrade = createTradeHistoryItem(currentDay, params.operation === 'buy' ? 'Buy' : 'Sell'); // Store entry details
             activeTrade.suggestedEntryPrice = entryPrice;
-            activeTrade.trade = params.operation === 'buy' ? 'Buy' : 'Sell';
             stopPriceCalculated = calculateStopPrice(entryPrice, params);
             activeTrade.stopPrice = stopPriceCalculated;
             
@@ -112,22 +120,22 @@ export default function AnnualPortfolioPage() {
           const stopHit = checkStopLoss(currentDay, stopPriceCalculated, params.operation);
           if (stopHit) {
             const exitPrice = stopPriceCalculated;
-            currentDay.trade = 'Close';
-            currentDay.stop = 'Executed';
+            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
+            currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
-            tradePairs.push({ open: activeTrade, close: { ...currentDay, exitPrice: exitPrice } });
+            tradePairs.push({ open: activeTrade, close: createTradeHistoryItem({ ...currentDay, exitPrice }, 'Close', 'Executed') });
             activeTrade = null; // Close trade
             stopPriceCalculated = null;
           } else if (isLastBusinessDayOfYear(currentDate)) {
             // Verifica Fim do Ano
             const exitPrice = currentDay.exitPrice;
-            currentDay.trade = 'Close';
+            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
-            tradePairs.push({ open: activeTrade, close: { ...currentDay } });
+            tradePairs.push({ open: activeTrade, close: createTradeHistoryItem(currentDay, 'Close') });
             activeTrade = null; // Close trade
             stopPriceCalculated = null;
           }

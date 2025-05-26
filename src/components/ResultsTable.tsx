@@ -1,4 +1,3 @@
-
 import { AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,8 +21,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-interface AnalysisResult {
-  lastCurrentCapital?: number;
+interface TradeDetail {
+  profitLoss: number;
+  trade: string;
+  stop: string;
 }
 
 interface ResultsTableProps {
@@ -42,11 +43,7 @@ type SortField =
   | "lossPercentage"
   | "stops"
   | "stopPercentage"
-  | "finalCapital"
-  | "profit"
-  | "sharpeRatio"
-  | "sortinoRatio"
-  | "recoveryFactor";
+  | "finalCapital";
 
 interface SortConfig {
   field: SortField;
@@ -61,8 +58,45 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Function to calculate all metrics based on tradeDetails
+  const calculateMetrics = (result: AnalysisResult) => {
+    // Add null check for tradeDetails
+    const tradeDetails = result.tradeDetails || [];
+    
+    const profits = tradeDetails.filter(
+      detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
+    ).length;
+    
+    const losses = tradeDetails.filter(
+      detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
+    ).length;
+    
+    const stops = tradeDetails.filter(
+      detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
+    ).length;
+    
+    const profitPercentage = result.trades > 0 ? (profits / result.trades) * 100 : 0;
+    const lossPercentage = result.trades > 0 ? (losses / result.trades) * 100 : 0;
+    const stopPercentage = result.trades > 0 ? (stops / result.trades) * 100 : 0;
+    
+    return {
+      profits,
+      profitPercentage,
+      losses,
+      lossPercentage,
+      stops,
+      stopPercentage
+    };
+  };
+
+  // Add metrics to results for sorting
+  const resultsWithMetrics = results.map(result => ({
+    ...result,
+    ...calculateMetrics(result)
+  }));
+
   // Sort results
-  const sortedResults = [...results].sort((a, b) => {
+  const sortedResults = [...resultsWithMetrics].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -110,7 +144,6 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
     const maxVisiblePages = 5;
     
     if (totalPages <= maxVisiblePages) {
-      // Show all pages if there are few pages
       for (let i = 1; i <= totalPages; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -124,7 +157,6 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
     } else {
-      // Always show first page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink
@@ -136,7 +168,6 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         </PaginationItem>
       );
       
-      // Show ellipsis if not near the start
       if (page > 3) {
         items.push(
           <PaginationItem key="start-ellipsis">
@@ -145,18 +176,15 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
-      // Calculate range of visible pages
       let startPage = Math.max(2, page - 1);
       let endPage = Math.min(totalPages - 1, page + 1);
       
-      // Adjust if at edges
       if (page <= 3) {
         endPage = Math.min(totalPages - 1, 4);
       } else if (page >= totalPages - 2) {
         startPage = Math.max(2, totalPages - 3);
       }
       
-      // Add visible page numbers
       for (let i = startPage; i <= endPage; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -170,7 +198,6 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
-      // Show ellipsis if not near the end
       if (page < totalPages - 2) {
         items.push(
           <PaginationItem key="end-ellipsis">
@@ -179,7 +206,6 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
-      // Always show last page
       items.push(
         <PaginationItem key={totalPages}>
           <PaginationLink
@@ -322,32 +348,26 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                     <TableCell className="text-center">
                       {result.tradePercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">
-                      {result.profits}
-                    </TableCell>
+                    <TableCell className="text-center">{result.profits}</TableCell>
                     <TableCell className={cn(
                       "text-center",
                       "text-green-600 dark:text-green-400"
                     )}>
                       {result.profitPercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">
-                      {result.losses}
-                    </TableCell>
+                    <TableCell className="text-center">{result.losses}</TableCell>
                     <TableCell className={cn(
                       "text-center",
                       "text-red-600 dark:text-red-400"
                     )}>
                       {result.lossPercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">
-                      {result.stops}
-                    </TableCell>
+                    <TableCell className="text-center">{result.stops}</TableCell>
                     <TableCell className="text-center">
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${result.lastCurrentCapital ? result.lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
+                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 
