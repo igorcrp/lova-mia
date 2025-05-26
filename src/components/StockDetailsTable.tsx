@@ -92,25 +92,36 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  function calculateStopTrigger(item: any, operation: string): string {
-    if (item.trade !== "Executed" || item.stopPrice === '-') {
-      return "-";
+  interface TradeItemForStopTrigger {
+    trade: string;
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+}
+  
+  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+    // Verifica se o item é válido e se a trade foi executada
+    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
+        return "-";
     }
 
+    // Converte os valores para número
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
 
-    if (isNaN(stopPrice) {
-      return "-";
+    // Verifica se as conversões foram bem sucedidas
+    if (isNaN(stopPrice) || isNaN(low) || isNaN(high)) {
+        return "-";
     }
 
+    // Aplica a lógica de stop trigger baseada na operação
     if (operation === 'buy') {
-      return low < stopPrice ? "Executed" : "-";
+        return low < stopPrice ? "Executed" : "-";
     } else {
-      return high > stopPrice ? "Executed" : "-";
+        return high > stopPrice ? "Executed" : "-";
     }
-  }
+}
 
   // Pagination
   const totalItems = processedData.length;
