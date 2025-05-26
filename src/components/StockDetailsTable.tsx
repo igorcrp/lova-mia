@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -62,7 +63,7 @@ export function StockDetailsTable({
     // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
-      profitLoss: Number(item.profitLoss) || 0,
+      profitLoss: Number(item.profit) || 0,
       currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
         ? Number(item.currentCapital) 
         : undefined,
