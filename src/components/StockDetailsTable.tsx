@@ -1,20 +1,19 @@
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StockDetailsTableProps {
   result: DetailedResult;
-  params: StockAnalysisParams;
+  params: StockAnalysisParams & { interval?: string };
   onUpdateParams: (params: StockAnalysisParams) => void;
   isLoading?: boolean;
 }
@@ -25,102 +24,110 @@ export function StockDetailsTable({
   onUpdateParams,
   isLoading = false
 }: StockDetailsTableProps) {
-  // State for sorting
+  // State management
   const [sortField, setSortField] = useState<keyof TradeHistoryItem>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-
-  // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  // State for stock setup parameters
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  const [entryPercentage, setEntryPercentage] = useState(params.entryPercentage);
-  const [stopPercentage, setStopPercentage] = useState(params.stopPercentage);
-  const [initialCapital, setInitialCapital] = useState(params.initialCapital);
+  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage ?? null);
+  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage ?? null);
+  const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
 
-  // Data is already filtered at the API level, no need to filter again
-  const filteredTradeHistory = result.tradeHistory || [];
+  const setupPanelRef = useRef<HTMLDivElement>(null);
+  const [chartHeight, setChartHeight] = useState(400);
+  const isMobile = useIsMobile();
 
-  // Calculate sorted data
-  const sortedData = useMemo(() => {
-    if (filteredTradeHistory.length === 0) return [];
-    return [...filteredTradeHistory].sort((a, b) => {
+  // Update chart height to match setup panel
+  useEffect(() => {
+    const updateHeight = () => {
+      if (setupPanelRef.current) {
+        setChartHeight(setupPanelRef.current.clientHeight);
+      }
+    };
+
+    const timer = setTimeout(updateHeight, 100);
+    window.addEventListener('resize', updateHeight);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
+  // Process and sort data
+  const processedData = useMemo(() => {
+    if (!result?.tradeHistory?.length) return [];
+    
+    // Create a safe copy of the data
+    const data = result.tradeHistory.map(item => ({
+      ...item,
+      profitLoss: Number(item.profitLoss) || 0,
+      currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
+        ? Number(item.currentCapital) 
+        : undefined,
+      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-"
+    }));
+
+    // Sort data
+    return [...data].sort((a, b) => {
+      const valA = a[sortField];
+      const valB = b[sortField];
+
       if (sortField === "date") {
-        const dateA = new Date(a[sortField]);
-        const dateB = new Date(b[sortField]);
-        return sortDirection === "asc" ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+        const dateA = new Date(valA as string);
+        const dateB = new Date(valB as string);
+        return sortDirection === "asc" 
+          ? dateA.getTime() - dateB.getTime() 
+          : dateB.getTime() - dateA.getTime();
       }
 
-      // For numeric fields
-      const valA = a[sortField] as number;
-      const valB = b[sortField] as number;
-      return sortDirection === "asc" ? valA - valB : valB - valA;
+      // Numeric comparison for other fields
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
+      return sortDirection === "asc" ? numA - numB : numB - numA;
     });
-  }, [filteredTradeHistory, sortField, sortDirection]);
+  }, [result, sortField, sortDirection]);
 
-  // Capital evolution data is already filtered at the API level
-  const filteredCapitalEvolution = result.capitalEvolution || [];
-
-  // Calculate pagination
-  const totalItems = sortedData.length;
+  // Pagination
+  const totalItems = processedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const currentData = sortedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentData = processedData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-  // Handle pagination change
+  // Handlers
+  const handleSortChange = (field: keyof TradeHistoryItem) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+    setCurrentPage(1);
+  };
+
   const handlePageChange = (page: number) => {
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
     setCurrentPage(page);
   };
 
-  // Handle sorting change
-  const handleSortChange = (field: keyof TradeHistoryItem) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc"); // Default to descending when changing fields
-    }
-  };
-
-  // Handle update button click
   const handleUpdateResults = () => {
-    onUpdateParams({
+    const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: entryPercentage,
-      stopPercentage: stopPercentage,
-      initialCapital: initialCapital
-    });
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+    };
+    onUpdateParams(cleanParams);
   };
 
-  // Generate pagination links
-  const paginationLinks = () => {
-    const links = [];
-    const maxDisplayLinks = 5; // Maximum number of page links to display
-
-    let startPage = Math.max(1, currentPage - Math.floor(maxDisplayLinks / 2));
-    const endPage = Math.min(totalPages, startPage + maxDisplayLinks - 1);
-
-    // Adjust startPage if needed to ensure we show maxDisplayLinks if possible
-    startPage = Math.max(1, endPage - maxDisplayLinks + 1);
-    for (let i = startPage; i <= endPage; i++) {
-      links.push(<PaginationItem key={i}>
-          <PaginationLink isActive={i === currentPage} onClick={() => handlePageChange(i)}>
-            {i}
-          </PaginationLink>
-        </PaginationItem>);
-    }
-    return links;
-  };
-
-  // Format currency function (handles NaN)
-  const formatCurrency = (amount: number | null | undefined) => {
-    // Check if amount is a valid number
-    if (typeof amount !== 'number' || isNaN(amount)) {
-      return "-"; // Or return "-" or "N/A"
-    }
+  // Formatting functions
+  const formatCurrency = (amount: number | undefined | null): string => {
+    if (amount === undefined || amount === null) return "-";
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -129,92 +136,115 @@ export function StockDetailsTable({
     }).format(amount);
   };
 
-  // Format percentage function
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(2)}%`;
+  const formatDate = (dateString: string | undefined | null): string => {
+    if (!dateString) return "-";
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch {
+      return dateString;
+    }
   };
 
-  // Format date function (UTC safe)
-  const formatDate = (dateString: string) => {
-    // Parse the date string as UTC
-    const date = new Date(`${dateString}T00:00:00Z`);
-    // Get UTC components
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
-    const year = date.getUTCFullYear();
-    return `${day}/${month}/${year}`;
-};
-  
-  // Format trade status - replace "Not Executed" with "-"
-  const formatTradeStatus = (status: string) => {
-    return status === "Not Executed" ? "-" : status;
+  const formatTradeStatus = (status: string | undefined | null): string => {
+    if (status === undefined || status === null) return "-";
+    return String(status).trim() || "-";
   };
 
-  // Get sort icon
   const getSortIcon = (field: keyof TradeHistoryItem) => {
     if (sortField !== field) return null;
-    return sortDirection === "asc" ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />;
+    return sortDirection === "asc" 
+      ? <ChevronUp className="h-4 w-4 ml-1" /> 
+      : <ChevronDown className="h-4 w-4 ml-1" />;
   };
-  
-  // Check if we have any data to display
-  const hasData = filteredTradeHistory.length > 0;
-  
-  // Show a message if no data is available for the selected period
-  if (!hasData && !isLoading) {
+
+  // Columns configuration
+  const columns = [
+    { id: "date", label: "Date", width: "w-24" },
+    { id: "entryPrice", label: "Open", width: "w-20" },
+    { id: "high", label: "High", width: "w-20" },
+    { id: "low", label: "Low", width: "w-20" },
+    { id: "exitPrice", label: "Close", width: "w-20" },
+    { id: "volume", label: "Volume", width: "w-24" },
+    { id: "suggestedEntryPrice", label: "Suggested Entry", width: "w-28" },
+    { id: "actualPrice", label: "Actual Price", width: "w-24" },
+    { id: "trade", label: "Trade", width: "w-20" },
+    { id: "lotSize", label: "Lot Size", width: "w-20" },
+    { id: "stopPrice", label: "Stop Price", width: "w-24" },
+    { id: "profitLoss", label: "Profit/Loss", width: "w-28" },
+    { id: "currentCapital", label: "Current Capital", width: "w-32" }
+  ];
+
+  if (!processedData.length && !isLoading) {
     return (
       <Alert className="mt-4">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>No data available</AlertTitle>
         <AlertDescription>
-          No trade history data is available for the selected stock in the {params.period} period. 
-          Try selecting a different time period or asset.
+          No trade history data is available for the selected stock with the current parameters.
         </AlertDescription>
       </Alert>
     );
   }
-  
-  return <div className="w-full flex flex-col gap-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Capital Evolution Chart (3/4 width) */}
-        <div className="md:col-span-3 h-[400px] bg-card rounded-lg border p-4">
+
+  return (
+    <div className="w-full flex flex-col gap-6">
+      {/* Chart and Setup Panel */}
+      <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
+        {/* Chart */}
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
-          <ResponsiveContainer width="100%" height="85%">
-            <LineChart data={filteredCapitalEvolution}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" tickFormatter={dateString => formatDate(dateString)} stroke="#64748b" />
-              <YAxis tickFormatter={value => `$${value.toLocaleString()}`} stroke="#64748b" />
-              <Tooltip content={({
-              active,
-              payload
-            }) => {
-              if (active && payload && payload.length) {
-                const data = payload[0].payload;
-                return <div className="bg-background border rounded-md p-2 shadow-md">
-                        <p className="text-sm font-medium">{formatDate(data.date)}</p>
-                        <p className="text-sm">Capital: {formatCurrency(data.capital)}</p>
-                      </div>;
-              }
-              return null;
-            }} />
-              <Line type="monotone" dataKey="capital" stroke="#8b5cf6" strokeWidth={2} dot={{
-              r: 4,
-              strokeWidth: 2
-            }} activeDot={{
-              r: 6
-            }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={result.capitalEvolution || []}>
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={formatDate}
+                  stroke="#64748b"
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  tickFormatter={formatCurrency}
+                  stroke="#64748b"
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip 
+                  content={({ active, payload }) => (
+                    active && payload?.length ? (
+                      <div className="bg-background border rounded-md p-3 shadow-lg">
+                        <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      </div>
+                    ) : null
+                  )}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="capital" 
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         
-        {/* Stock Setup Panel (1/4 width) */}
-        <div className="md:col-span-1 bg-card rounded-lg border p-4">
+        {/* Setup Panel */}
+        <div ref={setupPanelRef} className={`${isMobile ? 'order-1' : 'md:col-span-1'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Stock Setup</h3>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Reference Price</label>
-              <Select value={refPrice} onValueChange={value => setRefPrice(value as "open" | "high" | "low" | "close")} disabled={isLoading}>
+              <Select 
+                value={refPrice} 
+                onValueChange={(v) => setRefPrice(v as any)}
+                disabled={isLoading}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select reference price" />
+                  <SelectValue placeholder="Select price" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="open">Open</SelectItem>
@@ -226,124 +256,134 @@ export function StockDetailsTable({
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Entry Price</label>
+              <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
-                <Input type="text" value={entryPercentage} onChange={e => {
-                const value = parseFloat(e.target.value);
-                setEntryPercentage(!isNaN(value) ? value : entryPercentage);
-              }} disabled={isLoading} className="flex-1" />
+                <Input 
+                  type="number"
+                  value={entryPercentage ?? ""}
+                  onChange={(e) => setEntryPercentage(Number(e.target.value) || null)}
+                  disabled={isLoading}
+                  placeholder="e.g. 1.50"
+                />
                 <span className="ml-2">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Stop Price</label>
+              <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
-                <Input type="text" value={stopPercentage} onChange={e => {
-                const value = parseFloat(e.target.value);
-                setStopPercentage(!isNaN(value) ? value : stopPercentage);
-              }} disabled={isLoading} className="flex-1" />
+                <Input 
+                  type="number"
+                  value={stopPercentage ?? ""}
+                  onChange={(e) => setStopPercentage(Number(e.target.value) || null)}
+                  disabled={isLoading}
+                  placeholder="e.g. 2.00"
+                />
                 <span className="ml-2">%</span>
               </div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Initial Capital</label>
-              <Input type="text" value={initialCapital} onChange={e => {
-              const value = parseFloat(e.target.value);
-              setInitialCapital(!isNaN(value) ? value : initialCapital);
-            }} disabled={isLoading} />
+              <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
+              <Input 
+                type="number"
+                value={initialCapital ?? ""}
+                onChange={(e) => setInitialCapital(Number(e.target.value) || null)}
+                disabled={isLoading}
+                placeholder="e.g. 10000.00"
+              />
             </div>
             
-            <Button onClick={handleUpdateResults} className="w-full" disabled={isLoading}>
-              Update Results
+            <Button 
+              onClick={handleUpdateResults} 
+              className="w-full" 
+              disabled={isLoading}
+            >
+              {isLoading ? 'Updating...' : 'Update Results'}
             </Button>
           </div>
         </div>
       </div>
       
-      {/* Stock Details Table */}
+      {/* Table */}
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("date")}>
-                  <div className="flex items-center justify-center">
-                    Date {getSortIcon("date")}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("entryPrice")}>
-                  <div className="flex items-center justify-center">
-                    Open {getSortIcon("entryPrice")}
-                  </div>
-                </TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("exitPrice")}>
-                  <div className="flex items-center justify-center">
-                    Close {getSortIcon("exitPrice")}
-                  </div>
-                </TableHead>
-                <TableHead className="text-center">High</TableHead>
-                <TableHead className="text-center">Low</TableHead>
-                <TableHead className="text-center">Volume</TableHead>
-                <TableHead className="text-center">Suggested Entry</TableHead>
-                <TableHead className="text-center">Actual Price</TableHead>
-                <TableHead className="text-center">Trade</TableHead>
-                <TableHead className="text-center">Lot Size</TableHead>
-                <TableHead className="text-center">Stop Price</TableHead>
-                <TableHead className="text-center">Stop Trigger</TableHead>
-                <TableHead className="cursor-pointer text-center" onClick={() => handleSortChange("profit")}>
-                  <div className="flex items-center justify-center">
-                    Profit/ Loss {getSortIcon("profit")}
-                  </div>
-                </TableHead>
-                <TableHead className="text-center">Current Capital</TableHead>
+                {columns.map((column) => (
+                  <TableHead 
+                    key={column.id}
+                    className={`text-center px-2 py-2 text-sm cursor-pointer ${column.width}`}
+                    onClick={() => handleSortChange(column.id as keyof TradeHistoryItem)}
+                  >
+                    <div className="flex items-center justify-center">
+                      {column.label} {getSortIcon(column.id as keyof TradeHistoryItem)}
+                    </div>
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentData.length === 0 ? (
+              {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center py-4 text-muted-foreground">
-                    No data available for the selected period
+                  <TableCell colSpan={columns.length} className="text-center py-6">
+                    Loading data...
+                  </TableCell>
+                </TableRow>
+              ) : currentData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-6">
+                    No data to display
                   </TableCell>
                 </TableRow>
               ) : (
-                currentData.map((trade, index) => (
-                  <TableRow key={trade.date}>
-                    <TableCell>{formatDate(trade.date)}</TableCell>
-                    <TableCell>{trade.entryPrice.toFixed(2)}</TableCell>
-                    <TableCell>{trade.exitPrice.toFixed(2)}</TableCell>
-                    <TableCell>
-                      {trade.high ? trade.high.toFixed(2) : (trade.exitPrice * 1.005).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {trade.low ? trade.low.toFixed(2) : (trade.entryPrice * 0.995).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {trade.volume ? trade.volume.toLocaleString() : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {params.operation === "buy" 
-                        ? (trade.entryPrice * (1 - params.entryPercentage / 100)).toFixed(2) 
-                        : (trade.entryPrice * (1 + params.entryPercentage / 100)).toFixed(2)}
-                    </TableCell>
-                    <TableCell>{trade.entryPrice.toFixed(2)}</TableCell>
-                    <TableCell>{formatTradeStatus(trade.trade)}</TableCell>
-                    <TableCell>
-                      {Math.floor((filteredCapitalEvolution[Math.max(0, index - 1)]?.capital || params.initialCapital) / trade.entryPrice / 10) * 10}
-                    </TableCell>
-                    <TableCell>
-                      {params.operation === "buy" 
-                        ? (trade.entryPrice * (1 - params.stopPercentage / 100)).toFixed(2) 
-                        : (trade.entryPrice * (1 + params.stopPercentage / 100)).toFixed(2)}
-                    </TableCell>
-                    <TableCell>{trade.stop || "-"}</TableCell>
-                    <TableCell className={trade.profit >= 0 ? "text-green-600" : "text-red-600"}>
-                      {formatCurrency(trade.profit)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCurrency(filteredCapitalEvolution[index]?.capital || params.initialCapital)}
-                    </TableCell>
+                currentData.map((item) => (
+                  <TableRow 
+                    key={`${item.date}-${item.profitLoss}`}
+                    className={
+                      item.trade === "Buy" ? "bg-green-50 hover:bg-green-100" :
+                      item.trade === "Sell" ? "bg-red-50 hover:bg-red-100" :
+                      "hover:bg-muted/50"
+                    }
+                  >
+                    {columns.map((column) => {
+                      const value = item[column.id as keyof TradeHistoryItem];
+                      let formattedValue = "-";
+                      
+                      if (value !== undefined && value !== null) {
+                        if (column.id === "date") {
+                          formattedValue = formatDate(value as string);
+                        } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                          formattedValue = formatCurrency(value as number);
+                        } else if (column.id === "volume" || column.id === "lotSize") {
+                          formattedValue = (value as number).toLocaleString();
+                        } else if (typeof value === "number") {
+                          formattedValue = value.toFixed(2);
+                        } else {
+                          formattedValue = String(value);
+                        }
+                      }
+                      
+                      return (
+                        <TableCell 
+                          key={column.id}
+                          className={`text-center px-2 py-2 text-sm ${
+                            column.id === "currentCapital" ? "font-medium" : ""
+                          } ${
+                            column.id === "profitLoss" ? 
+                              (Number(item.profitLoss) > 0 ? "text-green-600" : 
+                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                          } ${
+                            column.id === "trade" ?
+                              (item.trade === "Buy" ? "text-green-600" :
+                               item.trade === "Sell" ? "text-red-600" : "") : ""
+                          }`}
+                        >
+                          {formattedValue}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}
@@ -351,42 +391,63 @@ export function StockDetailsTable({
           </Table>
         </div>
         
-        {/* Pagination and Items Per Page */}
-        <div className="flex flex-col sm:flex-row justify-between items-center p-4">
-          <div className="flex items-center mb-4 sm:mb-0">
-            <span className="text-sm mr-2">Items per page:</span>
-            <Select value={String(itemsPerPage)} onValueChange={value => {
-            setItemsPerPage(Number(value));
-            setCurrentPage(1); // Reset to first page when changing items per page
-          }}>
-              <SelectTrigger className="w-[80px]">
-                <SelectValue placeholder="10" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="500">500</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {totalPages > 0 && (
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
+            <div className="flex items-center gap-2 mb-4 sm:mb-0">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <select
+                className="bg-card border rounded px-2 py-1 text-sm"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {[10, 25, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+            
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} className={currentPage === 1 ? "pointer-events-none opacity-50" : ""} />
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  />
                 </PaginationItem>
                 
-                {paginationLinks()}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = currentPage <= 3
+                    ? i + 1
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        isActive={currentPage === pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
                 
                 <PaginationItem>
-                  <PaginationNext onClick={() => handlePageChange(currentPage + 1)} className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""} />
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-    </div>;
+    </div>
+  );
 }
