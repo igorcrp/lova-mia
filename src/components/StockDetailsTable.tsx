@@ -63,7 +63,7 @@ export function StockDetailsTable({
     // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
-      profitLoss: Number(item.profit) || 0,
+      profitLoss: Number(item.profitLoss) || 0,
       currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
         ? Number(item.currentCapital) 
         : undefined,
