@@ -496,6 +496,7 @@ const analysis = {
           results.push({
             assetCode: stock.code,
             assetName: stock.name || stock.code,
+            tradeDetails: tradeHistory, // Rename to tradeDetails to match frontend expectation
             lastCurrentCapital: capitalEvolution.length > 0 
               ? capitalEvolution[capitalEvolution.length - 1].capital 
               : params.initialCapital,
