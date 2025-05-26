@@ -614,10 +614,10 @@ const analysis = {
             ? ((stopPrice as number) - (actualPrice as number)) * lotSize
             : ((actualPrice as number) - (stopPrice as number)) * lotSize;
         } else {
-          // Otherwise, calculate based on close price of the next day
+          // Otherwise, calculate based on close price of the current day
           profit = params.operation === 'buy'
-            ? (nextData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - nextData.close) * lotSize;
+            ? (currentData.close - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - currentData.close) * lotSize;
         }
       }
       
