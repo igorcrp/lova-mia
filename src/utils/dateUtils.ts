@@ -75,7 +75,7 @@ export function getStartDateForPeriod(period: string): Date {
       case 'wtd':
       const dayOfWeek = today.getDay();
       // Ajuste para começar na segunda-feira (1) em vez de domingo (0)
-      startDate = subDays(today, dayOfWeek); // Go back to Sunday
+      subDays(today, dayOfWeek === 0 ? 6 : dayOfWeek - 1); // Go back to Sunday
       break;
     case '1w':
     case '1 week':
