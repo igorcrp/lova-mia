@@ -593,15 +593,15 @@ const analysis = {
         ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
         : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
       
-      // Determine if stop is triggered
+      // Determine if stop is triggered (using current day's data for Daytrade)
       let stop = undefined;
-      if (trade === "Executed" && i < sortedData.length - 1) {
+      if (trade === "Executed" && stopPrice !== '-') { // Check if trade executed and stop price is valid
         if (params.operation === 'buy') {
-          // Buy: If Low < Stop Price → "Executed"
-          stop = stopPrice !== '-' && nextData.low < stopPrice ? "Executed" : undefined;
+          // Buy: If current day's Low < Stop Price → "Executed"
+          stop = currentData.low < stopPrice ? "Executed" : undefined;
         } else {
-          // Sell: If High > Stop Price → "Executed"
-          stop = stopPrice !== '-' && nextData.high > stopPrice ? "Executed" : undefined;
+          // Sell: If current day's High > Stop Price → "Executed"
+          stop = currentData.high > stopPrice ? "Executed" : undefined;
         }
       }
       
