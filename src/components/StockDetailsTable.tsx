@@ -384,8 +384,9 @@ export function StockDetailsTable({
                           formattedValue = formatCurrency(value as number);
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
-                        } else if (column.id === "stopTrigger") {
-                          formattedValue = item.stopTrigger || "-";
+                        else if (column.id === "stopTrigger") {
+                          const stop = item.stop;
+                          formattedValue = stop === "Executed" ? "Executed" : "-";
                         } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
