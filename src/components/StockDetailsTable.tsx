@@ -372,8 +372,19 @@ export function StockDetailsTable({
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
-                          // Display the value from the API (item.stop)
-                          formattedValue = item.stop ? String(item.stop) : "-";
+                          // Recalculate based on formula to ensure consistency
+                          const stopPriceNum = Number(item.stopPrice);
+                          const lowNum = Number(item.low);
+                          const highNum = Number(item.high);
+                          let isTriggered = false;
+                          if (item.trade === "Executed" && !isNaN(stopPriceNum)) {
+                            if (params.operation === "buy" && !isNaN(lowNum) && lowNum < stopPriceNum) {
+                              isTriggered = true;
+                            } else if (params.operation === "sell" && !isNaN(highNum) && highNum > stopPriceNum) {
+                              isTriggered = true;
+                            }
+                          }
+                          formattedValue = isTriggered ? "Executed" : "-";
                         } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
