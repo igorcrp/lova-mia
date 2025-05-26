@@ -58,38 +58,52 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Results already contain pre-calculated metrics from the API
-  // No need for calculateMetrics function here
-
-  // Sort results directly using pre-calculated metrics
-  const sortedResults = [...results].sort((a, b) => {
-    // Ensure metrics exist, default to 0 if not
-    const safeA = { ...a, profits: a.profits ?? 0, losses: a.losses ?? 0, stops: a.stops ?? 0 };
-    const safeB = { ...b, profits: b.profits ?? 0, losses: b.losses ?? 0, stops: b.stops ?? 0 };
-
-    const fieldA = safeA[sortConfig.field];
-    const fieldB = safeB[sortConfig.field];
+  // Function to calculate all metrics based on tradeDetails
+  const calculateMetrics = (result: AnalysisResult) => {
+    // Add null check for tradeDetails
+    const tradeDetails = result.tradeDetails || [];
     
-    // Handle string comparison for assetCode
-    if (sortConfig.field === 'assetCode') {
-      return sortConfig.direction === "asc" 
-        ? String(fieldA).localeCompare(String(fieldB)) 
-        : String(fieldB).localeCompare(String(fieldA));
-    }
+    const profits = tradeDetails.filter(
+      detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
+    ).length;
+    
+    const losses = tradeDetails.filter(
+      detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
+    ).length;
+    
+    const stops = tradeDetails.filter(
+      detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
+    ).length;
+    
+    const profitPercentage = result.trades > 0 ? (profits / result.trades) * 100 : 0;
+    const lossPercentage = result.trades > 0 ? (losses / result.trades) * 100 : 0;
+    const stopPercentage = result.trades > 0 ? (stops / result.trades) * 100 : 0;
+    
+    return {
+      profits,
+      profitPercentage,
+      losses,
+      lossPercentage,
+      stops,
+      stopPercentage
+    };
+  };
 
-    // Handle numeric comparison for other fields
-    const numA = Number(fieldA);
-    const numB = Number(fieldB);
+  // Add metrics to results for sorting
+  const resultsWithMetrics = results.map(result => ({
+    ...result,
+    ...calculateMetrics(result)
+  }));
 
-    if (isNaN(numA) || isNaN(numB)) {
-        // Handle cases where conversion might fail, though unlikely with defaults
-        return 0; 
-    }
-
-    if (numA < numB) {
+  // Sort results
+  const sortedResults = [...resultsWithMetrics].sort((a, b) => {
+    const fieldA = a[sortConfig.field];
+    const fieldB = b[sortConfig.field];
+    
+    if (fieldA < fieldB) {
       return sortConfig.direction === "asc" ? -1 : 1;
     }
-    if (numA > numB) {
+    if (fieldA > fieldB) {
       return sortConfig.direction === "asc" ? 1 : -1;
     }
     return 0;
