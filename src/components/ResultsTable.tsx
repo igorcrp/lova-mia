@@ -1,3 +1,4 @@
+
 import { AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,20 +22,8 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-interface TradeDetail {
-  profitLoss: number;
-  trade: string;
-  stop: string;
-}
-
 interface AnalysisResult {
-  assetCode: string;
-  tradingDays: number;
-  trades: number;
-  tradePercentage: number;
-  finalCapital: number;
   lastCurrentCapital?: number;
-  tradeDetails: TradeDetail[];
 }
 
 interface ResultsTableProps {
@@ -53,7 +42,11 @@ type SortField =
   | "lossPercentage"
   | "stops"
   | "stopPercentage"
-  | "finalCapital";
+  | "finalCapital"
+  | "profit"
+  | "sharpeRatio"
+  | "sortinoRatio"
+  | "recoveryFactor";
 
 interface SortConfig {
   field: SortField;
@@ -68,42 +61,8 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Função para calcular todas as métricas baseadas nos tradeDetails
-  const calculateMetrics = (result: AnalysisResult) => {
-    const profits = result.tradeDetails.filter(
-      detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
-    ).length;
-    
-    const losses = result.tradeDetails.filter(
-      detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
-    ).length;
-    
-    const stops = result.tradeDetails.filter(
-      detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
-    ).length;
-    
-    const profitPercentage = result.trades > 0 ? (profits / result.trades) * 100 : 0;
-    const lossPercentage = result.trades > 0 ? (losses / result.trades) * 100 : 0;
-    const stopPercentage = result.trades > 0 ? (stops / result.trades) * 100 : 0;
-    
-    return {
-      profits,
-      profitPercentage,
-      losses,
-      lossPercentage,
-      stops,
-      stopPercentage
-    };
-  };
-
-  // Adiciona as métricas calculadas aos resultados para ordenação
-  const resultsWithMetrics = results.map(result => ({
-    ...result,
-    ...calculateMetrics(result)
-  }));
-
   // Sort results
-  const sortedResults = [...resultsWithMetrics].sort((a, b) => {
+  const sortedResults = [...results].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -151,6 +110,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
     const maxVisiblePages = 5;
     
     if (totalPages <= maxVisiblePages) {
+      // Show all pages if there are few pages
       for (let i = 1; i <= totalPages; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -164,6 +124,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
     } else {
+      // Always show first page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink
@@ -175,6 +136,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         </PaginationItem>
       );
       
+      // Show ellipsis if not near the start
       if (page > 3) {
         items.push(
           <PaginationItem key="start-ellipsis">
@@ -183,15 +145,18 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
+      // Calculate range of visible pages
       let startPage = Math.max(2, page - 1);
       let endPage = Math.min(totalPages - 1, page + 1);
       
+      // Adjust if at edges
       if (page <= 3) {
         endPage = Math.min(totalPages - 1, 4);
       } else if (page >= totalPages - 2) {
         startPage = Math.max(2, totalPages - 3);
       }
       
+      // Add visible page numbers
       for (let i = startPage; i <= endPage; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -205,6 +170,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
+      // Show ellipsis if not near the end
       if (page < totalPages - 2) {
         items.push(
           <PaginationItem key="end-ellipsis">
@@ -213,6 +179,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
         );
       }
       
+      // Always show last page
       items.push(
         <PaginationItem key={totalPages}>
           <PaginationLink
@@ -355,21 +322,27 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
                     <TableCell className="text-center">
                       {result.tradePercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">{result.profits}</TableCell>
+                    <TableCell className="text-center">
+                      {result.profits}
+                    </TableCell>
                     <TableCell className={cn(
                       "text-center",
                       "text-green-600 dark:text-green-400"
                     )}>
                       {result.profitPercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">{result.losses}</TableCell>
+                    <TableCell className="text-center">
+                      {result.losses}
+                    </TableCell>
                     <TableCell className={cn(
                       "text-center",
                       "text-red-600 dark:text-red-400"
                     )}>
                       {result.lossPercentage.toFixed(2)}%
                     </TableCell>
-                    <TableCell className="text-center">{result.stops}</TableCell>
+                    <TableCell className="text-center">
+                      {result.stops}
+                    </TableCell>
                     <TableCell className="text-center">
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
