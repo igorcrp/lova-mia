@@ -115,8 +115,12 @@ export function StockDetailsTable({
     return links;
   };
 
-  // Format currency function
-  const formatCurrency = (amount: number) => {
+  // Format currency function (handles NaN)
+  const formatCurrency = (amount: number | null | undefined) => {
+    // Check if amount is a valid number
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      return "$0.00"; // Or return "-" or "N/A"
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
