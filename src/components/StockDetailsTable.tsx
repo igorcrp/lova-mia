@@ -30,9 +30,11 @@ export function StockDetailsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage ?? null);
-  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage ?? null);
+  const [entryPercentage, setEntryPercentage] = useState<number | string | null>(params.entryPercentage ?? null);
+  const [stopPercentage, setStopPercentage] = useState<number | string | null>(params.stopPercentage ?? null);
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
+  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
+  const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(400);
@@ -296,11 +298,21 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="number"
-                  value={entryPercentage ?? ""}
-                  onChange={(e) => setEntryPercentage(Number(e.target.value) || null)}
+                  type="text" // Changed from number
+                  inputMode="decimal" // Added for mobile
+                  value={isEntryPriceFocused 
+                         ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
+                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
+                  onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
+                  onFocus={() => setIsEntryPriceFocused(true)}
+                  onBlur={() => {
+                    handleBlurFormatting(entryPercentage, setEntryPercentage);
+                    setIsEntryPriceFocused(false);
+                  }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
+                  min="0" // Added for semantics
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -310,11 +322,21 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="number"
-                  value={stopPercentage ?? ""}
-                  onChange={(e) => setStopPercentage(Number(e.target.value) || null)}
+                  type="text" // Changed from number
+                  inputMode="decimal" // Added for mobile
+                  value={isStopPriceFocused 
+                         ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
+                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
+                  onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
+                  onFocus={() => setIsStopPriceFocused(true)}
+                  onBlur={() => {
+                    handleBlurFormatting(stopPercentage, setStopPercentage);
+                    setIsStopPriceFocused(false);
+                  }}
                   disabled={isLoading}
                   placeholder="e.g. 2.00"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
+                  min="0" // Added for semantics
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -490,3 +512,57 @@ export function StockDetailsTable({
     </div>
   );
 }
+
+
+  // Função auxiliar para lidar com a entrada de números decimais positivos
+  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
+    if (value === "") {
+      onChange(null); // Permite campo vazio temporariamente
+      return;
+    }
+    // Regex para permitir números positivos com até 2 casas decimais
+    // Permite iniciar com "." ou "0."
+    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+    if (regex.test(value)) {
+      // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
+      if (value === "." || value.endsWith(".")) {
+         onChange(value); // Mantém como string temporariamente para permitir digitação
+      } else {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue >= 0) {
+          onChange(numValue);
+        }
+      }
+    } else if (value === "-") { // Impede digitar negativo
+      // Não faz nada se tentar digitar "-" 
+    } else {
+      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+         // Formata para 2 casas decimais se for um número válido colado
+         onChange(parseFloat(numValue.toFixed(2)));
+      } else if (value === "") {
+         onChange(null);
+      }
+    }
+  };
+
+  // Função auxiliar para formatar no blur
+  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
+    let numValue = 0;
+    if (typeof value === "string") {
+      // Se for só um ponto, trata como 0
+      if (value === ".") {
+        numValue = 0;
+      } else {
+        numValue = parseFloat(value) || 0;
+      }
+    } else if (typeof value === "number") {
+      numValue = value;
+    } else if (value === null || value === undefined) {
+      onChange(null); // Mantém nulo se estava vazio
+      return;
+    }
+    // Garante que seja positivo e formata
+    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+  };
