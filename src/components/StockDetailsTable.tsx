@@ -239,6 +239,7 @@ export function StockDetailsTable({
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
               >
                 <Tooltip 
+                  cursor={false} // Remove vertical line on hover
                   content={({ active, payload }) => (
                     active && payload?.length ? (
                       <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
