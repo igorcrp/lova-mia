@@ -351,37 +351,28 @@ export function StockSetupForm({
                            loadingState.assetClasses || 
                            loadingState.assets;
 
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | null) => void) => {
+   // Função auxiliar para lidar com a entrada de números decimais positivos (atualizada)
+  const handleDecimalInputChange = (value: string, onChange: (val: string | null) => void) => {
     if (value === "") {
-      onChange(null); // Permite campo vazio temporariamente
+      onChange(null); // Permite campo vazio
       return;
     }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com '.' ou '0.'
-    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      // Se o valor for apenas '.', ou terminar com '.', não converte para float ainda
-      if (value === '.' || value.endsWith('.')) {
-         onChange(value as any); // Mantém como string temporariamente para permitir digitação
-      } else {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue >= 0) {
-          onChange(numValue);
-        }
-      }
-    } else if (value === '-') { // Impede digitar negativo
-      // Não faz nada se tentar digitar '-' 
-    } else {
-      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue) && numValue >= 0) {
-         // Formata para 2 casas decimais se for um número válido colado
-         onChange(parseFloat(numValue.toFixed(2)));
-      } else if (value === '') {
-         onChange(null);
-      }
+
+    // Impede números negativos
+    if (value.startsWith('-')) {
+      return; // Não atualiza, impede digitação do '-'
     }
+
+    // Regex para permitir números positivos (incluindo 0) com até 2 casas decimais.
+    // Permite: 1, 1., 1.0, 1.05, 0, 0., 0.0, 0.05, .5, .05
+    const regex = /^\d*(\.\d{0,2})?$/;
+
+    if (regex.test(value)) {
+      // Passa o valor como string para permitir digitação (ex: "1.", ".0")
+      onChange(value);
+    }
+    // Se não passar no regex (ex: "1.055", "abc"), não chama onChange,
+    // impedindo a atualização do input com valor inválido.
   };
 
   // Função auxiliar para formatar no blur
@@ -793,4 +784,3 @@ export function StockSetupForm({
     </Form>
   );
 }
-
