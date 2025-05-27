@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -234,39 +235,46 @@ export function StockDetailsTable({
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={result.capitalEvolution || []}>
+              <AreaChart data={result.capitalEvolution || []}>
+                <defs>
+                  <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
                 <XAxis 
                   dataKey="date" 
-                  tickFormatter={formatDate}
-                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
+                  tick={false}
                 />
                 <YAxis 
-                  tickFormatter={formatCurrency}
-                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
+                  tick={false}
+                  domain={['dataMin - 100', 'dataMax + 100']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-3 shadow-lg">
-                        <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
-                        <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      <div className="bg-background border rounded-md p-2 shadow-lg">
+                        <p className="text-xs font-medium">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-xs text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
                 />
-                <Line 
+                <Area 
                   type="monotone" 
                   dataKey="capital" 
                   stroke="#8b5cf6"
                   strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6 }}
+                  fill="url(#capitalGradient)"
+                  fillOpacity={1}
+                  animationDuration={2000}
+                  animationBegin={0}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
