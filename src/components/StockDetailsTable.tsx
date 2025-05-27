@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -234,7 +234,7 @@ export function StockDetailsTable({
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
+              <LineChart
                 data={result.capitalEvolution || []}
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
               >
@@ -249,25 +249,27 @@ export function StockDetailsTable({
                   )}
                 />
                 <defs>
-                  <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
                 </defs>
-                <Area
+                <Line
                   type="monotone"
                   dataKey="capital"
-                  stroke="#8b5cf6"
-                  fillOpacity={1}
-                  fill="url(#capitalGradient)"
+                  stroke="#00ffff" // Neon cyan color
                   strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6, strokeWidth: 2, fill: '#8b5cf6' }}
+                  dot={false} // No dots by default, maybe add activeDot styling
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
+                  filter="url(#glow)" // Apply glow effect
                   isAnimationActive={true}
                   animationDuration={2000}
                   animationEasing="ease-in-out"
                 />
-              </AreaChart>
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
