@@ -46,6 +46,8 @@ export function StockSetupForm({
   const [comparisonStockInput, setComparisonStockInput] = useState("");
   const [selectedStocks, setSelectedStocks] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
+  const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   // Form setup with react-hook-form
   const form = useForm<StockAnalysisParams>({
@@ -594,7 +596,7 @@ export function StockSetupForm({
             )}
           />
 
-          {/* Campo % Entry Price Corrigido */}
+          {/* Campo % Entry Price Corrigido com controle de foco */}
           <FormField
             control={form.control}
             name="entryPercentage"
@@ -607,10 +609,16 @@ export function StockSetupForm({
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
-                      // CORRECTED VALUE PROP: Reflects state directly, allows typing
-                      value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                      // VALUE: Show formatted value only when NOT focused
+                      value={isEntryPriceFocused 
+                             ? (field.value === null || field.value === undefined ? '' : String(field.value)) 
+                             : (typeof field.value === 'number' ? field.value.toFixed(2) : '')}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
-                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // Formatting happens here
+                      onFocus={() => setIsEntryPriceFocused(true)}
+                      onBlur={() => {
+                        handleBlurFormatting(field.value, field.onChange); // Format and update state first
+                        setIsEntryPriceFocused(false); // Then update focus state
+                      }}
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0" // Atributo HTML para semântica e validação básica
                     />
@@ -622,7 +630,7 @@ export function StockSetupForm({
             )}
           />
 
-          {/* Campo % Stop Corrigido */}
+          {/* Campo % Stop Corrigido com controle de foco */}
           <FormField
             control={form.control}
             name="stopPercentage"
@@ -635,10 +643,16 @@ export function StockSetupForm({
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
-                      // CORRECTED VALUE PROP: Reflects state directly, allows typing
-                      value={field.value === null || field.value === undefined ? '' : String(field.value)}
+                      // VALUE: Show formatted value only when NOT focused
+                      value={isStopPriceFocused 
+                             ? (field.value === null || field.value === undefined ? '' : String(field.value)) 
+                             : (typeof field.value === 'number' ? field.value.toFixed(2) : '')}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
-                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // Formatting happens here
+                      onFocus={() => setIsStopPriceFocused(true)}
+                      onBlur={() => {
+                        handleBlurFormatting(field.value, field.onChange); // Format and update state first
+                        setIsStopPriceFocused(false); // Then update focus state
+                      }}
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0" // Atributo HTML para semântica e validação básica
                     />
