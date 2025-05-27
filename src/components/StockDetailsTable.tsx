@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -228,19 +228,25 @@ export function StockDetailsTable({
       {/* Chart and Setup Panel */}
       <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
         {/* Chart */}
-        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-slate-900 rounded-lg border border-slate-800 p-6 relative overflow-hidden`}>
-          <h3 className="text-lg font-medium mb-4 text-cyan-400 relative z-10">Capital Evolution</h3>
-          <div className="h-[300px] relative z-10" style={{ margin: '-20px -20px -20px -20px' }}>
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-slate-900 rounded-lg border border-slate-800 p-4 relative overflow-hidden`}>
+          <h3 className="text-lg font-medium mb-4 text-white relative z-10">Capital Evolution</h3>
+          <div className="h-[300px] w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart 
                 data={result.capitalEvolution || []}
-                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
               >
                 <defs>
                   <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="50%" stopColor="#1e40af" stopOpacity={0.4}/>
+                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.9}/>
+                    <stop offset="30%" stopColor="#f59e0b" stopOpacity={0.7}/>
+                    <stop offset="70%" stopColor="#d97706" stopOpacity={0.4}/>
                     <stop offset="100%" stopColor="#000000" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#fbbf24"/>
+                    <stop offset="50%" stopColor="#f59e0b"/>
+                    <stop offset="100%" stopColor="#d97706"/>
                   </linearGradient>
                 </defs>
                 <XAxis 
@@ -253,14 +259,14 @@ export function StockDetailsTable({
                   hide={true}
                   axisLine={false}
                   tickLine={false}
-                  domain={['dataMin', 'dataMax']}
+                  domain={['dataMin - 1000', 'dataMax + 1000']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-slate-800/95 backdrop-blur-sm border border-cyan-400/30 rounded-lg px-3 py-2 shadow-lg">
-                        <p className="font-medium text-xs text-cyan-300">{formatDate(payload[0].payload.date)}</p>
-                        <p className="text-cyan-400 text-xs font-bold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      <div className="bg-slate-800/95 backdrop-blur-sm border border-amber-400/30 rounded-lg px-3 py-2 shadow-lg">
+                        <p className="font-medium text-xs text-amber-300">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-amber-400 text-xs font-bold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
@@ -268,15 +274,21 @@ export function StockDetailsTable({
                 <Area 
                   type="monotone" 
                   dataKey="capital" 
-                  stroke="#3b82f6"
-                  strokeWidth={2}
+                  stroke="url(#strokeGradient)"
+                  strokeWidth={3}
                   fill="url(#capitalGradient)"
                   fillOpacity={1}
                   animationBegin={0}
-                  animationDuration={2000}
+                  animationDuration={2500}
                   animationEasing="ease-out"
-                  dot={{ fill: '#3b82f6', strokeWidth: 2, r: 3 }}
-                  activeDot={{ r: 5, fill: '#3b82f6', stroke: '#ffffff', strokeWidth: 2 }}
+                  dot={false}
+                  activeDot={{ 
+                    r: 6, 
+                    fill: '#fbbf24', 
+                    stroke: '#ffffff', 
+                    strokeWidth: 3,
+                    style: { filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6))' }
+                  }}
                 />
               </AreaChart>
             </ResponsiveContainer>
