@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -234,37 +234,38 @@ export function StockDetailsTable({
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={result.capitalEvolution || []}>
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={formatDate}
-                  stroke="#64748b"
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tickFormatter={formatCurrency}
-                  stroke="#64748b"
-                  axisLine={false}
-                  tickLine={false}
-                />
+              <AreaChart
+                data={result.capitalEvolution || []}
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
+              >
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-3 shadow-lg">
-                        <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
+                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
+                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p> {/* Added small bottom margin */}
                         <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="capital" 
+                <defs>
+                  <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="capital"
                   stroke="#8b5cf6"
+                  fillOpacity={1}
+                  fill="url(#capitalGradient)"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 6 }}
+                  activeDot={{ r: 6, strokeWidth: 2, fill: '#8b5cf6' }}
+                  isAnimationActive={true}
+                  animationDuration={2000}
+                  animationEasing="ease-in-out"
                 />
               </LineChart>
             </ResponsiveContainer>
