@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -95,14 +94,14 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
     trade: string;
-    stopPrice: string | number | null;
+    stopPrice?: string | number | null;
     low?: number | string | null;
     high?: number | string | null;
 }
   
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
     // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
+    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null || item.stopPrice === undefined) {
         return "-";
     }
 
@@ -229,50 +228,37 @@ export function StockDetailsTable({
       {/* Chart and Setup Panel */}
       <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
         {/* Chart */}
-        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4 relative overflow-hidden`} style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-slate-900 rounded-lg border border-slate-800 p-6 relative overflow-hidden`}>
           <h3 className="text-lg font-medium mb-4 text-cyan-400 relative z-10">Capital Evolution</h3>
-          <div className="h-[300px] relative z-10">
+          <div className="h-[300px] relative z-10" style={{ margin: '-20px -20px -20px -20px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart 
                 data={result.capitalEvolution || []}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
               >
                 <defs>
                   <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#06d6a0" stopOpacity={0.8}/>
-                    <stop offset="25%" stopColor="#36d9a3" stopOpacity={0.6}/>
-                    <stop offset="50%" stopColor="#5eead4" stopOpacity={0.4}/>
-                    <stop offset="75%" stopColor="#7dd3fc" stopOpacity={0.3}/>
-                    <stop offset="100%" stopColor="#0891b2" stopOpacity={0.1}/>
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="50%" stopColor="#1e40af" stopOpacity={0.4}/>
+                    <stop offset="100%" stopColor="#000000" stopOpacity={0.1}/>
                   </linearGradient>
-                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#06d6a0"/>
-                    <stop offset="25%" stopColor="#10b981"/>
-                    <stop offset="50%" stopColor="#14b8a6"/>
-                    <stop offset="75%" stopColor="#0891b2"/>
-                    <stop offset="100%" stopColor="#0284c7"/>
-                  </linearGradient>
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                    <feMerge> 
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
                 </defs>
                 <XAxis 
                   dataKey="date" 
                   hide={true}
-                  domain={['dataMin', 'dataMax']}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis 
                   hide={true}
-                  domain={['dataMin - 100', 'dataMax + 100']}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={['dataMin', 'dataMax']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-slate-900/90 backdrop-blur-md border border-cyan-400/30 rounded-lg p-2 shadow-2xl shadow-cyan-400/20">
+                      <div className="bg-slate-800/95 backdrop-blur-sm border border-cyan-400/30 rounded-lg px-3 py-2 shadow-lg">
                         <p className="font-medium text-xs text-cyan-300">{formatDate(payload[0].payload.date)}</p>
                         <p className="text-cyan-400 text-xs font-bold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
@@ -282,27 +268,19 @@ export function StockDetailsTable({
                 <Area 
                   type="monotone" 
                   dataKey="capital" 
-                  stroke="url(#strokeGradient)"
-                  strokeWidth={3}
+                  stroke="#3b82f6"
+                  strokeWidth={2}
                   fill="url(#capitalGradient)"
                   fillOpacity={1}
-                  filter="url(#glow)"
                   animationBegin={0}
                   animationDuration={2000}
                   animationEasing="ease-out"
+                  dot={{ fill: '#3b82f6', strokeWidth: 2, r: 3 }}
+                  activeDot={{ r: 5, fill: '#3b82f6', stroke: '#ffffff', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          
-          {/* Grid pattern overlay */}
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: `
-              linear-gradient(rgba(6, 214, 160, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(6, 214, 160, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: '40px 40px'
-          }}></div>
         </div>
         
         {/* Setup Panel */}
