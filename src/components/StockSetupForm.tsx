@@ -607,10 +607,10 @@ export function StockSetupForm({
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
-                      // MODIFIED VALUE PROP: Always format number to 2 decimal places
-                      value={typeof field.value === 'number' ? field.value.toFixed(2) : field.value === null || field.value === undefined ? '' : String(field.value)} 
+                      // CORRECTED VALUE PROP: Reflects state directly, allows typing
+                      value={field.value === null || field.value === undefined ? '' : String(field.value)}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
-                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // handleBlurFormatting already ensures .toFixed(2) on final value
+                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // Formatting happens here
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0" // Atributo HTML para semântica e validação básica
                     />
@@ -635,10 +635,10 @@ export function StockSetupForm({
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
-                      // MODIFIED VALUE PROP: Always format number to 2 decimal places
-                      value={typeof field.value === 'number' ? field.value.toFixed(2) : field.value === null || field.value === undefined ? '' : String(field.value)}
+                      // CORRECTED VALUE PROP: Reflects state directly, allows typing
+                      value={field.value === null || field.value === undefined ? '' : String(field.value)}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
-                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // handleBlurFormatting already ensures .toFixed(2) on final value
+                      onBlur={() => handleBlurFormatting(field.value, field.onChange)} // Formatting happens here
                       className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       min="0" // Atributo HTML para semântica e validação básica
                     />
