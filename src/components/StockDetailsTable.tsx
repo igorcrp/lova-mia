@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
-import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
+import { Area, AreaChart, YAxis, Line, ResponsiveContainer, Tooltip } from "recharts";import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -233,45 +232,44 @@ export function StockDetailsTable({
         <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={result.capitalEvolution || []}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
-              >
-                <Tooltip 
-                  cursor={false} // Remove vertical line on hover
-                  content={({ active, payload }) => (
-                    active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
-                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p> {/* Added small bottom margin */}
-                        <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
-                      </div>
-                    ) : null
-                  )}
-                />
-                <defs>
-                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-                <Line
-                  type="monotone"
-                  dataKey="capital"
-                  stroke="#00ffff" // Neon cyan color
-                  strokeWidth={2}
-                  dot={false} // No dots by default, maybe add activeDot styling
-                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
-                  filter="url(#glow)" // Apply glow effect
-                  isAnimationActive={true}
-                  animationDuration={2000}
-                  animationEasing="ease-in-out"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={result.capitalEvolution || []}
+              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+            >
+              <Tooltip 
+                cursor={false}
+                content={({ active, payload }) => (
+                  active && payload?.length ? (
+                    <div className="bg-background border rounded-md p-2 shadow-lg text-sm">
+                      <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p>
+                      <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                    </div>
+                  ) : null
+                )}
+              />
+              <YAxis /> {/* Eixo Y automático */}
+              <defs>
+                <linearGradient id="capitalArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#00ffff" stopOpacity={0.5}/>
+                  <stop offset="95%" stopColor="#00ffff" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="capital"
+                stroke="#00ffff"
+                fill="url(#capitalArea)"
+                fillOpacity={1}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }}
+                isAnimationActive={true}
+                animationDuration={2000}
+                animationEasing="ease-in-out"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
           </div>
         </div>
         
