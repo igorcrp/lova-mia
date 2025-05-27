@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -94,21 +94,21 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
     trade: string;
-    stopPrice?: string | number | null;
-    low?: number | string | null;
-    high?: number | string | null;
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
 }
   
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
     // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null || item.stopPrice === undefined) {
+    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
         return "-";
     }
 
     // Converte os valores para número
     const stopPrice = Number(item.stopPrice);
-    const low = Number(item.low || 0);
-    const high = Number(item.high || 0);
+    const low = Number(item.low);
+    const high = Number(item.high);
 
     // Verifica se as conversões foram bem sucedidas
     if (isNaN(stopPrice) || isNaN(low) || isNaN(high)) {
@@ -228,69 +228,43 @@ export function StockDetailsTable({
       {/* Chart and Setup Panel */}
       <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
         {/* Chart */}
-        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-slate-900 rounded-lg border border-slate-800 p-4 relative overflow-hidden`}>
-          <h3 className="text-lg font-medium mb-4 text-white relative z-10">Capital Evolution</h3>
-          <div className="h-[300px] w-full relative">
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
+          <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                data={result.capitalEvolution || []}
-                margin={{ top: 20, right: 20, left: 20, bottom: 20 }}
-              >
-                <defs>
-                  <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.9}/>
-                    <stop offset="30%" stopColor="#f59e0b" stopOpacity={0.7}/>
-                    <stop offset="70%" stopColor="#d97706" stopOpacity={0.4}/>
-                    <stop offset="100%" stopColor="#000000" stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#fbbf24"/>
-                    <stop offset="50%" stopColor="#f59e0b"/>
-                    <stop offset="100%" stopColor="#d97706"/>
-                  </linearGradient>
-                </defs>
+              <LineChart data={result.capitalEvolution || []}>
                 <XAxis 
                   dataKey="date" 
-                  hide={true}
+                  tickFormatter={formatDate}
+                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis 
-                  hide={true}
+                  tickFormatter={formatCurrency}
+                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
-                  domain={['dataMin - 1000', 'dataMax + 1000']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-slate-800/95 backdrop-blur-sm border border-amber-400/30 rounded-lg px-3 py-2 shadow-lg">
-                        <p className="font-medium text-xs text-amber-300">{formatDate(payload[0].payload.date)}</p>
-                        <p className="text-amber-400 text-xs font-bold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      <div className="bg-background border rounded-md p-3 shadow-lg">
+                        <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
                 />
-                <Area 
+                <Line 
                   type="monotone" 
                   dataKey="capital" 
-                  stroke="url(#strokeGradient)"
-                  strokeWidth={3}
-                  fill="url(#capitalGradient)"
-                  fillOpacity={1}
-                  animationBegin={0}
-                  animationDuration={2500}
-                  animationEasing="ease-out"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
                   dot={false}
-                  activeDot={{ 
-                    r: 6, 
-                    fill: '#fbbf24', 
-                    stroke: '#ffffff', 
-                    strokeWidth: 3,
-                    style: { filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6))' }
-                  }}
+                  activeDot={{ r: 6 }}
                 />
-              </AreaChart>
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
