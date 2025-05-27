@@ -1,5 +1,3 @@
-
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -7,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -32,11 +30,9 @@ export function StockDetailsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  const [entryPercentage, setEntryPercentage] = useState<number | string | null>(params.entryPercentage ?? null);
-  const [stopPercentage, setStopPercentage] = useState<number | string | null>(params.stopPercentage ?? null);
+  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage ?? null);
+  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage ?? null);
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
-  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
-  const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(400);
@@ -98,14 +94,14 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
     trade: string;
-    stopPrice?: string | number | null;
+    stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
 }
   
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
     // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null || item.stopPrice === undefined) {
+    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
         return "-";
     }
 
@@ -156,9 +152,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : 0,
-      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : 0,
-      initialCapital: Number(initialCapital?.toFixed ? initialCapital.toFixed(2) : initialCapital) || 0
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
   };
@@ -236,59 +232,39 @@ export function StockDetailsTable({
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                data={result.capitalEvolution || []}
-                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-              >
-                <defs>
-                  <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.9}/>
-                    <stop offset="20%" stopColor="#6366f1" stopOpacity={0.8}/>
-                    <stop offset="40%" stopColor="#8b5cf6" stopOpacity={0.7}/>
-                    <stop offset="60%" stopColor="#a855f7" stopOpacity={0.5}/>
-                    <stop offset="80%" stopColor="#c084fc" stopOpacity={0.3}/>
-                    <stop offset="100%" stopColor="#e879f9" stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#3b82f6"/>
-                    <stop offset="50%" stopColor="#8b5cf6"/>
-                    <stop offset="100%" stopColor="#e879f9"/>
-                  </linearGradient>
-                </defs>
+              <LineChart data={result.capitalEvolution || []}>
                 <XAxis 
                   dataKey="date" 
+                  tickFormatter={formatDate}
+                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
-                  tick={false}
                 />
                 <YAxis 
+                  tickFormatter={formatCurrency}
+                  stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
-                  tick={false}
-                  domain={['dataMin * 0.99', 'dataMax * 1.01']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-2 shadow-xl">
-                        <p className="text-xs font-medium text-foreground">{formatDate(payload[0].payload.date)}</p>
-                        <p className="text-xs text-primary font-semibold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      <div className="bg-background border rounded-md p-3 shadow-lg">
+                        <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
                 />
-                <Area 
+                <Line 
                   type="monotone" 
                   dataKey="capital" 
-                  stroke="url(#strokeGradient)"
-                  strokeWidth={3}
-                  fill="url(#capitalGradient)"
-                  fillOpacity={1}
-                  animationDuration={2500}
-                  animationBegin={0}
-                  connectNulls={false}
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 6 }}
                 />
-              </AreaChart>
+              </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -320,21 +296,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
-                  value={isEntryPriceFocused 
-                         ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
-                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
-                  onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
-                  onFocus={() => setIsEntryPriceFocused(true)}
-                  onBlur={() => {
-                    handleBlurFormatting(entryPercentage, setEntryPercentage);
-                    setIsEntryPriceFocused(false);
-                  }}
+                  type="number"
+                  value={entryPercentage ?? ""}
+                  onChange={(e) => setEntryPercentage(Number(e.target.value) || null)}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -344,21 +310,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
-                  value={isStopPriceFocused 
-                         ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
-                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
-                  onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
-                  onFocus={() => setIsStopPriceFocused(true)}
-                  onBlur={() => {
-                    handleBlurFormatting(stopPercentage, setStopPercentage);
-                    setIsStopPriceFocused(false);
-                  }}
+                  type="number"
+                  value={stopPercentage ?? ""}
+                  onChange={(e) => setStopPercentage(Number(e.target.value) || null)}
                   disabled={isLoading}
                   placeholder="e.g. 2.00"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -534,54 +490,3 @@ export function StockDetailsTable({
     </div>
   );
 }
-
-
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-    if (value === "") {
-      onChange(null);
-      return;
-    }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com "." ou "0."
-     const regex = /^(?:\d+)?(?:\.\d{0,2})?$|^\.\d{0,2}$/;
-      if (regex.test(value)) {
-        if (value === "." || value.endsWith(".")) {
-          onChange(value);
-        } else {
-          const numValue = parseFloat(value);
-          if (!isNaN(numValue) && numValue >= 0) {
-            onChange(numValue);
-          }
-        }
-      } else if (value === "-") {// Impede digitar negativo
-      // Não faz nada se tentar digitar "-" 
-      } else {
-        // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue) && numValue >= 0) {
-           // Formata para 2 casas decimais se for um número válido colado
-        onChange(parseFloat(numValue.toFixed(2)));
-      }
-    }
-  };
-
-  // Função auxiliar para formatar no blur
-    const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-      let numValue = 0;
-      if (typeof value === "string") {
-        if (value === ".") {
-          numValue = 0;
-        } else {
-          numValue = parseFloat(value) || 0;
-        }
-      } else if (typeof value === "number") {
-        numValue = value;
-      } else if (value === null || value === undefined) {
-        onChange(null);
-        return;
-      }
-    // Garante que seja positivo e formata
-      onChange(parseFloat(Math.max(0, numValue).toFixed(2)));
-  };
-
