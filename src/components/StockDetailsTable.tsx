@@ -30,12 +30,9 @@ export function StockDetailsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [refPrice, setRefPrice] = useState(params.referencePrice);
-  // Use string | null for input state to handle intermediate values like "1."
-  const [entryPercentageInput, setEntryPercentageInput] = useState<string | null>(params.entryPercentage !== null && params.entryPercentage !== undefined ? String(params.entryPercentage.toFixed(2)) : null);
-  const [stopPercentageInput, setStopPercentageInput] = useState<string | null>(params.stopPercentage !== null && params.stopPercentage !== undefined ? String(params.stopPercentage.toFixed(2)) : null);
+  const [entryPercentage, setEntryPercentage] = useState<number | null>(params.entryPercentage ?? null);
+  const [stopPercentage, setStopPercentage] = useState<number | null>(params.stopPercentage ?? null);
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
-  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
-  const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(400);
@@ -62,6 +59,7 @@ export function StockDetailsTable({
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
     
+    // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
       profitLoss: Number(item.profitLoss) || 0,
@@ -69,9 +67,11 @@ export function StockDetailsTable({
         ? Number(item.currentCapital) 
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
+      // Calculate stop trigger here for consistency
       stopTrigger: calculateStopTrigger(item, params.operation)
     }));
 
+    // Sort data
     return [...data].sort((a, b) => {
       const valA = a[sortField];
       const valB = b[sortField];
@@ -84,6 +84,7 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
+      // Numeric comparison for other fields
       const numA = Number(valA) || 0;
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
@@ -96,24 +97,31 @@ export function StockDetailsTable({
     stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
-  }
+}
   
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+    // Verifica se o item é válido e se a trade foi executada
     if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
         return "-";
     }
+
+    // Converte os valores para número
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
+
+    // Verifica se as conversões foram bem sucedidas
     if (isNaN(stopPrice) || isNaN(low) || isNaN(high)) {
         return "-";
     }
+
+    // Aplica a lógica de stop trigger baseada na operação
     if (operation === 'buy') {
         return low < stopPrice ? "Executed" : "-";
     } else {
         return high > stopPrice ? "Executed" : "-";
     }
-  }
+}
 
   // Pagination
   const totalItems = processedData.length;
@@ -140,66 +148,13 @@ export function StockDetailsTable({
     setCurrentPage(page);
   };
 
-  // --- Helper functions for decimal input (defined inside component) ---
-  const handleDecimalInputChange = (value: string, onChange: (val: string | null) => void) => {
-    if (value === "") {
-      onChange(null);
-      return;
-    }
-    if (value.startsWith('-')) {
-      return;
-    }
-    const regex = /^\d*(\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      onChange(value);
-    }
-  };
-
-  const handleBlurFormatting = (value: string | null | undefined, onChange: (val: string | null) => void) => {
-    let numValue = 0;
-    if (typeof value === 'string') {
-      // Handle cases like '.' or '1.' before parsing
-      if (value === '.' || value.endsWith('.')) {
-         value = value.replace('.', ''); // Treat '.' as empty, '1.' as '1'
-      }
-      numValue = parseFloat(value) || 0;
-    } else if (typeof value === 'number') { // Should not happen with string state, but safe guard
-      numValue = value;
-    }
-    // Format to 2 decimal places and update the string state
-    onChange(Math.max(0, numValue).toFixed(2));
-  };
-  // --- End Helper functions ---
-
   const handleUpdateResults = () => {
-    // Parse the string state to number before updating params
-    const parseAndFormat = (value: string | null | undefined): number => {
-      let numValue = 0;
-      if (typeof value === 'string') {
-        if (value === '.' || value.endsWith('.')) {
-           value = value.replace('.', '');
-        }
-        numValue = parseFloat(value) || 0;
-      }
-      // Ensure positive and format
-      return Math.max(0, parseFloat(numValue.toFixed(2)));
-    };
-
-    const finalEntryPercentage = parseAndFormat(entryPercentageInput);
-    const finalStopPercentage = parseAndFormat(stopPercentageInput);
-    const finalInitialCapital = Number(initialCapital) || 0;
-
-    // Update local state with formatted string values for consistency in display
-    setEntryPercentageInput(finalEntryPercentage.toFixed(2));
-    setStopPercentageInput(finalStopPercentage.toFixed(2));
-    setInitialCapital(finalInitialCapital); // Assuming initialCapital state is fine as number
-
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: finalEntryPercentage,
-      stopPercentage: finalStopPercentage,
-      initialCapital: finalInitialCapital
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
   };
@@ -218,18 +173,16 @@ export function StockDetailsTable({
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return "-";
     try {
-      // Ensure UTC interpretation
-      const date = new Date(`${dateString}T00:00:00Z`); 
-      if (isNaN(date.getTime())) {
-          // Fallback if parsing fails
-          return dateString; 
-      }
+      const date = new Date(`${dateString}T00:00:00Z`);
       const day = String(date.getUTCDate()).padStart(2, '0');
-      const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const year = date.getUTCFullYear();
+      if (isNaN(date.getTime())) {
+          return dateString;
+      }
       return `${day}/${month}/${year}`;
     } catch {
-        return dateString; // Return original on error
+        return dateString;
     }
   };
 
@@ -277,8 +230,7 @@ export function StockDetailsTable({
         {/* Chart */}
         <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
-          {/* Adjust height based on isMobile or keep fixed */} 
-          <div style={{ height: isMobile ? '250px' : chartHeight }}> 
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={result.capitalEvolution || []}>
                 <XAxis 
@@ -287,21 +239,17 @@ export function StockDetailsTable({
                   stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
-                  interval={isMobile ? 'preserveStartEnd' : undefined} // Adjust ticks for mobile
-                  tick={{ fontSize: 10 }} // Smaller font for mobile
                 />
                 <YAxis 
                   tickFormatter={formatCurrency}
                   stroke="#64748b"
                   axisLine={false}
                   tickLine={false}
-                  width={isMobile ? 70 : 80} // Adjust width for mobile
-                  tick={{ fontSize: 10 }}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg text-xs">
+                      <div className="bg-background border rounded-md p-3 shadow-lg">
                         <p className="font-medium">{formatDate(payload[0].payload.date)}</p>
                         <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
@@ -314,7 +262,7 @@ export function StockDetailsTable({
                   stroke="#8b5cf6"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -348,19 +296,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" 
-                  inputMode="decimal" 
-                  value={entryPercentageInput ?? ''} // Use string state directly
-                  onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentageInput)}
-                  onFocus={() => setIsEntryPriceFocused(true)} // Focus state might not be needed anymore
-                  onBlur={() => {
-                    handleBlurFormatting(entryPercentageInput, setEntryPercentageInput);
-                    setIsEntryPriceFocused(false);
-                  }}
+                  type="number"
+                  value={entryPercentage ?? ""}
+                  onChange={(e) => setEntryPercentage(Number(e.target.value) || null)}
                   disabled={isLoading}
-                  placeholder="e.g. 1.05"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  min="0"
+                  placeholder="e.g. 1.50"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -370,19 +310,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" 
-                  inputMode="decimal" 
-                  value={stopPercentageInput ?? ''} // Use string state directly
-                  onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentageInput)}
-                  onFocus={() => setIsStopPriceFocused(true)} // Focus state might not be needed anymore
-                  onBlur={() => {
-                    handleBlurFormatting(stopPercentageInput, setStopPercentageInput);
-                    setIsStopPriceFocused(false);
-                  }}
+                  type="number"
+                  value={stopPercentage ?? ""}
+                  onChange={(e) => setStopPercentage(Number(e.target.value) || null)}
                   disabled={isLoading}
-                  placeholder="e.g. 1.00"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  min="0"
+                  placeholder="e.g. 2.00"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -391,12 +323,11 @@ export function StockDetailsTable({
             <div>
               <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
               <Input 
-                type="number" // Keep as number for simplicity if direct number input is okay
+                type="number"
                 value={initialCapital ?? ""}
-                onChange={(e) => setInitialCapital(Number(e.target.value) || null)} // Basic number handling
+                onChange={(e) => setInitialCapital(Number(e.target.value) || null)}
                 disabled={isLoading}
                 placeholder="e.g. 10000.00"
-                step="0.01" // Optional: suggest step for number input
               />
             </div>
             
@@ -444,55 +375,118 @@ export function StockDetailsTable({
                   </TableCell>
                 </TableRow>
               ) : (
-                currentData.map((item, index) => (
+                currentData.map((item) => (
                   <TableRow 
-                    // Use a more robust key if possible, combining date and another unique field
-                    key={`${item.date}-${index}-${item.trade}`}
-                    className="text-center text-xs md:text-sm"
+                    key={`${item.date}-${item.profitLoss}`}
+                    className={
+                      item.trade === "Buy" ? "bg-green-50 hover:bg-green-100" :
+                      item.trade === "Sell" ? "bg-red-50 hover:bg-red-100" :
+                      "hover:bg-muted/50"
+                    }
                   >
-                    {columns.map((column) => (
-                      <TableCell key={column.id} className="px-2 py-1">
-                        {column.id === 'date' ? formatDate(item[column.id]) :
-                         column.id === 'profitLoss' || column.id === 'currentCapital' ? formatCurrency(item[column.id]) :
-                         // Handle potential null/undefined or non-numeric values gracefully
-                         item[column.id] !== null && item[column.id] !== undefined ? String(item[column.id]) : '-'}
-                      </TableCell>
-                    ))}
+                    {columns.map((column) => {
+                      const value = item[column.id as keyof TradeHistoryItem];
+                      let formattedValue = "-";
+                      
+                      if (value !== undefined && value !== null) {
+                        if (column.id === "date") {
+                          formattedValue = formatDate(value as string);
+                        } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                          formattedValue = formatCurrency(value as number);
+                        } else if (column.id === "volume" || column.id === "lotSize") {
+                          formattedValue = (value as number).toLocaleString();
+                        } else if (column.id === "stopTrigger") {
+                          formattedValue = item.stopTrigger || "-";
+                        } else if (typeof value === "number") {
+                          formattedValue = value.toFixed(2);
+                        } else {
+                          formattedValue = String(value);
+                        }
+                      }
+                      
+                      return (
+                        <TableCell 
+                          key={column.id}
+                          className={`text-center px-2 py-2 text-sm ${
+                            column.id === "currentCapital" ? "font-medium" : ""
+                          } ${
+                            column.id === "profitLoss" ? 
+                              (Number(item.profitLoss) > 0 ? "text-green-600" : 
+                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                          } ${
+                            column.id === "trade" ?
+                              (item.trade === "Buy" ? "text-green-600" :
+                               item.trade === "Sell" ? "text-red-600" : "") : ""
+                          }`}
+                        >
+                          {formattedValue}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
         </div>
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
+            <div className="flex items-center gap-2 mb-4 sm:mb-0">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <select
+                className="bg-card border rounded px-2 py-1 text-sm"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {[10, 25, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+            
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = currentPage <= 3
+                    ? i + 1
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        isActive={currentPage === pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                href="#"
-                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
-                className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-              />
-            </PaginationItem>
-            {/* Simple page number display - consider more advanced logic for many pages */}
-            <PaginationItem>
-              <PaginationLink href="#" isActive>
-                Page {currentPage} of {totalPages}
-              </PaginationLink>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext 
-                href="#"
-                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
-                className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
     </div>
   );
 }
