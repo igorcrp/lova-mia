@@ -248,13 +248,23 @@ export function StockDetailsTable({
                     ) : null
                   )}
                 />
+                <defs>
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
                 <Line
                   type="monotone"
                   dataKey="capital"
-                  stroke="#ffffff" // White line
+                  stroke="#00ffff" // Neon cyan color
                   strokeWidth={2}
-                  dot={{ r: 3, fill: '#ffffff' }} // Visible white dots on all points
-                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#aaaaaa' }} // Slightly larger dot on hover
+                  dot={false} // No dots by default, maybe add activeDot styling
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
+                  filter="url(#glow)" // Apply glow effect
                   isAnimationActive={true}
                   animationDuration={2000}
                   animationEasing="ease-in-out"
