@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Area, AreaChart, YAxis, Line, ResponsiveContainer, Tooltip } from "recharts";
 import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
