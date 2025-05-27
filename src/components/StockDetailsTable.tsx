@@ -267,7 +267,7 @@ export function StockDetailsTable({
                   animationDuration={2000}
                   animationEasing="ease-in-out"
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
