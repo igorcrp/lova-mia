@@ -1,4 +1,5 @@
 
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -97,14 +98,14 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
     trade: string;
-    stopPrice: string | number | null;
+    stopPrice?: string | number | null;
     low: number | string | null;
     high: number | string | null;
 }
   
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
     // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
+    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null || item.stopPrice === undefined) {
         return "-";
     }
 
@@ -155,9 +156,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
-      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : 0,
+      initialCapital: Number(initialCapital?.toFixed ? initialCapital.toFixed(2) : initialCapital) || 0
     };
     onUpdateParams(cleanParams);
   };
@@ -235,11 +236,23 @@ export function StockDetailsTable({
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={result.capitalEvolution || []}>
+              <AreaChart 
+                data={result.capitalEvolution || []}
+                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+              >
                 <defs>
                   <linearGradient id="capitalGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.9}/>
+                    <stop offset="20%" stopColor="#6366f1" stopOpacity={0.8}/>
+                    <stop offset="40%" stopColor="#8b5cf6" stopOpacity={0.7}/>
+                    <stop offset="60%" stopColor="#a855f7" stopOpacity={0.5}/>
+                    <stop offset="80%" stopColor="#c084fc" stopOpacity={0.3}/>
+                    <stop offset="100%" stopColor="#e879f9" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#3b82f6"/>
+                    <stop offset="50%" stopColor="#8b5cf6"/>
+                    <stop offset="100%" stopColor="#e879f9"/>
                   </linearGradient>
                 </defs>
                 <XAxis 
@@ -252,14 +265,14 @@ export function StockDetailsTable({
                   axisLine={false}
                   tickLine={false}
                   tick={false}
-                  domain={['dataMin - 100', 'dataMax + 100']}
+                  domain={['dataMin * 0.99', 'dataMax * 1.01']}
                 />
                 <Tooltip 
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg">
-                        <p className="text-xs font-medium">{formatDate(payload[0].payload.date)}</p>
-                        <p className="text-xs text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
+                      <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-2 shadow-xl">
+                        <p className="text-xs font-medium text-foreground">{formatDate(payload[0].payload.date)}</p>
+                        <p className="text-xs text-primary font-semibold">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
                   )}
@@ -267,12 +280,13 @@ export function StockDetailsTable({
                 <Area 
                   type="monotone" 
                   dataKey="capital" 
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
+                  stroke="url(#strokeGradient)"
+                  strokeWidth={3}
                   fill="url(#capitalGradient)"
                   fillOpacity={1}
-                  animationDuration={2000}
+                  animationDuration={2500}
                   animationBegin={0}
+                  connectNulls={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
