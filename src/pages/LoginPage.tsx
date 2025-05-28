@@ -110,27 +110,20 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (email: string, password: string) => {
-    try {
-      setIsSubmitting(true);
-      console.log("Attempting login for:", email);
-      
-      // Check if email exists in our database
-      const emailExists = await checkEmailExists(email);
-      if (!emailExists) {
-        toast.error("Email não encontrado. Você precisa se cadastrar primeiro.");
-        return;
-      }
-      
-      // Proceed with login
-      await login(email, password);
-    } catch (error: any) {
-      console.error("Login failed", error);
-      // Error is already handled in the auth context
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleLogin = async (email: string, password: string) => {const handleLogin = async (email: string, password: string) => {
+  try {
+    setIsSubmitting(true);
+    console.log("Attempting login for:", email);
+    
+    // Proceed with login - let the auth context handle the validation
+    await login(email, password);
+  } catch (error: any) {
+    console.error("Login failed", error);
+    // Error is already handled in the auth context
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
