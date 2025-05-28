@@ -37,31 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          // Get user data from our users table
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', session.user.email)
-            .maybeSingle();
-
-          if (userData && !error) {
-            const fullUser: User = {
-              id: userData.id,
-              email: userData.email,
-              full_name: userData.name || '',
-              level_id: userData.level_id || 1,
-              status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
-              email_verified: userData.email_verified || false,
-              account_type: 'free' as 'free' | 'premium',
-              created_at: userData.created_at || new Date().toISOString(),
-              last_login: new Date().toISOString(),
-              avatar_url: undefined
-            };
-
-            setUser(fullUser);
-            localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-            localStorage.setItem("alphaquant-token", session.access_token);
-          }
+          await syncUserData(session.user);
         }
       } catch (error) {
         console.error("Error checking session:", error);
@@ -78,33 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log("Auth state changed:", event, session?.user?.email);
         
         if (event === 'SIGNED_IN' && session?.user) {
-          // User signed in, get their data from users table
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', session.user.email)
-            .maybeSingle();
-
-          if (userData && !error) {
-            const fullUser: User = {
-              id: userData.id,
-              email: userData.email,
-              full_name: userData.name || '',
-              level_id: userData.level_id || 1,
-              status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
-              email_verified: userData.email_verified || false,
-              account_type: 'free' as 'free' | 'premium',
-              created_at: userData.created_at || new Date().toISOString(),
-              last_login: new Date().toISOString(),
-              avatar_url: undefined
-            };
-
-            setUser(fullUser);
-            localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-            localStorage.setItem("alphaquant-token", session.access_token);
-
-            // Redirect based on user level
-            if (fullUser.level_id === 2) {
+          await syncUserData(session.user);
+          
+          // Get user level to determine redirect
+          const userData = await getUserData(session.user);
+          if (userData) {
+            if (userData.level_id === 2) {
               navigate("/admin");
             } else {
               navigate("/app");
@@ -122,54 +77,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Function to check user status in Supabase and handle redirection
-  const checkUserStatusAndRedirect = async (userEmail: string) => {
+  const syncUserData = async (authUser: any) => {
     try {
-      console.log("Checking status for user:", userEmail);
-      
-      // Query the public.users table for user data
-      const { data: userData, error } = await supabase
+      // Get user data from our users table
+      let { data: userData, error } = await supabase
         .from('users')
-        .select('email, status_users, level_id')
-        .eq('email', userEmail)
+        .select('*')
+        .eq('email', authUser.email)
         .maybeSingle();
 
-      if (error) {
-        console.error("Error checking user status:", error);
-        toast.error("Erro ao verificar status do usuário.");
-        throw error;
+      // If user doesn't exist in our table (e.g., Google login), create them
+      if (!userData && !error) {
+        console.log("Creating user profile for:", authUser.email);
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            email: authUser.email,
+            name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
+            auth_user_id: authUser.id,
+            auth_id: authUser.id,
+            level_id: 1,
+            status_users: 'active',
+            email_verified: authUser.email_confirmed_at ? true : false
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error creating user profile:", insertError);
+        } else {
+          userData = newUser;
+        }
       }
 
-      console.log("User data from Supabase:", userData);
+      if (userData && !error) {
+        const fullUser: User = {
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.name || '',
+          level_id: userData.level_id || 1,
+          status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
+          email_verified: userData.email_verified || false,
+          account_type: 'free' as 'free' | 'premium',
+          created_at: userData.created_at || new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          avatar_url: undefined
+        };
 
-      // Handle different user cases based on requirements
-      if (userData) {
-        // User exists in the database
-        if (userData.status_users === 'active') {
-          // User is active, check level and redirect accordingly
-          if (userData.level_id === 2) {
-            navigate("/admin");
-            return { isActive: true, level: 2 };
-          } else {
-            navigate("/app");
-            return { isActive: true, level: 1 };
-          }
-        } else {
-          // User exists but is not active
-          toast.warning("Por favor, confirme seu cadastro clicando no link enviado para seu email.");
-          navigate("/login");
-          return { isActive: false, level: userData.level_id };
+        setUser(fullUser);
+        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+        
+        if (authUser.access_token) {
+          localStorage.setItem("alphaquant-token", authUser.access_token);
         }
-      } else {
-        // User doesn't exist in the database
-        toast.info("Cadastro não encontrado. Por favor, registre-se primeiro.");
-        navigate("/login");
-        return { isActive: false, level: null };
       }
     } catch (error) {
-      console.error("Error checking user status:", error);
-      toast.error("Erro ao verificar status do usuário.");
-      return { isActive: false, level: null };
+      console.error("Error syncing user data:", error);
+    }
+  };
+
+  const getUserData = async (authUser: any) => {
+    try {
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', authUser.email)
+        .maybeSingle();
+
+      return userData;
+    } catch (error) {
+      console.error("Error getting user data:", error);
+      return null;
     }
   };
   

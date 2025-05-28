@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
@@ -32,6 +33,56 @@ export default function LoginPage() {
     setConfirmPassword("");
   };
 
+  const handleSignUp = async (email: string, password: string, name: string) => {
+    try {
+      setIsSubmitting(true);
+      console.log("Attempting sign up for:", email);
+      
+      // Sign up with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // Create user record in our users table
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            email: email,
+            name: name,
+            auth_user_id: data.user.id,
+            auth_id: data.user.id,
+            level_id: 1, // Default to regular user
+            status_users: 'active',
+            email_verified: false
+          });
+
+        if (insertError) {
+          console.error("Error creating user profile:", insertError);
+          // Don't throw here as the auth user was created successfully
+        }
+
+        toast.success("Conta criada com sucesso! Verifique seu email para confirmar.");
+      }
+    } catch (error: any) {
+      console.error("Sign up failed", error);
+      toast.error(error.message || "Falha no registro. Tente novamente.");
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -51,14 +102,22 @@ export default function LoginPage() {
         toast.error("Por favor, digite uma senha.");
         return;
       }
+
+      if (password.length < 6) {
+        toast.error("A senha deve ter pelo menos 6 caracteres.");
+        return;
+      }
       
       if (password !== confirmPassword) {
         toast.error("As senhas não coincidem.");
         return;
       }
       
-      // Handle sign up logic (to be implemented)
-      toast.info("Funcionalidade de registro será implementada em breve!");
+      try {
+        await handleSignUp(email, password, name);
+      } catch (error) {
+        console.error("Sign up submission error:", error);
+      }
       return;
     }
     
