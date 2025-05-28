@@ -156,28 +156,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Attempting login for:", email);
       
-      // Use Supabase auth directly
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
+  
       if (error) {
         throw error;
       }
-
+  
       if (data.user) {
-        // Get user data to check level_id
-        const userData = await getUserData(data.user);
-        if (userData) {
-          toast.success("Login realizado com sucesso!");
-          // Redirect based on level_id
-          if (userData.level_id === 2) {
-            navigate("/admin");
-          } else {
-            navigate("/app");
-          }
-        }
+        await syncUserData(data.user); // Adicione esta linha para sincronizar os dados do usuário
+        toast.success("Login realizado com sucesso!");
       }
     } catch (error: any) {
       console.error("Login failed", error);
