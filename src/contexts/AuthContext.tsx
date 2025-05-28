@@ -1,4 +1,3 @@
-
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
@@ -14,7 +13,6 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-// Define types for API responses to fix TypeScript errors
 interface AuthResponse {
   user?: Partial<User>;
   session?: {
@@ -31,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for existing Supabase session first
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -48,23 +45,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkSession();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log("Auth state changed:", event, session?.user?.email);
         
         if (event === 'SIGNED_IN' && session?.user) {
           await syncUserData(session.user);
-          
-          // Get user level to determine redirect
-          const userData = await getUserData(session.user);
-          if (userData) {
-            if (userData.level_id === 2) {
-              navigate("/admin");
-            } else {
-              navigate("/app");
-            }
-          }
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           localStorage.removeItem("alphaquant-user");
@@ -78,15 +64,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [navigate]);
 
   const syncUserData = async (authUser: any) => {
-  try {
-      // Get user data from our users table
+    try {
       let { data: userData, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', authUser.email)
-          .maybeSingle();
+        .from('users')
+        .select('*')
+        .eq('email', authUser.email)
+        .maybeSingle();
 
-      // If user doesn't exist in our table (e.g., Google login), create them automatically
       if (!userData && !error) {
         console.log("Creating user profile for Google login:", authUser.email);
         const { data: newUser, error: insertError } = await supabase
@@ -96,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
             auth_user_id: authUser.id,
             auth_id: authUser.id,
-            level_id: 1, // Default to regular user
+            level_id: 1,
             status_users: 'active',
             email_verified: authUser.email_confirmed_at ? true : false
           })
@@ -130,33 +114,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (authUser.access_token) {
           localStorage.setItem("alphaquant-token", authUser.access_token);
         }
+
+        // Redirect based on user level
+        if (userData.level_id === 2) {
+          navigate("/admin");
+        } else {
+          navigate("/app");
+        }
       }
-    setUser(fullUser);
-      localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-    if (authUser.access_token) {
-      localStorage.setItem("alphaquant-token", authUser.access_token);
-      }
-    
     } catch (error) {
       console.error("Error syncing user data:", error);
     }
   };
 
-  const getUserData = async (authUser: any) => {
-    try {
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', authUser.email)
-        .maybeSingle();
-
-      return userData;
-    } catch (error) {
-      console.error("Error getting user data:", error);
-      return null;
-    }
-  };
-  
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -166,13 +136,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
       });
-  
+
       if (error) {
         throw error;
       }
-  
+
       if (data.user) {
-        await syncUserData(data.user); // Adicione esta linha para sincronizar os dados do usuário
+        await syncUserData(data.user);
         toast.success("Login realizado com sucesso!");
       }
     } catch (error: any) {
@@ -183,16 +153,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   };
-        if (userData.level_id === 2) {
-        navigate("/admin");
-      } else {
-        navigate("/app");
-      }
-    }
-  } catch (error) {
-    console.error("Error syncing user data:", error);
-  }
-};
   
   const googleLogin = async () => {
     try {
@@ -209,8 +169,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         throw error;
       }
-
-      // The redirect will handle the rest
     } catch (error: any) {
       console.error("Google login failed", error);
       toast.error(error.message || "Falha no login com Google.");
@@ -229,13 +187,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
-      // Clear storage
       localStorage.removeItem("alphaquant-user");
       localStorage.removeItem("alphaquant-token");
-      
       setUser(null);
       navigate("/login");
-      
       toast.success("Logout realizado com sucesso!");
     } catch (error: any) {
       console.error("Logout failed", error);
