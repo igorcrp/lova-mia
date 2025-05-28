@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const syncUserData = async (authUser: any) => {const syncUserData = async (authUser: any) => {
+const syncUserData = async (authUser: any) => {
   try {
     let { data: userData, error } = await supabase
       .from('users')
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 };
 
-  const login = async (email: string, password: string) => const login = async (email: string, password: string) => {
+const login = async (email: string, password: string) => {
   try {
     setIsLoading(true);
     console.log("Attempting login for:", email);
