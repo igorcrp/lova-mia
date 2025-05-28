@@ -15,8 +15,6 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState("");
   const { login, googleLogin, user } = useAuth();
   
   // If already logged in, redirect to appropriate dashboard
@@ -28,7 +26,6 @@ export default function LoginPage() {
 
   const toggleAuthMode = () => {
     setIsSignUp(!isSignUp);
-    setShowConfirmationMessage(false);
     // Reset form fields when toggling
     setEmail("");
     setPassword("");
@@ -75,17 +72,6 @@ export default function LoginPage() {
           // Don't throw here as the auth user was created successfully
         }
 
-        // Set the confirmation message and switch back to login
-        setRegisteredEmail(email);
-        setShowConfirmationMessage(true);
-        setIsSignUp(false);
-        
-        // Reset form fields
-        setEmail("");
-        setPassword("");
-        setName("");
-        setConfirmPassword("");
-        
         toast.success("Conta criada com sucesso! Verifique seu email para confirmar.");
       }
     } catch (error: any) {
@@ -172,17 +158,6 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold mb-2 text-center">
           {isSignUp ? "Criar conta" : "Entrar"}
         </h1>
-        
-        {showConfirmationMessage && !isSignUp && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-800 text-sm text-center">
-              <strong>Conta criada com sucesso!</strong><br />
-              Um email de confirmação foi enviado para <strong>{registeredEmail}</strong>.<br />
-              Por favor, verifique sua caixa de entrada e clique no link para ativar sua conta.
-            </p>
-          </div>
-        )}
-        
         <p className="text-muted-foreground mb-6 text-center">
           {isSignUp 
             ? "Preencha seus dados para criar uma nova conta"
