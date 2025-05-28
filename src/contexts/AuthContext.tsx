@@ -78,13 +78,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [navigate]);
 
   const syncUserData = async (authUser: any) => {
-    try {
+  try {
       // Get user data from our users table
       let { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', authUser.email)
-        .maybeSingle();
+          .from('users')
+          .select('*')
+          .eq('email', authUser.email)
+          .maybeSingle();
 
       // If user doesn't exist in our table (e.g., Google login), create them automatically
       if (!userData && !error) {
@@ -131,6 +131,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem("alphaquant-token", authUser.access_token);
         }
       }
+    setUser(fullUser);
+      localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+    if (authUser.access_token) {
+      localStorage.setItem("alphaquant-token", authUser.access_token);
+      }
+    
     } catch (error) {
       console.error("Error syncing user data:", error);
     }
@@ -177,6 +183,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     }
   };
+        if (userData.level_id === 2) {
+        navigate("/admin");
+      } else {
+        navigate("/app");
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing user data:", error);
+  }
+};
   
   const googleLogin = async () => {
     try {
