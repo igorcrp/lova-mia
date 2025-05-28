@@ -33,10 +33,32 @@ export default function LoginPage() {
     setConfirmPassword("");
   };
 
+  const checkEmailExists = async (email: string) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('email')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error checking email:", error);
+      return false;
+    }
+
+    return !!data;
+  };
+
   const handleSignUp = async (email: string, password: string, name: string) => {
     try {
       setIsSubmitting(true);
       console.log("Attempting sign up for:", email);
+      
+      // Check if email already exists
+      const emailExists = await checkEmailExists(email);
+      if (emailExists) {
+        toast.error("O email informado já foi cadastrado. Escolha outro email.");
+        return;
+      }
       
       // Sign up with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
@@ -72,12 +94,39 @@ export default function LoginPage() {
           // Don't throw here as the auth user was created successfully
         }
 
-        toast.success("Conta criada com sucesso! Verifique seu email para confirmar.");
+        // Switch to login mode and show success message
+        setIsSignUp(false);
+        setEmail("");
+        setPassword("");
+        setName("");
+        setConfirmPassword("");
+        toast.success("Um email de confirmação foi enviado para " + email + ". Por favor, confirme seu email para ativar sua conta.");
       }
     } catch (error: any) {
       console.error("Sign up failed", error);
       toast.error(error.message || "Falha no registro. Tente novamente.");
-      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      setIsSubmitting(true);
+      console.log("Attempting login for:", email);
+      
+      // Check if email exists in our database
+      const emailExists = await checkEmailExists(email);
+      if (!emailExists) {
+        toast.error("Email não encontrado. Você precisa se cadastrar primeiro.");
+        return;
+      }
+      
+      // Proceed with login
+      await login(email, password);
+    } catch (error: any) {
+      console.error("Login failed", error);
+      // Error is already handled in the auth context
     } finally {
       setIsSubmitting(false);
     }
@@ -113,11 +162,7 @@ export default function LoginPage() {
         return;
       }
       
-      try {
-        await handleSignUp(email, password, name);
-      } catch (error) {
-        console.error("Sign up submission error:", error);
-      }
+      await handleSignUp(email, password, name);
       return;
     }
     
@@ -127,16 +172,7 @@ export default function LoginPage() {
       return;
     }
     
-    try {
-      setIsSubmitting(true);
-      console.log("Submitting login for:", email);
-      await login(email, password);
-    } catch (error) {
-      console.error("Login submission error:", error);
-      // Error is already handled in the auth context
-    } finally {
-      setIsSubmitting(false);
-    }
+    await handleLogin(email, password);
   };
   
   const handleGoogleLogin = async () => {

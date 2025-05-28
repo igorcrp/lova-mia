@@ -86,9 +86,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('email', authUser.email)
         .maybeSingle();
 
-      // If user doesn't exist in our table (e.g., Google login), create them
+      // If user doesn't exist in our table (e.g., Google login), create them automatically
       if (!userData && !error) {
-        console.log("Creating user profile for:", authUser.email);
+        console.log("Creating user profile for Google login:", authUser.email);
         const { data: newUser, error: insertError } = await supabase
           .from('users')
           .insert({
@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
             auth_user_id: authUser.id,
             auth_id: authUser.id,
-            level_id: 1,
+            level_id: 1, // Default to regular user
             status_users: 'active',
             email_verified: authUser.email_confirmed_at ? true : false
           })
@@ -167,8 +167,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        toast.success("Login realizado com sucesso!");
-        // The auth state change listener will handle the rest
+        // Get user data to check level_id
+        const userData = await getUserData(data.user);
+        if (userData) {
+          toast.success("Login realizado com sucesso!");
+          // Redirect based on level_id
+          if (userData.level_id === 2) {
+            navigate("/admin");
+          } else {
+            navigate("/app");
+          }
+        }
       }
     } catch (error: any) {
       console.error("Login failed", error);
