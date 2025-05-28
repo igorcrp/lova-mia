@@ -30,7 +30,7 @@ export function ProtectedRoute({ requireLevel }: ProtectedRouteProps) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="loading-circle" />
-        <span className="ml-3">Loading...</span>
+        <span className="ml-3">Carregando...</span>
       </div>
     );
   }
@@ -44,12 +44,14 @@ export function ProtectedRoute({ requireLevel }: ProtectedRouteProps) {
   // User is not active
   if (user.status !== 'active') {
     console.log("User not active, redirecting to login");
+    toast.warning("Sua conta não está ativa. Entre em contato com o suporte.");
     return <Navigate to="/login" replace />;
   }
   
   // Check required level
   if (requireLevel !== undefined && user.level_id < requireLevel) {
     console.log(`User level ${user.level_id} is insufficient, required: ${requireLevel}`);
+    toast.error("Você não tem permissão para acessar esta área.");
     // Redirect to appropriate dashboard based on user level
     return <Navigate to={user.level_id === 1 ? "/app" : "/admin"} replace />;
   }

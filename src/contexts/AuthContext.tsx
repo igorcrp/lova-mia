@@ -31,22 +31,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is already logged in
-    const storedUser = localStorage.getItem("alphaquant-user");
-    const storedToken = localStorage.getItem("alphaquant-token");
-    
-    if (storedUser && storedToken) {
+    // Check for existing Supabase session first
+    const checkSession = async () => {
       try {
-        setUser(JSON.parse(storedUser));
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Get user data from our users table
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', session.user.email)
+            .maybeSingle();
+
+          if (userData && !error) {
+            const fullUser: User = {
+              id: userData.id,
+              email: userData.email,
+              full_name: userData.name || '',
+              level_id: userData.level_id || 1,
+              status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
+              email_verified: userData.email_verified || false,
+              account_type: 'free' as 'free' | 'premium',
+              created_at: userData.created_at || new Date().toISOString(),
+              last_login: new Date().toISOString(),
+              avatar_url: undefined
+            };
+
+            setUser(fullUser);
+            localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+            localStorage.setItem("alphaquant-token", session.access_token);
+          }
+        }
       } catch (error) {
-        console.error("Failed to parse stored user", error);
-        localStorage.removeItem("alphaquant-user");
-        localStorage.removeItem("alphaquant-token");
+        console.error("Error checking session:", error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    
-    setIsLoading(false);
-  }, []);
+    };
+
+    checkSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          // User signed in, get their data from users table
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', session.user.email)
+            .maybeSingle();
+
+          if (userData && !error) {
+            const fullUser: User = {
+              id: userData.id,
+              email: userData.email,
+              full_name: userData.name || '',
+              level_id: userData.level_id || 1,
+              status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
+              email_verified: userData.email_verified || false,
+              account_type: 'free' as 'free' | 'premium',
+              created_at: userData.created_at || new Date().toISOString(),
+              last_login: new Date().toISOString(),
+              avatar_url: undefined
+            };
+
+            setUser(fullUser);
+            localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+            localStorage.setItem("alphaquant-token", session.access_token);
+
+            // Redirect based on user level
+            if (fullUser.level_id === 2) {
+              navigate("/admin");
+            } else {
+              navigate("/app");
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          localStorage.removeItem("alphaquant-user");
+          localStorage.removeItem("alphaquant-token");
+          navigate("/login");
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   // Function to check user status in Supabase and handle redirection
   const checkUserStatusAndRedirect = async (userEmail: string) => {
@@ -103,56 +177,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting login for:", email);
-      const response = await api.auth.login(email, password) as AuthResponse;
-      console.log("Login response:", response);
       
-      if (!response || !response.session) {
-        throw new Error("Invalid login response from API");
+      // Use Supabase auth directly
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
-      
-      // Check user status in Supabase and handle redirection
-      const userStatus = await checkUserStatusAndRedirect(email);
-      console.log("User status after check:", userStatus);
-      
-      // Only create user object if user is active
-      if (userStatus.isActive) {
-        // Safely extract user data with default values
-        const userResponse = response.user || {};
-        
-        // Create a user object with all required properties from the User type
-        const fullUser: User = {
-          id: userResponse.id || '',
-          email: userResponse.email || email,
-          full_name: userResponse.full_name || '',
-          level_id: userStatus.level,
-          status: 'active',
-          email_verified: true,
-          account_type: (userResponse.account_type as 'free' | 'premium') || 'free',
-          created_at: userResponse.created_at || new Date().toISOString(),
-          last_login: userResponse.last_login || new Date().toISOString(),
-          avatar_url: userResponse.avatar_url
-        };
-        
-        // Extract token safely
-        let sessionToken = '';
-        const session = response.session || {};
-        
-        if (typeof session === 'string') {
-          sessionToken = session;
-        } else if (session && typeof session === 'object') {
-          sessionToken = session.access_token || session.token || '';
-        }
-        
-        // Store user and token
-        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-        localStorage.setItem("alphaquant-token", sessionToken);
-        
-        setUser(fullUser);
+
+      if (data.user) {
         toast.success("Login realizado com sucesso!");
+        // The auth state change listener will handle the rest
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
-      toast.error("Falha no login. Verifique suas credenciais.");
+      toast.error(error.message || "Falha no login. Verifique suas credenciais.");
       throw error;
     } finally {
       setIsLoading(false);
@@ -163,54 +205,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting Google login");
-      const response = await api.auth.googleLogin() as AuthResponse;
-      console.log("Google login response:", response);
       
-      if (!response.user?.email) {
-        throw new Error('Failed to get user email from Google login');
-      }
-      
-      // Check user status in Supabase and handle redirection
-      const userEmail = response.user.email;
-      const userStatus = await checkUserStatusAndRedirect(userEmail);
-      console.log("User status after check:", userStatus);
-      
-      // Only create user object if user is active
-      if (userStatus.isActive) {
-        // Create a user object with all required properties from the User type
-        const fullUser: User = {
-          id: response.user.id || '',
-          email: userEmail,
-          full_name: response.user.full_name || '',
-          level_id: userStatus.level,
-          status: 'active',
-          email_verified: true,
-          account_type: (response.user.account_type as 'free' | 'premium') || 'free',
-          created_at: response.user.created_at || new Date().toISOString(),
-          last_login: response.user.last_login || new Date().toISOString(),
-          avatar_url: response.user.avatar_url
-        };
-        
-        // Extract token safely
-        let sessionToken = '';
-        const session = response.session || {};
-        
-        if (typeof session === 'string') {
-          sessionToken = session;
-        } else if (session && typeof session === 'object') {
-          sessionToken = session.access_token || session.token || '';
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/app`
         }
-        
-        // Store user and token
-        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-        localStorage.setItem("alphaquant-token", sessionToken);
-        
-        setUser(fullUser);
-        toast.success("Login realizado com sucesso!");
+      });
+
+      if (error) {
+        throw error;
       }
-    } catch (error) {
+
+      // The redirect will handle the rest
+    } catch (error: any) {
       console.error("Google login failed", error);
-      toast.error("Falha no login com Google.");
+      toast.error(error.message || "Falha no login com Google.");
       throw error;
     } finally {
       setIsLoading(false);
@@ -220,8 +230,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       setIsLoading(true);
-      await api.auth.logout();
+      const { error } = await supabase.auth.signOut();
       
+      if (error) {
+        throw error;
+      }
+
       // Clear storage
       localStorage.removeItem("alphaquant-user");
       localStorage.removeItem("alphaquant-token");
@@ -230,9 +244,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigate("/login");
       
       toast.success("Logout realizado com sucesso!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Logout failed", error);
-      toast.error("Falha ao realizar logout.");
+      toast.error(error.message || "Falha ao realizar logout.");
       throw error;
     } finally {
       setIsLoading(false);
