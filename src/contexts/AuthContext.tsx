@@ -129,32 +129,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 };
 
-  const login = async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      console.log("Attempting login for:", email);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+  const login = async (email: string, password: string) => const login = async (email: string, password: string) => {
+  try {
+    setIsLoading(true);
+    console.log("Attempting login for:", email);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) {
-        throw error;
-      }
+    if (error) {
+      throw error;
+    }
 
-      if (data.user) {
+    if (data.user) {
+      // Get the session after successful login
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         await syncUserData(data.user);
         toast.success("Login realizado com sucesso!");
+      } else {
+        throw new Error("Failed to get session after login");
       }
-    } catch (error: any) {
-      console.error("Login failed", error);
-      toast.error(error.message || "Falha no login. Verifique suas credenciais.");
-      throw error;
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } catch (error: any) {
+    console.error("Login failed", error);
+    toast.error(error.message || "Falha no login. Verifique suas credenciais.");
+    throw error;
+  } finally {
+    setIsLoading(false);
+  }
+};
   
   const googleLogin = async () => {
     try {
