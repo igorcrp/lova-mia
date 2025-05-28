@@ -63,71 +63,101 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-const syncUserData = async (authUser: any) => {
-  try {
-    let { data: userData, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', authUser.email)
-      .maybeSingle();
-
-    if (!userData && !error) {
-      console.log("Creating user profile for Google login:", authUser.email);
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          email: authUser.email,
-          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
-          auth_user_id: authUser.id,
-          auth_id: authUser.id,
-          level_id: 1,
-          status_users: 'active',
-          email_verified: authUser.email_confirmed_at ? true : false
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("Error creating user profile:", insertError);
-      } else {
-        userData = newUser;
+    const syncUserData = async (authUser: any) => {
+      try {
+        // Verificar se o email foi confirmado no auth.users
+        const isEmailVerified = authUser.email_confirmed_at ? true : false;
+        
+        let { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authUser.email)
+          .maybeSingle();
+    
+        if (!userData && !error) {
+          console.log("Creating user profile for new login:", authUser.email);
+          const { data: newUser, error: insertError } = await supabase
+            .from('users')
+            .insert({
+              email: authUser.email,
+              name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
+              auth_user_id: authUser.id,
+              auth_id: authUser.id,
+              level_id: 1, // Default para usuário regular
+              status_users: 'active',
+              email_verified: isEmailVerified
+            })
+            .select()
+            .single();
+    
+          if (insertError) {
+            console.error("Error creating user profile:", insertError);
+            throw insertError;
+          } else {
+            userData = newUser;
+          }
+        } else if (userData && !error) {
+          // Atualizar o status de verificação de email se necessário
+          if (isEmailVerified !== userData.email_verified) {
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ email_verified: isEmailVerified })
+              .eq('email', authUser.email);
+              
+            if (updateError) {
+              console.error("Error updating email verification status:", updateError);
+            } else {
+              userData.email_verified = isEmailVerified;
+            }
+          }
+        }
+    
+        if (userData && !error) {
+          // Verificar se o email foi confirmado antes de prosseguir
+          if (!isEmailVerified) {
+            toast.error("Por favor, confirme seu email antes de fazer login.");
+            await supabase.auth.signOut();
+            navigate("/login");
+            return;
+          }
+          
+          const fullUser: User = {
+            id: userData.id,
+            email: userData.email,
+            full_name: userData.name || '',
+            level_id: userData.level_id || 1,
+            status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
+            email_verified: userData.email_verified || false,
+            account_type: 'free' as 'free' | 'premium',
+            created_at: userData.created_at || new Date().toISOString(),
+            last_login: new Date().toISOString(),
+            avatar_url: undefined
+          };
+    
+          setUser(fullUser);
+          localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+          
+          // Get the session to access the token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            localStorage.setItem("alphaquant-token", session.access_token);
+          }
+    
+          // Redirect based on user level
+          if (userData.level_id === 2) {
+            navigate("/admin");
+          } else {
+            navigate("/app");
+          }
+        }
+      } catch (error) {
+        console.error("Error syncing user data:", error);
+        toast.error("Erro ao sincronizar dados do usuário. Por favor, tente novamente.");
+        await supabase.auth.signOut();
+        navigate("/login");
       }
-    }
+    };
 
-    if (userData && !error) {
-      const fullUser: User = {
-        id: userData.id,
-        email: userData.email,
-        full_name: userData.name || '',
-        level_id: userData.level_id || 1,
-        status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
-        email_verified: userData.email_verified || false,
-        account_type: 'free' as 'free' | 'premium',
-        created_at: userData.created_at || new Date().toISOString(),
-        last_login: new Date().toISOString(),
-        avatar_url: undefined
-      };
-
-      setUser(fullUser);
-      localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-      
-      // Get the session to access the token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        localStorage.setItem("alphaquant-token", session.access_token);
-      }
-
-      // Redirect based on user level
-      if (userData.level_id === 2) {
-        navigate("/admin");
-      } else {
-        navigate("/app");
-      }
-    }
-  } catch (error) {
-    console.error("Error syncing user data:", error);
-  }
-};
 
 const login = async (email: string, password: string) => {
   try {
