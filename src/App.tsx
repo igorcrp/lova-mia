@@ -55,16 +55,14 @@ const App = () => (
               </Route>
               
               {/* Protected app routes */}
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/app" element={<AppHomePage />} />
-                  <Route path="/app/daytrade" element={<DaytradePage />} />
-                  <Route path="/app/weekly" element={<WeeklyPortfolioPage />} />
-                  <Route path="/app/monthly" element={<MonthlyPortfolioPage />} />
-                  <Route path="/app/annual" element={<AnnualPortfolioPage />} />
-                  <Route path="/app/profile" element={<ProfilePage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<EmailVerificationGuard />}>
+                    <Route element={<AppLayout />}>
+                      <Route path="/app" element={<AppHomePage />} />
+                      {/* ... outras rotas ... */}
+                    </Route>
+                  </Route>
                 </Route>
-              </Route>
               
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />
