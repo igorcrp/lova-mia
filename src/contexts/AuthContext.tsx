@@ -63,69 +63,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const syncUserData = async (authUser: any) => {
-    try {
-      let { data: userData, error } = await supabase
+  const syncUserData = async (authUser: any) => {const syncUserData = async (authUser: any) => {
+  try {
+    let { data: userData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', authUser.email)
+      .maybeSingle();
+
+    if (!userData && !error) {
+      console.log("Creating user profile for Google login:", authUser.email);
+      const { data: newUser, error: insertError } = await supabase
         .from('users')
-        .select('*')
-        .eq('email', authUser.email)
-        .maybeSingle();
+        .insert({
+          email: authUser.email,
+          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
+          auth_user_id: authUser.id,
+          auth_id: authUser.id,
+          level_id: 1,
+          status_users: 'active',
+          email_verified: authUser.email_confirmed_at ? true : false
+        })
+        .select()
+        .single();
 
-      if (!userData && !error) {
-        console.log("Creating user profile for Google login:", authUser.email);
-        const { data: newUser, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            email: authUser.email,
-            name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
-            auth_user_id: authUser.id,
-            auth_id: authUser.id,
-            level_id: 1,
-            status_users: 'active',
-            email_verified: authUser.email_confirmed_at ? true : false
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Error creating user profile:", insertError);
-        } else {
-          userData = newUser;
-        }
+      if (insertError) {
+        console.error("Error creating user profile:", insertError);
+      } else {
+        userData = newUser;
       }
-
-      if (userData && !error) {
-        const fullUser: User = {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.name || '',
-          level_id: userData.level_id || 1,
-          status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
-          email_verified: userData.email_verified || false,
-          account_type: 'free' as 'free' | 'premium',
-          created_at: userData.created_at || new Date().toISOString(),
-          last_login: new Date().toISOString(),
-          avatar_url: undefined
-        };
-
-        setUser(fullUser);
-        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-        
-        if (authUser.access_token) {
-          localStorage.setItem("alphaquant-token", authUser.access_token);
-        }
-
-        // Redirect based on user level
-        if (userData.level_id === 2) {
-          navigate("/admin");
-        } else {
-          navigate("/app");
-        }
-      }
-    } catch (error) {
-      console.error("Error syncing user data:", error);
     }
-  };
+
+    if (userData && !error) {
+      const fullUser: User = {
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.name || '',
+        level_id: userData.level_id || 1,
+        status: userData.status_users as 'active' | 'pending' | 'inactive' || 'active',
+        email_verified: userData.email_verified || false,
+        account_type: 'free' as 'free' | 'premium',
+        created_at: userData.created_at || new Date().toISOString(),
+        last_login: new Date().toISOString(),
+        avatar_url: undefined
+      };
+
+      setUser(fullUser);
+      localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+      
+      // Get the session to access the token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        localStorage.setItem("alphaquant-token", session.access_token);
+      }
+
+      // Redirect based on user level
+      if (userData.level_id === 2) {
+        navigate("/admin");
+      } else {
+        navigate("/app");
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing user data:", error);
+  }
+};
 
   const login = async (email: string, password: string) => {
     try {
