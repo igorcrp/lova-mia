@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts";
-import { DetailedResult, TradeHistoryItem, StockAnalysisParams } from "@/types";
+import { DetailedResult, TradeHistoryItem, StockAnalysisParams, TradeItemForStopTrigger } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -70,7 +71,7 @@ export function StockDetailsTable({
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
       // Calculate stop trigger here for consistency
-      stopTrigger: calculateStopTrigger(item, params.operation)
+      stopTrigger: calculateStopTrigger(item as TradeItemForStopTrigger, params.operation)
     }));
 
     // Sort data
@@ -94,13 +95,6 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    trade: string;
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-}
-  
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
     // Verifica se o item é válido e se a trade foi executada
     if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
@@ -154,8 +148,8 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : 0,
       initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
@@ -236,14 +230,14 @@ export function StockDetailsTable({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={result.capitalEvolution || []}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <Tooltip 
-                  cursor={false} // Remove vertical line on hover
+                  cursor={false}
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
-                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p> {/* Added small bottom margin */}
+                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm">
+                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p>
                         <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
@@ -261,11 +255,11 @@ export function StockDetailsTable({
                 <Line
                   type="monotone"
                   dataKey="capital"
-                  stroke="#00ffff" // Neon cyan color
+                  stroke="#00ffff"
                   strokeWidth={2}
-                  dot={false} // No dots by default, maybe add activeDot styling
-                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
-                  filter="url(#glow)" // Apply glow effect
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }}
+                  filter="url(#glow)"
                   isAnimationActive={true}
                   animationDuration={2000}
                   animationEasing="ease-in-out"
@@ -302,11 +296,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isEntryPriceFocused 
                          ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
-                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
                   onFocus={() => setIsEntryPriceFocused(true)}
                   onBlur={() => {
@@ -315,8 +309,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -326,11 +320,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isStopPriceFocused 
                          ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
-                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
                   onFocus={() => setIsStopPriceFocused(true)}
                   onBlur={() => {
@@ -339,8 +333,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 2.00"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -517,56 +511,48 @@ export function StockDetailsTable({
   );
 }
 
-
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-    if (value === "") {
-      onChange(null); // Permite campo vazio temporariamente
-      return;
-    }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com "." ou "0."
-    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
-      if (value === "." || value.endsWith(".")) {
-         onChange(value); // Mantém como string temporariamente para permitir digitação
-      } else {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue >= 0) {
-          onChange(numValue);
-        }
-      }
-    } else if (value === "-") { // Impede digitar negativo
-      // Não faz nada se tentar digitar "-" 
+// Função auxiliar para lidar com a entrada de números decimais positivos
+const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
+  if (value === "") {
+    onChange(null);
+    return;
+  }
+  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+  if (regex.test(value)) {
+    if (value === "." || value.endsWith(".")) {
+       onChange(value);
     } else {
-      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && numValue >= 0) {
-         // Formata para 2 casas decimais se for um número válido colado
-         onChange(parseFloat(numValue.toFixed(2)));
-      } else if (value === "") {
-         onChange(null);
+        onChange(numValue);
       }
     }
-  };
+  } else if (value === "-") {
+    // Não faz nada se tentar digitar "-" 
+  } else {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+       onChange(parseFloat(numValue.toFixed(2)));
+    } else if (value === "") {
+       onChange(null);
+    }
+  }
+};
 
-  // Função auxiliar para formatar no blur
-  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-    let numValue = 0;
-    if (typeof value === "string") {
-      // Se for só um ponto, trata como 0
-      if (value === ".") {
-        numValue = 0;
-      } else {
-        numValue = parseFloat(value) || 0;
-      }
-    } else if (typeof value === "number") {
-      numValue = value;
-    } else if (value === null || value === undefined) {
-      onChange(null); // Mantém nulo se estava vazio
-      return;
+// Função auxiliar para formatar no blur
+const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
+  let numValue = 0;
+  if (typeof value === "string") {
+    if (value === ".") {
+      numValue = 0;
+    } else {
+      numValue = parseFloat(value) || 0;
     }
-    // Garante que seja positivo e formata
-    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-  };
+  } else if (typeof value === "number") {
+    numValue = value;
+  } else if (value === null || value === undefined) {
+    onChange(null);
+    return;
+  }
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+};

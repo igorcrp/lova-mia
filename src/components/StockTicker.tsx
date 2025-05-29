@@ -1,6 +1,5 @@
 
 import React, { useEffect, useState } from "react";
-import { api } from "@/services/api";
 
 interface StockQuote {
   symbol: string;
@@ -15,10 +14,15 @@ export function StockTicker() {
   useEffect(() => {
     const fetchQuotes = async () => {
       try {
-        // The API is expecting a string array for stock symbols
-        const stockSymbols: string[] = ["AAPL", "MSFT", "GOOGL", "AMZN", "META"];
-        const data = await api.analysis.getLiveQuotes(stockSymbols);
-        setQuotes(data);
+        // Mock data for now since getLiveQuotes doesn't exist in the API
+        const mockQuotes: StockQuote[] = [
+          { symbol: "AAPL", price: 175.43, change: 2.35 },
+          { symbol: "MSFT", price: 378.85, change: -1.25 },
+          { symbol: "GOOGL", price: 2847.52, change: 0.85 },
+          { symbol: "AMZN", price: 3342.88, change: 1.75 },
+          { symbol: "META", price: 486.91, change: -0.95 }
+        ];
+        setQuotes(mockQuotes);
       } catch (error) {
         console.error("Failed to fetch quotes", error);
       } finally {

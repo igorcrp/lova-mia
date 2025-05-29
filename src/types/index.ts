@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   email: string;
@@ -90,7 +89,7 @@ export interface TradeHistoryItem {
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
-  stopPrice?: number;
+  stopPrice?: number | string; // Made optional and allow string
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
 }
@@ -113,3 +112,10 @@ export interface TradeDetail {
   stop: string;
 }
 
+// Add TradeItemForStopTrigger interface
+export interface TradeItemForStopTrigger {
+  trade: string;
+  stopPrice?: string | number | null;
+  low?: number | string | null;
+  high?: number | string | null;
+}
