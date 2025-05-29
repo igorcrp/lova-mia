@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { StockInfo, StockAnalysisParams, AnalysisResult, DetailedResult } from "@/types";
 
@@ -199,13 +198,10 @@ export const api = {
       
       // Safely handle the data array and type check
       const stockCodes = Array.isArray(data) ? 
-        data.map(item => {
-          // Type guard to ensure item has stock_code property and is not null
-          if (item && typeof item === 'object' && 'stock_code' in item && item.stock_code) {
-            return item.stock_code;
-          }
-          return null;
-        }).filter(Boolean) : [];
+        data
+          .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+          .map(item => item.stock_code)
+          .filter(Boolean) : [];
       
       const uniqueCodes = [...new Set(stockCodes)];
       return uniqueCodes.map(code => ({
