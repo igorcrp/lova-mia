@@ -200,8 +200,8 @@ export const api = {
       // Safely handle the data array and type check
       const stockCodes = Array.isArray(data) ? 
         data.map(item => {
-          // Type guard to ensure item has stock_code property
-          if (item && typeof item === 'object' && 'stock_code' in item) {
+          // Type guard to ensure item has stock_code property and is not null
+          if (item && typeof item === 'object' && 'stock_code' in item && item.stock_code) {
             return item.stock_code;
           }
           return null;
@@ -238,17 +238,8 @@ export const api = {
       return data;
     },
 
-    async runAnalysis(params: StockAnalysisParams, progressCallback?: (progress: number) => void): Promise<AnalysisResult[]> {
+    async runAnalysis(params: StockAnalysisParams): Promise<AnalysisResult[]> {
       console.log('Mock runAnalysis called with params:', params);
-      
-      // Simulate progress if callback provided
-      if (progressCallback) {
-        progressCallback(0);
-        setTimeout(() => progressCallback(25), 100);
-        setTimeout(() => progressCallback(50), 200);
-        setTimeout(() => progressCallback(75), 300);
-        setTimeout(() => progressCallback(100), 400);
-      }
       
       // Return mock data that matches the expected structure
       return [
@@ -341,7 +332,9 @@ export const api = {
         ...user,
         full_name: user.name || '',
         status: user.status_users as 'active' | 'inactive' | 'pending' || 'pending',
-        account_type: user.metadata?.account_type as 'free' | 'premium' || 'free',
+        account_type: (user.metadata && typeof user.metadata === 'object' && 'account_type' in user.metadata) 
+          ? user.metadata.account_type as 'free' | 'premium' 
+          : 'free',
         last_login: user.updated_at
       }));
     },
@@ -403,6 +396,12 @@ export const api = {
     async updateStatus(assetId: string, status: string) {
       console.log('Mock updateStatus called for asset:', assetId, 'status:', status);
       return {
+        id: assetId,
+        code: 'MOCK001',
+        name: 'Mock Asset 1',
+        country: 'Brazil',
+        stock_market: 'B3',
+        asset_class: 'stocks',
         status: status as 'active' | 'inactive'
       };
     },
