@@ -25,8 +25,18 @@ export const auth = {
         throw new Error("Erro ao verificar usuário");
       }
 
-      // If user doesn't exist or has no status, proceed with normal login
-      // The auth will fail naturally if credentials are wrong
+      // If user doesn't exist, throw error
+      if (!userData || userData.length === 0) {
+        throw new Error("EMAIL_NOT_FOUND");
+      }
+
+      // If user exists but is pending, throw specific error
+      const userStatus = userData[0];
+      if (userStatus.status_users === 'pending') {
+        throw new Error("PENDING_CONFIRMATION");
+      }
+
+      // Proceed with login if user is active
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -35,16 +45,6 @@ export const auth = {
       if (error) {
         console.error("Login error:", error);
         throw error;
-      }
-
-      // After successful auth login, check user status
-      if (userData && userData.length > 0) {
-        const userStatus = userData[0];
-        
-        // If user exists but is pending, throw specific error
-        if (userStatus.status_users === 'pending') {
-          throw new Error("PENDING_CONFIRMATION");
-        }
       }
 
       console.log("Login successful:", data);
@@ -65,6 +65,20 @@ export const auth = {
     try {
       console.log(`Attempting to register user with email: ${email}`);
       
+      // First check if user already exists
+      const { data: existingUser, error: checkError } = await supabase.rpc('check_user_by_email', {
+        p_email: email
+      });
+
+      if (checkError) {
+        console.error("Error checking existing user:", checkError);
+        throw new Error("Erro ao verificar usuário existente");
+      }
+
+      if (existingUser && existingUser.length > 0) {
+        throw new Error("EMAIL_ALREADY_EXISTS");
+      }
+      
       // Register user with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -84,7 +98,7 @@ export const auth = {
 
       console.log("Auth registration successful:", authData);
 
-      // Insert user data into public.users table with level_id=1 and status_user='pending'
+      // Insert user data into public.users table with level_id=1 and status_users='pending'
       if (authData.user) {
         const { error: userError } = await supabase
           .from('users')
@@ -92,7 +106,7 @@ export const auth = {
             {
               id: authData.user.id,
               email: email,
-              full_name: fullName,
+              name: fullName,
               level_id: 1,
               status_users: 'pending',
               created_at: new Date().toISOString(),

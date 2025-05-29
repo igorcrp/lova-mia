@@ -1,3 +1,4 @@
+
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
@@ -53,6 +54,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const confirmation = params.get('confirmation');
     const reset = params.get('reset');
     
+    // Check for hash parameters (Supabase auth tokens)
+    const hash = window.location.hash;
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const tokenType = hashParams.get('type');
+      
+      if (accessToken && tokenType === 'signup') {
+        console.log('Email confirmation detected, processing...');
+        handleEmailConfirmation(accessToken);
+        return;
+      }
+    }
+    
     if (confirmation === 'true') {
       toast.success("Email confirmado com sucesso! Você já pode fazer login.");
     }
@@ -63,6 +78,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     setIsLoading(false);
   }, [location]);
+
+  // Handle email confirmation when user clicks the link
+  const handleEmailConfirmation = async (accessToken: string) => {
+    try {
+      console.log('Processing email confirmation...');
+      
+      // Set the session using the access token
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: ''
+      });
+
+      if (sessionError) {
+        console.error('Error setting session:', sessionError);
+        toast.error('Erro ao confirmar email.');
+        setIsLoading(false);
+        return;
+      }
+
+      if (sessionData.user) {
+        console.log('User confirmed:', sessionData.user);
+        
+        // Update user status to active in public.users table
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ status_users: 'active' })
+          .eq('id', sessionData.user.id);
+
+        if (updateError) {
+          console.error('Error updating user status:', updateError);
+        } else {
+          console.log('User status updated to active');
+        }
+
+        // Clear the hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
+        
+        toast.success("Email confirmado com sucesso! Você já pode fazer login.");
+        navigate("/login?confirmation=true");
+      }
+    } catch (error) {
+      console.error('Error in email confirmation:', error);
+      toast.error('Erro ao confirmar email.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Function to check user status in Supabase and handle redirection
   const checkUserStatusAndRedirect = async (userEmail: string) => {
