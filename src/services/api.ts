@@ -72,8 +72,6 @@ export const api = {
     },
 
     async checkUserByEmail(email: string) {
-      // This function would need to be created in Supabase
-      // For now, we'll query the users table directly
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -96,6 +94,83 @@ export const api = {
       
       if (error) throw error;
       return data;
+    },
+
+    async getCountries() {
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('country')
+        .order('country');
+      
+      if (error) throw error;
+      
+      const uniqueCountries = [...new Set(data.map(item => item.country))];
+      return uniqueCountries;
+    },
+
+    async getStockMarkets(country?: string) {
+      let query = supabase
+        .from('market_data_sources')
+        .select('stock_market')
+        .order('stock_market');
+      
+      if (country) {
+        query = query.eq('country', country);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      const uniqueMarkets = [...new Set(data.map(item => item.stock_market))];
+      return uniqueMarkets;
+    },
+
+    async getAssetClasses(country?: string, stockMarket?: string) {
+      let query = supabase
+        .from('market_data_sources')
+        .select('asset_class')
+        .order('asset_class');
+      
+      if (country) {
+        query = query.eq('country', country);
+      }
+      if (stockMarket) {
+        query = query.eq('stock_market', stockMarket);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      const uniqueAssetClasses = [...new Set(data.map(item => item.asset_class))];
+      return uniqueAssetClasses;
+    },
+
+    async getDataTableName(country: string, stockMarket: string, assetClass: string) {
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('stock_table')
+        .eq('country', country)
+        .eq('stock_market', stockMarket)
+        .eq('asset_class', assetClass)
+        .single();
+      
+      if (error) throw error;
+      return data?.stock_table || null;
+    },
+
+    async checkTableExists(tableName: string) {
+      try {
+        const { error } = await supabase
+          .from(tableName as any)
+          .select('*')
+          .limit(1);
+        
+        return !error;
+      } catch {
+        return false;
+      }
     }
   },
 
@@ -153,15 +228,12 @@ export const api = {
       return data;
     },
 
-    // Mock functions for missing API endpoints
     async runAnalysis(params: StockAnalysisParams): Promise<AnalysisResult[]> {
-      // This would be implemented as an edge function or backend service
       console.log('Mock runAnalysis called with params:', params);
       return [];
     },
 
     async getDetailedAnalysis(params: StockAnalysisParams): Promise<DetailedResult> {
-      // This would be implemented as an edge function or backend service
       console.log('Mock getDetailedAnalysis called with params:', params);
       return {
         assetCode: '',
@@ -190,7 +262,6 @@ export const api = {
     }
   },
 
-  // Mock functions for admin features
   users: {
     async getAll() {
       const { data, error } = await supabase
@@ -209,19 +280,42 @@ export const api = {
       
       if (error) throw error;
       return data;
+    },
+
+    async getUserStats() {
+      console.log('Mock getUserStats called');
+      return {
+        total: 0,
+        active: 0,
+        pending: 0,
+        inactive: 0
+      };
+    },
+
+    async create(userData: any) {
+      console.log('Mock create user called with:', userData);
+      return {};
     }
   },
 
   assets: {
     async getAll() {
-      // This would query an assets table if it existed
       console.log('Mock getAll assets called');
       return [];
     },
 
     async updateStatus(assetId: string, status: string) {
-      // This would update an asset's status
       console.log('Mock updateStatus called for asset:', assetId, 'status:', status);
+      return {};
+    },
+
+    async getTotalCount() {
+      console.log('Mock getTotalCount assets called');
+      return 0;
+    },
+
+    async create(assetData: any) {
+      console.log('Mock create asset called with:', assetData);
       return {};
     }
   }

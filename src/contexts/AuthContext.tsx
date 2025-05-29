@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   resendConfirmationEmail: (email: string) => Promise<void>;
   loading: boolean;
+  isLoading: boolean; // Add missing property
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: userProfile.email,
           full_name: userProfile.name || '',
           level_id: userProfile.level_id || 1,
-          status: userProfile.status_users || 'pending',
+          status: (userProfile.status_users as 'active' | 'inactive' | 'pending') || 'pending',
           email_verified: userProfile.email_verified || false,
           account_type: 'free',
           created_at: userProfile.created_at,
@@ -257,7 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       googleLogin,
       resetPassword,
       resendConfirmationEmail,
-      loading
+      loading,
+      isLoading: loading
     }}>
       {children}
     </AuthContext.Provider>
