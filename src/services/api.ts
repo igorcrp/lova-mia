@@ -76,9 +76,9 @@ export const api = {
         .from('users')
         .select('*')
         .eq('email', email)
-        .single();
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
       
@@ -197,8 +197,16 @@ export const api = {
       
       if (error) throw error;
       
-      // Safely handle the data array
-      const stockCodes = Array.isArray(data) ? data.map(item => item?.stock_code).filter(Boolean) : [];
+      // Safely handle the data array and type check
+      const stockCodes = Array.isArray(data) ? 
+        data.map(item => {
+          // Type guard to ensure item has stock_code property
+          if (item && typeof item === 'object' && 'stock_code' in item) {
+            return item.stock_code;
+          }
+          return null;
+        }).filter(Boolean) : [];
+      
       const uniqueCodes = [...new Set(stockCodes)];
       return uniqueCodes.map(code => ({
         code,
@@ -230,36 +238,92 @@ export const api = {
       return data;
     },
 
-    async runAnalysis(params: StockAnalysisParams): Promise<AnalysisResult[]> {
+    async runAnalysis(params: StockAnalysisParams, progressCallback?: (progress: number) => void): Promise<AnalysisResult[]> {
       console.log('Mock runAnalysis called with params:', params);
-      return [];
+      
+      // Simulate progress if callback provided
+      if (progressCallback) {
+        progressCallback(0);
+        setTimeout(() => progressCallback(25), 100);
+        setTimeout(() => progressCallback(50), 200);
+        setTimeout(() => progressCallback(75), 300);
+        setTimeout(() => progressCallback(100), 400);
+      }
+      
+      // Return mock data that matches the expected structure
+      return [
+        {
+          assetCode: 'MOCK001',
+          assetName: 'Mock Asset 1',
+          tradingDays: 250,
+          trades: 50,
+          tradePercentage: 20,
+          profits: 30,
+          profitPercentage: 60,
+          losses: 15,
+          lossPercentage: 30,
+          stops: 5,
+          stopPercentage: 10,
+          finalCapital: params.initialCapital * 1.15,
+          profit: params.initialCapital * 0.15,
+          averageGain: 500,
+          averageLoss: 300,
+          maxDrawdown: 5.2,
+          sharpeRatio: 1.8,
+          sortinoRatio: 2.1,
+          recoveryFactor: 2.9,
+          successRate: 60
+        }
+      ];
     },
 
-    async getDetailedAnalysis(params: StockAnalysisParams): Promise<DetailedResult> {
-      console.log('Mock getDetailedAnalysis called with params:', params);
+    async getDetailedAnalysis(assetCode: string, params: StockAnalysisParams): Promise<DetailedResult> {
+      console.log('Mock getDetailedAnalysis called with assetCode:', assetCode, 'params:', params);
+      
+      // Return mock detailed data
       return {
-        assetCode: '',
-        assetName: '',
-        tradingDays: 0,
-        trades: 0,
-        tradePercentage: 0,
-        profits: 0,
-        profitPercentage: 0,
-        losses: 0,
-        lossPercentage: 0,
-        stops: 0,
-        stopPercentage: 0,
-        finalCapital: 0,
-        profit: 0,
-        averageGain: 0,
-        averageLoss: 0,
-        maxDrawdown: 0,
-        sharpeRatio: 0,
-        sortinoRatio: 0,
-        recoveryFactor: 0,
-        successRate: 0,
-        tradeHistory: [],
-        capitalEvolution: []
+        assetCode: assetCode,
+        assetName: `Mock Asset ${assetCode}`,
+        tradingDays: 250,
+        trades: 50,
+        tradePercentage: 20,
+        profits: 30,
+        profitPercentage: 60,
+        losses: 15,
+        lossPercentage: 30,
+        stops: 5,
+        stopPercentage: 10,
+        finalCapital: params.initialCapital * 1.15,
+        profit: params.initialCapital * 0.15,
+        averageGain: 500,
+        averageLoss: 300,
+        maxDrawdown: 5.2,
+        sharpeRatio: 1.8,
+        sortinoRatio: 2.1,
+        recoveryFactor: 2.9,
+        successRate: 60,
+        tradeHistory: [
+          {
+            date: '2024-01-15',
+            entryPrice: 100,
+            exitPrice: 105,
+            profit: 500,
+            profitPercentage: 5,
+            trade: 'Buy',
+            stop: '-',
+            volume: 100
+          }
+        ],
+        capitalEvolution: [
+          {
+            date: '2024-01-01',
+            capital: params.initialCapital
+          },
+          {
+            date: '2024-01-15',
+            capital: params.initialCapital * 1.05
+          }
+        ]
       };
     }
   },
@@ -271,7 +335,15 @@ export const api = {
         .select('*');
       
       if (error) throw error;
-      return data;
+      
+      // Transform the data to match the User interface
+      return data.map(user => ({
+        ...user,
+        full_name: user.name || '',
+        status: user.status_users as 'active' | 'inactive' | 'pending' || 'pending',
+        account_type: user.metadata?.account_type as 'free' | 'premium' || 'free',
+        last_login: user.updated_at
+      }));
     },
 
     async updateStatus(userId: string, status: string) {
@@ -287,12 +359,12 @@ export const api = {
     async getUserStats() {
       console.log('Mock getUserStats called');
       return {
-        total: 0,
-        active: 0,
-        pending: 0,
-        inactive: 0,
-        premium: 0,
-        new: 0
+        total: 156,
+        active: 98,
+        pending: 23,
+        inactive: 35,
+        premium: 45,
+        new: 12
       };
     },
 
@@ -315,17 +387,29 @@ export const api = {
   assets: {
     async getAll() {
       console.log('Mock getAll assets called');
-      return [];
+      return [
+        {
+          id: '1',
+          code: 'MOCK001',
+          name: 'Mock Asset 1',
+          country: 'Brazil',
+          stock_market: 'B3',
+          asset_class: 'stocks',
+          status: 'active' as const
+        }
+      ];
     },
 
     async updateStatus(assetId: string, status: string) {
       console.log('Mock updateStatus called for asset:', assetId, 'status:', status);
-      return {};
+      return {
+        status: status as 'active' | 'inactive'
+      };
     },
 
     async getTotalCount() {
       console.log('Mock getTotalCount assets called');
-      return 0;
+      return 487;
     },
 
     async create(assetData: any) {
@@ -337,7 +421,7 @@ export const api = {
         country: assetData.country,
         stock_market: assetData.stock_market,
         asset_class: assetData.asset_class,
-        status: assetData.status
+        status: assetData.status as 'active' | 'inactive'
       };
     }
   }
