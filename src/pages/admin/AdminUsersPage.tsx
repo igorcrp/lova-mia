@@ -41,15 +41,20 @@ export default function AdminUsersPage() {
         setIsLoading(true);
         const data = await api.users.getAll();
         
-        // Ensure users have the correct status type
+        // Map database users to User type
         const typedUsers: User[] = data.map(user => ({
-          ...user,
-          status: (user.status === 'active' || user.status === 'pending' || user.status === 'inactive') 
-            ? user.status 
-            : 'active' as 'active' | 'pending' | 'inactive',
-          account_type: (user.account_type === 'free' || user.account_type === 'premium') 
-            ? user.account_type 
-            : 'free' as 'free' | 'premium'
+          id: user.id,
+          email: user.email,
+          full_name: user.name || '', // Map 'name' to 'full_name'
+          avatar_url: undefined,
+          level_id: user.level_id || 1,
+          status: (user.status_users === 'active' || user.status_users === 'pending' || user.status_users === 'inactive') 
+            ? user.status_users as 'active' | 'pending' | 'inactive'
+            : 'active',
+          email_verified: user.email_verified || false,
+          account_type: 'free' as 'free' | 'premium', // Default since not in database
+          created_at: user.created_at || new Date().toISOString(),
+          last_login: undefined
         }));
         
         setUsers(typedUsers);

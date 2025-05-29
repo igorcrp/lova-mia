@@ -78,7 +78,7 @@ export const api = {
         .eq('email', email)
         .single();
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      if (error && error.code !== 'PGRST116') {
         throw error;
       }
       
@@ -197,7 +197,9 @@ export const api = {
       
       if (error) throw error;
       
-      const uniqueCodes = [...new Set(data.map(item => item.stock_code))];
+      // Safely handle the data array
+      const stockCodes = Array.isArray(data) ? data.map(item => item?.stock_code).filter(Boolean) : [];
+      const uniqueCodes = [...new Set(stockCodes)];
       return uniqueCodes.map(code => ({
         code,
         name: code,
@@ -288,13 +290,25 @@ export const api = {
         total: 0,
         active: 0,
         pending: 0,
-        inactive: 0
+        inactive: 0,
+        premium: 0,
+        new: 0
       };
     },
 
     async create(userData: any) {
       console.log('Mock create user called with:', userData);
-      return {};
+      return {
+        id: 'mock-id',
+        email: userData.email,
+        full_name: userData.full_name,
+        level_id: userData.level_id,
+        status: userData.status,
+        email_verified: userData.email_verified,
+        account_type: userData.account_type,
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString()
+      };
     }
   },
 
@@ -316,7 +330,15 @@ export const api = {
 
     async create(assetData: any) {
       console.log('Mock create asset called with:', assetData);
-      return {};
+      return {
+        id: 'mock-asset-id',
+        code: assetData.code,
+        name: assetData.name,
+        country: assetData.country,
+        stock_market: assetData.stock_market,
+        asset_class: assetData.asset_class,
+        status: assetData.status
+      };
     }
   }
 };

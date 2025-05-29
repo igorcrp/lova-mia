@@ -47,7 +47,12 @@ export default function AdminAssetsPage() {
         
         // Ensure assets have the right status type
         const typedAssets: Asset[] = assetsData.map(asset => ({
-          ...asset,
+          id: asset.id,
+          code: asset.code,
+          name: asset.name,
+          country: asset.country,
+          stock_market: asset.stock_market,
+          asset_class: asset.asset_class,
           status: asset.status === 'active' ? 'active' : 'inactive'
         }));
         
@@ -122,7 +127,12 @@ export default function AdminAssetsPage() {
       
       // Ensure the created asset has proper types
       const typedAsset: Asset = {
-        ...createdAsset,
+        id: createdAsset.id,
+        code: createdAsset.code,
+        name: createdAsset.name,
+        country: createdAsset.country,
+        stock_market: createdAsset.stock_market,
+        asset_class: createdAsset.asset_class,
         status: createdAsset.status === 'active' ? 'active' : 'inactive'
       };
       
