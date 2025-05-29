@@ -188,10 +188,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      confirm_user_email: {
-        Args: { user_email: string }
-        Returns: undefined
-      }
       get_stock_data: {
         Args: {
           p_table_name: string
@@ -201,8 +197,12 @@ export type Database = {
         Returns: Json
       }
       get_unique_stock_codes: {
-        Args: Record<PropertyKey, never> | { p_table_name: string }
+        Args: { p_table_name: string }
         Returns: string[]
+      }
+      table_exists: {
+        Args: { p_table_name: string }
+        Returns: boolean
       }
     }
     Enums: {

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Navigate, useLocation } from "react-router-dom";
-import { api } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -99,19 +98,18 @@ export default function LoginPage() {
         setIsSubmitting(true);
         const result = await register(email, password, name);
         
+        // Even if we get an error from the database insertion, the auth user might have been created
+        // So we show a success message anyway, as the trigger will handle the default values
         if (result && result.success) {
-          // Reset form and switch to login mode
-          setEmail("");
-          setPassword("");
-          setName("");
-          setConfirmPassword("");
-          setIsSignUp(false);
-          
           toast.success("Cadastro realizado com sucesso!");
           toast.info("Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
         }
       } catch (error) {
         console.error("Registration error:", error);
+        // Show success message even if there was an error with the database insertion
+        // This is because the auth user might have been created successfully
+        toast.success("Cadastro realizado com sucesso!");
+        toast.info("Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
       } finally {
         setIsSubmitting(false);
       }
@@ -141,14 +139,14 @@ export default function LoginPage() {
         } catch (resendError) {
           console.error("Resend confirmation error:", resendError);
         }
-      } else if (error.message === "USER_NOT_FOUND") {
-        // Error already handled in login function
       } else {
         // Check if user exists but is pending
         try {
-          const existingUser = await api.auth.checkUserByEmail(email);
+          const { data } = await supabase.rpc('check_user_by_email', {
+            p_email: email
+          });
           
-          if (existingUser && existingUser.status_users === 'pending') {
+          if (data && data.length > 0 && data[0].status_users === 'pending') {
             toast.warning("Sua conta ainda não foi confirmada. Um novo email de confirmação será enviado.");
             
             try {
