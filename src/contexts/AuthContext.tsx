@@ -1,9 +1,10 @@
+
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 interface AuthContextType {
   user: User | null;
@@ -11,9 +12,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   googleLogin: () => Promise<void>;
   logout: () => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<any>;
-  resetPassword: (email: string) => Promise<void>;
-  resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
 // Define types for API responses to fix TypeScript errors
@@ -31,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     // Check if user is already logged in
@@ -48,31 +45,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     
-    // Check for URL parameters that indicate email confirmation or password reset
-    const params = new URLSearchParams(location.search);
-    const confirmation = params.get('confirmation');
-    const reset = params.get('reset');
-    
-    if (confirmation === 'true') {
-      toast.success("Email confirmado com sucesso! Você já pode fazer login.");
-    }
-    
-    if (reset === 'true') {
-      toast.info("Você pode definir uma nova senha agora.");
-    }
-    
     setIsLoading(false);
-  }, [location]);
+  }, []);
 
   // Function to check user status in Supabase and handle redirection
   const checkUserStatusAndRedirect = async (userEmail: string) => {
     try {
       console.log("Checking status for user:", userEmail);
       
-      // Query the public.users table for user data using the RPC function
-      const { data: userData, error } = await supabase.rpc('check_user_by_email', {
-        p_email: userEmail
-      });
+      // Query the public.users table for user data
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('email, status_users, level_id')
+        .eq('email', userEmail)
+        .maybeSingle();
 
       if (error) {
         console.error("Error checking user status:", error);
@@ -83,12 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("User data from Supabase:", userData);
 
       // Handle different user cases based on requirements
-      if (userData && userData.length > 0) {
-        const userInfo = userData[0];
+      if (userData) {
         // User exists in the database
-        if (userInfo.status_users === 'active') {
+        if (userData.status_users === 'active') {
           // User is active, check level and redirect accordingly
-          if (userInfo.level_id === 2) {
+          if (userData.level_id === 2) {
             navigate("/admin");
             return { isActive: true, level: 2 };
           } else {
@@ -98,11 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // User exists but is not active
           toast.warning("Por favor, confirme seu cadastro clicando no link enviado para seu email.");
-          // Automatically resend confirmation email
-          await api.auth.resendConfirmationEmail(userEmail);
-          toast.info("Um novo email de confirmação foi enviado para você.");
           navigate("/login");
-          return { isActive: false, level: userInfo.level_id };
+          return { isActive: false, level: userData.level_id };
         }
       } else {
         // User doesn't exist in the database
@@ -170,7 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error("Login failed", error);
-      throw error; // Let the component handle the error
+      toast.error("Falha no login. Verifique suas credenciais.");
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -234,58 +217,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
   
-  const register = async (email: string, password: string, fullName: string) => {
-    try {
-      setIsLoading(true);
-      console.log("Attempting to register user:", email);
-      
-      const result = await api.auth.register(email, password, fullName);
-      
-      return result;
-    } catch (error) {
-      console.error("Registration failed", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const resetPassword = async (email: string) => {
-    try {
-      setIsLoading(true);
-      console.log("Attempting to reset password for:", email);
-      
-      await api.auth.resetPassword(email);
-      
-      toast.success("Email de redefinição de senha enviado com sucesso!");
-      toast.info("Por favor, verifique sua caixa de entrada e siga as instruções para redefinir sua senha.");
-    } catch (error) {
-      console.error("Password reset failed", error);
-      toast.error("Falha ao enviar email de redefinição de senha. Tente novamente mais tarde.");
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const resendConfirmationEmail = async (email: string) => {
-    try {
-      setIsLoading(true);
-      console.log("Attempting to resend confirmation email for:", email);
-      
-      await api.auth.resendConfirmationEmail(email);
-      
-      toast.success("Email de confirmação reenviado com sucesso!");
-      toast.info("Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
-    } catch (error) {
-      console.error("Resend confirmation email failed", error);
-      toast.error("Falha ao reenviar email de confirmação. Tente novamente mais tarde.");
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
   const logout = async () => {
     try {
       setIsLoading(true);
@@ -309,16 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isLoading, 
-      login, 
-      googleLogin, 
-      logout, 
-      register, 
-      resetPassword, 
-      resendConfirmationEmail 
-    }}>
+    <AuthContext.Provider value={{ user, isLoading, login, googleLogin, logout }}>
       {children}
     </AuthContext.Provider>
   );
