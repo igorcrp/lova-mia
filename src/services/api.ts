@@ -84,31 +84,6 @@ export const auth = {
 
       console.log("Auth registration successful:", authData);
 
-      // Insert user data into public.users table with level_id=1 and status_user='pending'
-      if (authData.user) {
-        const { error: userError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: authData.user.id,
-              email: email,
-              name: fullName,
-              level_id: 1,
-              status_users: 'pending',
-              created_at: new Date().toISOString(),
-            }
-          ]);
-
-        if (userError) {
-          console.error("User data insertion error:", userError);
-          // Don't throw here, as the auth user is already created
-          // Just log the error and continue
-          console.warn("User created in auth but not in public.users table");
-        } else {
-          console.log("User registration successful in public.users table");
-        }
-      }
-
       return {
         user: authData.user,
         session: authData.session,
