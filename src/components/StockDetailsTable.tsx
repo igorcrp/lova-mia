@@ -61,12 +61,12 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   const calculateStopTrigger = (item: TradeHistoryItem, operation: string): string => {
     // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || !item.stopPrice || item.stopPrice === '-') {
+    if (!item || item.trade !== "Executed" || !item.stopPrice) {
         return "-";
     }
 
     // Converte os valores para número
-    const stopPrice = typeof item.stopPrice === 'number' ? item.stopPrice : parseFloat(item.stopPrice);
+    const stopPrice = typeof item.stopPrice === 'number' ? item.stopPrice : parseFloat(String(item.stopPrice));
     const low = typeof item.low === 'number' ? item.low : parseFloat(String(item.low || 0));
     const high = typeof item.high === 'number' ? item.high : parseFloat(String(item.high || 0));
 

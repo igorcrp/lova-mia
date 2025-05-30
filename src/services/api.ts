@@ -73,6 +73,35 @@ export const api = {
     async resetPassword(email: string) {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
+    },
+
+    // Additional auth methods for compatibility
+    async login(email: string, password: string) {
+      return this.signIn(email, password);
+    },
+
+    async logout() {
+      return this.signOut();
+    },
+
+    async register(email: string, password: string, fullName: string) {
+      return this.signUp(email, password, { full_name: fullName });
+    },
+
+    async googleLogin() {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google'
+      });
+      if (error) throw error;
+      return data;
+    },
+
+    async resendConfirmationEmail(email: string) {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+      if (error) throw error;
     }
   },
 
@@ -108,6 +137,31 @@ export const api = {
       
       if (error) throw error;
       return data;
+    },
+
+    // Additional methods for admin pages
+    async getAll() {
+      return this.getUsers();
+    },
+
+    async create(userData: any) {
+      const { data, error } = await supabase
+        .from('users')
+        .insert(userData)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+
+    async getUserStats() {
+      const users = await this.getUsers();
+      return {
+        total: users.length,
+        active: users.filter(u => u.status_users === 'active').length,
+        pending: users.filter(u => u.status_users === 'pending').length
+      };
     }
   },
 
@@ -115,6 +169,20 @@ export const api = {
     async getAssets() {
       // Mock implementation - replace with actual asset fetching logic
       return [];
+    },
+
+    async getAll() {
+      return this.getAssets();
+    },
+
+    async create(assetData: any) {
+      // Mock implementation
+      return assetData;
+    },
+
+    async getTotalCount() {
+      const assets = await this.getAssets();
+      return assets.length;
     }
   },
 
@@ -147,6 +215,16 @@ export const api = {
         console.error('Failed to get data table name:', error);
         throw error;
       }
+    },
+
+    async getMarketDataSources() {
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('*')
+        .order('country', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
     },
 
     async getCountries(): Promise<string[]> {
@@ -223,16 +301,66 @@ export const api = {
 
     async checkTableExists(tableName: string): Promise<boolean> {
       try {
-        // Check if table exists by trying to query its structure
-        const { error } = await supabase
-          .from(tableName)
-          .select('*')
-          .limit(1);
+        // Use RPC call to check table existence safely
+        const { data, error } = await supabase.rpc('check_table_exists', {
+          table_name: tableName
+        });
 
-        return !error;
+        if (error) {
+          console.error('Error checking table existence:', error);
+          return false;
+        }
+
+        return data === true;
       } catch (error) {
-        console.error('Table does not exist:', tableName);
+        console.error('Table existence check failed:', error);
         return false;
+      }
+    },
+
+    async getUniqueStockCodes(tableName: string): Promise<string[]> {
+      try {
+        console.log('Fetching unique stock codes from table:', tableName);
+        
+        // Use RPC call for dynamic table queries
+        const { data, error } = await supabase.rpc('get_unique_stock_codes', {
+          table_name: tableName
+        });
+
+        if (error) {
+          console.error('Error fetching stock codes:', error);
+          throw error;
+        }
+
+        console.log('Fetched stock codes:', data?.length || 0, 'codes');
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch stock codes:', error);
+        throw error;
+      }
+    },
+
+    async getStockData(tableName: string, stockCode: string, params: StockAnalysisParams) {
+      try {
+        console.log('Fetching stock data for:', { tableName, stockCode });
+        
+        // Use RPC call for dynamic table queries
+        const { data, error } = await supabase.rpc('get_stock_data', {
+          table_name: tableName,
+          stock_code: stockCode,
+          start_date: params.startDate,
+          end_date: params.endDate
+        });
+
+        if (error) {
+          console.error('Error fetching stock data:', error);
+          throw error;
+        }
+
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch stock data:', error);
+        throw error;
       }
     }
   },
@@ -386,22 +514,13 @@ export const api = {
       try {
         console.log('Fetching available stocks from table:', tableName);
         
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('stock_code')
-          .order('stock_code', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching stocks:', error);
-          throw error;
-        }
-
-        const uniqueStocks = [...new Set(data?.map(item => item.stock_code) || [])]
-          .map(code => ({
-            code,
-            name: code,
-            fullName: `${code} - Sample Company`
-          }));
+        const stockCodes = await api.marketData.getUniqueStockCodes(tableName);
+        
+        const uniqueStocks = stockCodes.map(code => ({
+          code,
+          name: code,
+          fullName: `${code} - Sample Company`
+        }));
 
         console.log('Fetched stocks:', uniqueStocks.length, 'stocks');
         return uniqueStocks;
