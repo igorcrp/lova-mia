@@ -84,7 +84,7 @@ export const auth = {
 
       console.log("Auth registration successful:", authData);
 
-      // Insert user data into public.users table with level_id=1 and status_users='pending'
+      // Insert user data into public.users table with level_id=1 and status_user='pending'
       if (authData.user) {
         const { error: userError } = await supabase
           .from('users')
@@ -92,7 +92,7 @@ export const auth = {
             {
               id: authData.user.id,
               email: email,
-              full_name: fullName,
+              name: fullName,
               level_id: 1,
               status_users: 'pending',
               created_at: new Date().toISOString(),
