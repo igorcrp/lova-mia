@@ -84,9 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log("User data from Supabase:", userData);
 
-      // Handle different user cases based on requirements
-      if (userData && userData.length > 0) {
-        const userInfo = userData[0];
+      // CORRIGIDO: Verifica se userData não é null (resultado de maybeSingle())
+      if (userData) {
+        const userInfo = userData; // userData já é o objeto do usuário
         // User exists in the database
         if (userInfo.status_users === 'active') {
           // User is active, check level and redirect accordingly
@@ -241,27 +241,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Attempting to register user:", email);
       
-      const result = await api.auth.register(email, password, fullName);
-      
-      // AJUSTADO: Garante que as mensagens e o redirecionamento ocorram após sucesso
-      // Verifica se a API retornou sucesso (ou pelo menos não um erro explícito)
-      if (result && !result.error) { // Adapte esta condição se a API retornar algo diferente
-        toast.success("Cadastro realizado com sucesso!");
-        toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
-        navigate("/login"); // Tenta redirecionar
-      } else {
-        // Se a API indicar erro ou não retornar sucesso, informa o usuário
-        console.error("Registration API call did not indicate success or returned an error:", result);
-        toast.error("Ocorreu um erro durante o registro. Tente novamente.");
-      }
-      
-      return result;
-    } catch (error) {
-      console.error("Registration failed", error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+    // Call the API function
+    const result = await api.auth.register(email, password, fullName);
+
+    // Check if the API call was successful (adapt if needed)
+    if (result && !result.error) {
+      console.log("Registration successful, navigating to login...");
+      // Try navigating FIRST
+      navigate("/login");
+      // Then show messages
+      toast.success("Cadastro realizado com sucesso!");
+      toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
+    } else {
+      // Handle API error case
+      console.error("Registration API call failed or returned error:", result);
+      toast.error("Ocorreu um erro durante o registro. Tente novamente.");
+      // Optionally re-throw or handle specific errors from 'result' if available
+      throw new Error(result?.error?.message || "Erro desconhecido no registro");
     }
+
+    return result; // Return result for potential further use
+
+  } catch (error: any) { // Catch errors from await or thrown errors
+    console.error("Registration failed in AuthContext:", error);
+    // Display a generic error or a specific one if available
+    toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
+    throw error; // Re-throw the error so the calling component knows about it
+  } finally {
+    setIsLoading(false);
+  }
   };
   
   const resetPassword = async (email: string) => {
