@@ -160,7 +160,15 @@ export const api = {
       return {
         total: users.length,
         active: users.filter(u => u.status_users === 'active').length,
-        pending: users.filter(u => u.status_users === 'pending').length
+        pending: users.filter(u => u.status_users === 'pending').length,
+        inactive: users.filter(u => u.status_users === 'inactive').length,
+        premium: users.filter(u => u.level_id === 2).length,
+        new: users.filter(u => {
+          const created = new Date(u.created_at);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return created > thirtyDaysAgo;
+        }).length
       };
     }
   },
@@ -344,12 +352,15 @@ export const api = {
       try {
         console.log('Fetching stock data for:', { tableName, stockCode });
         
+        // Get date range from period
+        const { startDate, endDate } = getDateRange(params.period);
+        
         // Use RPC call for dynamic table queries
         const { data, error } = await supabase.rpc('get_stock_data', {
           table_name: tableName,
-          stock_code: stockCode,
-          start_date: params.startDate,
-          end_date: params.endDate
+          stock_code_param: stockCode,
+          start_date: startDate,
+          end_date: endDate
         });
 
         if (error) {
