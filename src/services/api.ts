@@ -549,7 +549,8 @@ const analysis = {
       // Use fromDynamic to handle the dynamic table name
       // This resolves the TypeScript error where supabase.from() expects a literal table name
       const { data, error } = await fromDynamic(tableName)
-        .select('stock_code, name')
+        .select('stock_code') 
+        .groupBy('stock_code') 
         .order('stock_code');
       
       if (error) {
