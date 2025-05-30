@@ -1,681 +1,307 @@
-// This is a service layer to interact with Supabase and process data
 
-import { supabase, fromDynamic, MarketDataSource, StockRecord } from '@/integrations/supabase/client';
-import { AnalysisResult, Asset, DetailedResult, StockAnalysisParams, StockInfo, User } from '@/types';
-import { formatDateToYYYYMMDD, getDateRangeForPeriod } from '@/utils/dateUtils';
+import { supabase, fromDynamic, type MarketDataSource, type StockRecord } from "@/integrations/supabase/client";
+import { StockAnalysisParams, AnalysisResult, DetailedResult, TradeRecord } from "@/types";
 
-/**
- * Authentication API service
- */
-export const auth = {
-  /**
-   * Login with email and password
-   */
-  async login(email: string, password: string): Promise<any> {
-    try {
-      console.log(`Attempting to login with email: ${email}`);
-      
-      // REMOVIDO: Bloco que chamava RPC inexistente 'check_user_by_email'
-      // A verificação de status agora é feita no AuthContext após o login do Supabase Auth
+// API configuration
+const API_BASE_URL = 'https://api.example.com'; // Replace with actual API URL
 
-      // Autentica com Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+// Helper function to simulate analysis calculations
+const simulateAnalysis = (stockData: StockRecord[], params: StockAnalysisParams): AnalysisResult => {
+  if (!stockData || stockData.length === 0) {
+    return {
+      stockCode: 'UNKNOWN',
+      totalTrades: 0,
+      winRate: 0,
+      totalReturn: 0,
+      maxDrawdown: 0,
+      sharpeRatio: 0,
+      tradingDays: 0
+    };
+  }
 
-      if (error) {
-        console.error("Login error:", error);
-        // Verifica se o erro é por email não confirmado
-        if (error.message.includes("Email not confirmed")) {
-          throw new Error("PENDING_CONFIRMATION"); // Lança erro específico para tratamento no AuthContext
+  // Simple simulation based on price movements
+  const trades = stockData.slice(0, -1).map((record, index) => {
+    const nextRecord = stockData[index + 1];
+    const entry = record.close;
+    const exit = nextRecord.open;
+    const return_pct = ((exit - entry) / entry) * 100;
+    
+    return {
+      date: record.date,
+      entry_price: entry,
+      exit_price: exit,
+      return_pct
+    };
+  });
+
+  const winningTrades = trades.filter(t => t.return_pct > 0);
+  const totalReturn = trades.reduce((sum, t) => sum + t.return_pct, 0);
+  
+  return {
+    stockCode: stockData[0].stock_code,
+    totalTrades: trades.length,
+    winRate: trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0,
+    totalReturn,
+    maxDrawdown: Math.min(...trades.map(t => t.return_pct)),
+    sharpeRatio: totalReturn / Math.sqrt(trades.length),
+    tradingDays: stockData.length
+  };
+};
+
+// Helper function to get date range based on period
+const getDateRange = (period: string) => {
+  const endDate = new Date();
+  const startDate = new Date();
+  
+  switch (period) {
+    case '1D':
+      startDate.setDate(endDate.getDate() - 1);
+      break;
+    case '1W':
+      startDate.setDate(endDate.getDate() - 7);
+      break;
+    case '1M':
+      startDate.setMonth(endDate.getMonth() - 1);
+      break;
+    case '3M':
+      startDate.setMonth(endDate.getMonth() - 3);
+      break;
+    case '6M':
+      startDate.setMonth(endDate.getMonth() - 6);
+      break;
+    case '1Y':
+      startDate.setFullYear(endDate.getFullYear() - 1);
+      break;
+    case '2Y':
+      startDate.setFullYear(endDate.getFullYear() - 2);
+      break;
+    default:
+      startDate.setMonth(endDate.getMonth() - 3); // Default to 3 months
+  }
+  
+  return {
+    startDate: startDate.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0]
+  };
+};
+
+export const api = {
+  marketData: {
+    async getDataTableName(country: string, stockMarket: string, assetClass: string): Promise<string | null> {
+      try {
+        console.log('Fetching data table name for:', { country, stockMarket, assetClass });
+        
+        const { data, error } = await supabase
+          .from('market_data_sources')
+          .select('stock_table')
+          .eq('country', country)
+          .eq('stock_market', stockMarket)
+          .eq('asset_class', assetClass)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching data table name:', error);
+          throw error;
         }
-        throw error; // Lança outros erros de autenticação
+
+        if (!data) {
+          console.warn('No data source found for the specified criteria');
+          return null;
+        }
+
+        console.log('Found data table:', data.stock_table);
+        return data.stock_table;
+      } catch (error) {
+        console.error('Failed to get data table name:', error);
+        throw error;
       }
+    },
 
-      // REMOVIDO: Bloco que verificava status 'pending' após login bem-sucedido
-      // Essa lógica agora está no AuthContext
+    async getMarketDataSources(): Promise<MarketDataSource[]> {
+      try {
+        console.log('Fetching market data sources...');
+        
+        const { data, error } = await supabase
+          .from('market_data_sources')
+          .select('*')
+          .order('country', { ascending: true })
+          .order('stock_market', { ascending: true });
 
-      console.log("Supabase Auth Login successful:", data);
-      return {
-        user: data.user,
-        session: data.session,
-      };
-    } catch (error) {
-      console.error("Login failed:", error);
-      throw error;
+        if (error) {
+          console.error('Error fetching market data sources:', error);
+          throw error;
+        }
+
+        console.log('Fetched market data sources:', data?.length || 0, 'records');
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch market data sources:', error);
+        throw error;
+      }
+    },
+
+    async getUniqueStockCodes(tableName: string): Promise<string[]> {
+      try {
+        console.log('Fetching unique stock codes from table:', tableName);
+        
+        // Use the PostgreSQL function to get unique stock codes
+        const { data, error } = await supabase
+          .rpc('get_unique_stock_codes', { p_table_name: tableName });
+
+        if (error) {
+          console.error('Error fetching unique stock codes:', error);
+          throw error;
+        }
+
+        console.log('Fetched unique stock codes:', data?.length || 0, 'codes');
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch unique stock codes:', error);
+        throw error;
+      }
+    },
+
+    async getStockData(tableName: string, stockCode: string, params: StockAnalysisParams): Promise<StockRecord[]> {
+      try {
+        console.log('Fetching stock data for:', { tableName, stockCode, params });
+        
+        // Use the PostgreSQL function to get stock data
+        const { data, error } = await supabase
+          .rpc('get_stock_data', { 
+            p_table_name: tableName, 
+            p_stock_code_param: stockCode,
+            p_limit_rows: 500 // Increase limit for better analysis
+          });
+
+        if (error) {
+          console.error('Error fetching stock data:', error);
+          throw error;
+        }
+
+        console.log('Fetched stock data:', data?.length || 0, 'records');
+        return data || [];
+      } catch (error) {
+        console.error('Failed to fetch stock data:', error);
+        throw error;
+      }
     }
   },
 
-  /**
-   * Register a new user
-   */
-  async register(email: string, password: string, fullName: string): Promise<any> {
-    try {
-      console.log(`Attempting to register user with email: ${email}`);
-      
-      // Register user with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
-          data: {
-            full_name: fullName,
+  analysis: {
+    async runAnalysis(params: StockAnalysisParams, onProgress?: (progress: number) => void): Promise<AnalysisResult[]> {
+      try {
+        console.log('Running analysis with params:', params);
+        
+        if (!params.dataTableName) {
+          throw new Error('Data table name is required for analysis');
+        }
+
+        // Get unique stock codes from the specified table
+        const stockCodes = await api.marketData.getUniqueStockCodes(params.dataTableName);
+        
+        if (stockCodes.length === 0) {
+          console.warn('No stock codes found in the specified table');
+          return [];
+        }
+
+        console.log(`Processing ${stockCodes.length} stocks...`);
+        
+        const results: AnalysisResult[] = [];
+        const totalStocks = Math.min(stockCodes.length, 50); // Limit to 50 stocks for performance
+        
+        for (let i = 0; i < totalStocks; i++) {
+          const stockCode = stockCodes[i];
+          
+          try {
+            // Update progress
+            if (onProgress) {
+              onProgress((i / totalStocks) * 100);
+            }
+            
+            // Fetch stock data for this specific stock
+            const stockData = await api.marketData.getStockData(params.dataTableName, stockCode, params);
+            
+            if (stockData && stockData.length > 0) {
+              // Simulate analysis for this stock
+              const result = simulateAnalysis(stockData, params);
+              results.push(result);
+              
+              console.log(`Processed ${stockCode}: ${result.totalTrades} trades, ${result.winRate.toFixed(1)}% win rate`);
+            }
+          } catch (stockError) {
+            console.error(`Failed to process stock ${stockCode}:`, stockError);
+            // Continue with next stock instead of failing completely
           }
         }
-      });
 
-      if (authError) {
-        console.error("Registration auth error:", authError);
-        throw authError;
+        console.log(`Analysis completed: processed ${results.length} stocks`);
+        return results.sort((a, b) => b.totalReturn - a.totalReturn); // Sort by total return descending
+      } catch (error) {
+        console.error('Analysis failed:', error);
+        throw error;
       }
+    },
 
-      console.log("Auth registration successful:", authData);
-
-      // Insert user data into public.users table with level_id=1 and status_user='pending'
-      if (authData.user) {
-        const { error: userError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: authData.user.id,
-              email: email,
-              name: fullName,
-              level_id: 1,
-              status_users: 'pending',
-              created_at: new Date().toISOString(),
-            }
-          ]);
-
-        if (userError) {
-          console.error("User data insertion error:", userError);
-          // Don't throw here, as the auth user is already created
-          // Just log the error and continue
-          console.warn("User created in auth but not in public.users table");
-        } else {
-          console.log("User registration successful in public.users table");
+    async getDetailedAnalysis(stockCode: string, params: StockAnalysisParams): Promise<DetailedResult> {
+      try {
+        console.log('Getting detailed analysis for:', stockCode, params);
+        
+        if (!params.dataTableName) {
+          throw new Error('Data table name is required for detailed analysis');
         }
-      }
 
-      return {
-        user: authData.user,
-        session: authData.session,
-        success: true
-      };
-    } catch (error) {
-      console.error("Registration failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Send password reset email
-   */
-  async resetPassword(email: string): Promise<void> {
-    try {
-      console.log(`Sending password reset email to: ${email}`);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login?reset=true`,
-      });
-
-      if (error) {
-        console.error("Password reset error:", error);
-        throw error;
-      }
-
-      console.log("Password reset email sent successfully");
-    } catch (error) {
-      console.error("Password reset failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Update user password
-   */
-  async updatePassword(newPassword: string): Promise<void> {
-    try {
-      console.log("Updating user password");
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) {
-        console.error("Password update error:", error);
-        throw error;
-      }
-
-      console.log("Password updated successfully");
-    } catch (error) {
-      console.error("Password update failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Resend confirmation email
-   */
-  async resendConfirmationEmail(email: string): Promise<void> {
-    try {
-      console.log(`Resending confirmation email to: ${email}`);
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
+        // Fetch stock data for detailed analysis
+        const stockData = await api.marketData.getStockData(params.dataTableName, stockCode, params);
+        
+        if (!stockData || stockData.length === 0) {
+          throw new Error(`No data found for stock ${stockCode}`);
         }
-      });
 
-      if (error) {
-        console.error("Resend confirmation email error:", error);
+        // Generate trade history from stock data
+        const tradeHistory: TradeRecord[] = stockData.slice(0, -1).map((record, index) => {
+          const nextRecord = stockData[index + 1];
+          const entry = record.close;
+          const exit = nextRecord.open;
+          const return_pct = ((exit - entry) / entry) * 100;
+          
+          return {
+            date: record.date,
+            type: return_pct > 0 ? 'win' as const : 'loss' as const,
+            entryPrice: entry,
+            exitPrice: exit,
+            returnPct: return_pct,
+            volume: record.volume || 0
+          };
+        });
+
+        // Calculate summary statistics
+        const winningTrades = tradeHistory.filter(t => t.returnPct > 0);
+        const totalReturn = tradeHistory.reduce((sum, t) => sum + t.returnPct, 0);
+        
+        const result: DetailedResult = {
+          stockCode,
+          totalTrades: tradeHistory.length,
+          winRate: tradeHistory.length > 0 ? (winningTrades.length / tradeHistory.length) * 100 : 0,
+          totalReturn,
+          maxDrawdown: Math.min(...tradeHistory.map(t => t.returnPct)),
+          sharpeRatio: totalReturn / Math.sqrt(tradeHistory.length),
+          tradingDays: stockData.length,
+          tradeHistory,
+          monthlyReturns: [], // Could be calculated from tradeHistory if needed
+          riskMetrics: {
+            volatility: Math.sqrt(tradeHistory.reduce((sum, t) => sum + Math.pow(t.returnPct, 2), 0) / tradeHistory.length),
+            maxConsecutiveLosses: 0, // Could be calculated from tradeHistory
+            averageWin: winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.returnPct, 0) / winningTrades.length : 0,
+            averageLoss: 0 // Could be calculated from losing trades
+          }
+        };
+
+        console.log('Detailed analysis completed for:', stockCode);
+        return result;
+      } catch (error) {
+        console.error('Failed to get detailed analysis:', error);
         throw error;
       }
-
-      console.log("Confirmation email resent successfully");
-    } catch (error) {
-      console.error("Resend confirmation email failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Login with Google
-   */
-  async googleLogin(): Promise<any> {
-    try {
-      console.log("Attempting to login with Google");
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/login?provider=google`
-        }
-      });
-
-      if (error) {
-        console.error("Google login error:", error);
-        throw error;
-      }
-
-      console.log("Google login initiated:", data);
-      return data;
-    } catch (error) {
-      console.error("Google login failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Logout current user
-   */
-  async logout(): Promise<void> {
-    try {
-      console.log("Attempting to logout");
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error("Logout error:", error);
-        throw error;
-      }
-
-      console.log("Logout successful");
-    } catch (error) {
-      console.error("Logout failed:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get current user data from public.users table
-   */
-  async getUserData(userId: string): Promise<User | null> {
-    try {
-      console.log(`Getting user data for ID: ${userId}`);
-      
-      // Use the secure function to get user data
-      const { data, error } = await supabase.rpc('get_current_user');
-
-      if (error) {
-        console.error("Get user data error:", error);
-        throw error;
-      }
-
-      console.log("User data retrieved:", data);
-      return data as User;
-    } catch (error) {
-      console.error("Get user data failed:", error);
-      return null;
-    }
-  },
-
-  /**
-   * Update user status to active after email confirmation
-   */
-  async confirmUserEmail(userId: string): Promise<void> {
-    try {
-      console.log(`Confirming email for user ID: ${userId}`);
-      const { error } = await supabase
-        .from('users')
-        .update({ status_users: 'active' })
-        .eq('id', userId);
-
-      if (error) {
-        console.error("Email confirmation error:", error);
-        throw error;
-      }
-
-      console.log("Email confirmed successfully");
-    } catch (error) {
-      console.error("Email confirmation failed:", error);
-      throw error;
     }
   }
-};
-
-/**
- * Market Data API service for fetching market data
- */
-const marketData = {
-  /**
-   * Get available countries with market data
-   */
-  async getCountries(): Promise<string[]> {
-    try {
-      // Use fromDynamic to query the market_data_sources table
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('country')
-        .order('country');
-
-      if (error) throw error;
-
-      // Check if data exists before accessing properties
-      if (!data || !Array.isArray(data)) return [];
-
-      // Extract unique country names using a safer approach with type assertion
-      const countries = [...new Set(data.map(item => (item as any).country).filter(Boolean))];
-      return countries;
-    } catch (error) {
-      console.error('Failed to fetch countries:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get available stock markets for a given country
-   */
-  async getStockMarkets(country: string): Promise<string[]> {
-    try {
-      // Use fromDynamic to query the market_data_sources table
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('stock_market')
-        .eq('country', country)
-        .order('stock_market');
-
-      if (error) throw error;
-
-      // Check if data exists before accessing properties
-      if (!data || !Array.isArray(data)) return [];
-
-      // Extract unique stock markets using a safer approach with type assertion
-      const markets = [...new Set(data.map(item => (item as any).stock_market).filter(Boolean))];
-      return markets;
-    } catch (error) {
-      console.error('Failed to fetch stock markets:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get available asset classes for a given country and stock market
-   */
-  async getAssetClasses(country: string, stockMarket: string): Promise<string[]> {
-    try {
-      // Use fromDynamic to query the market_data_sources table
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('asset_class')
-        .eq('country', country)
-        .eq('stock_market', stockMarket)
-        .order('asset_class');
-
-      if (error) throw error;
-
-      // Check if data exists before accessing properties
-      if (!data || !Array.isArray(data)) return [];
-
-      // Extract unique asset classes using a safer approach with type assertion
-      const classes = [...new Set(data.map(item => (item as any).asset_class).filter(Boolean))];
-      return classes;
-    } catch (error) {
-      console.error('Failed to fetch asset classes:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get the data table name for a specific market data source
-   */
-  async getDataTableName(
-    country: string,
-    stockMarket: string,
-    assetClass: string
-  ): Promise<string | null> {
-    try {
-      // Use fromDynamic to query the market_data_sources table
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('stock_table')
-        .eq('country', country)
-        .eq('stock_market', stockMarket)
-        .eq('asset_class', assetClass)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching data table name:', error);
-        return null;
-      }
-
-      // Return the table name using safer access with type assertion
-      return data ? (data as any).stock_table : null;
-    } catch (error) {
-      console.error('Failed to fetch data table name:', error);
-      return null;
-    }
-  },
-  
-  /**
-   * Check if the given table exists in the database
-   */
-  async checkTableExists(tableName: string): Promise<boolean> {
-    try {
-      if (!tableName) return false;
-      
-      // Try to query the table with limit 1 to check if it exists
-      const { error } = await fromDynamic(tableName)
-        .select('*')
-        .limit(1);
-      
-      // If there's no error, the table exists
-      return !error;
-    } catch (error) {
-      console.error('Error checking table existence:', error);
-      return false;
-    }
-  },
-  
-  /**
-   * Get market status by ID
-   */
-  async getMarketStatus(marketId: string): Promise<any> {
-    try {
-      const { data, error } = await fromDynamic('market_status')
-        .select('*')
-        .eq('id', marketId)
-        .single();
-        
-      if (error) {
-        console.error('Error fetching market status:', error);
-        return null;
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Failed to fetch market status:', error);
-      return null;
-    }
-  },
-  
-  /**
-   * Get all market data sources
-   */
-  async getAllMarketDataSources(): Promise<MarketDataSource[]> {
-    try {
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('*')
-        .order('country');
-        
-      if (error) {
-        console.error('Error fetching market data sources:', error);
-        return [];
-      }
-
-      return (data || []) as any as MarketDataSource[];
-    } catch (error) {
-      console.error('Failed to fetch market data sources:', error);
-      return [];
-    }
-  },
-  
-  /**
-   * Get market data sources by country
-   */
-  async getMarketDataSourcesByCountry(country: string): Promise<MarketDataSource[]> {
-    try {
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('*')
-        .eq('country', country)
-        .order('stock_market');
-        
-      if (error) {
-        console.error(`Error fetching market data sources for country ${country}:`, error);
-        return [];
-      }
-      
-      return (data || []) as any as MarketDataSource[];
-    } catch (error) {
-      console.error(`Failed to fetch market data sources for country ${country}:`, error);
-      return [];
-    }
-  },
-  
-  /**
-   * Get market data sources by country and stock market
-   */
-  async getMarketDataSourcesByCountryAndStockMarket(
-    country: string, 
-    stockMarket: string
-  ): Promise<MarketDataSource[]> {
-    try {
-      const { data, error } = await fromDynamic('market_data_sources')
-        .select('*')
-        .eq('country', country)
-        .eq('stock_market', stockMarket)
-        .order('asset_class');
-        
-      if (error) {
-        console.error(`Error fetching market data sources for country ${country} and stock market ${stockMarket}:`, error);
-        return [];
-      }
-      
-      return (data || []) as any as MarketDataSource[];
-    } catch (error) {
-      console.error(`Failed to fetch market data sources for country ${country} and stock market ${stockMarket}:`, error);
-      return [];
-    }
-  }
-};
-
-/**
- * Stock Analysis API service
- */
-const analysis = {
-  /**
-   * Get a list of available stocks for a specific data table
-   */
-  async getAvailableStocks(tableName: string): Promise<StockInfo[]> {
-    try {
-      if (!tableName) {
-        throw new Error('Table name is required');
-      }
-      
-      console.log(`Getting available stocks from table: ${tableName}`);
-      
-      // Use database function to get unique stock codes - this ensures we get ALL stocks
-      const { data, error } = await supabase.rpc('get_unique_stock_codes', {
-        p_table_name: tableName
-      });
-
-      if (error) {
-        console.error('Error getting unique stock codes:', error);
-        // Fallback to direct table query if the function fails
-        return await this.getAvailableStocksDirect(tableName);
-      }
-
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        console.warn('No stock codes returned from function, trying direct query');
-        return await this.getAvailableStocksDirect(tableName);
-      }
-      
-      console.log(`Found ${data.length} unique stock codes`);
-      
-      // Transform the data into StockInfo objects
-      const stocks: StockInfo[] = data.map(code => ({
-        code: String(code),
-        name: String(code), // Use code as name if no name is available
-      }));
-      
-      return stocks;
-    } catch (error) {
-      console.error('Failed to get available stocks:', error);
-      return await this.getAvailableStocksDirect(tableName);
-    }
-  },
-  
-  /**
-   * Fallback method to get stocks directly from the table
-   */
-  async getAvailableStocksDirect(tableName: string): Promise<StockInfo[]> {
-    try {
-      console.log(`Trying direct query to get stock codes from ${tableName}`);
-      
-      // Use fromDynamic to handle the dynamic table name
-      // This resolves the TypeScript error where supabase.from() expects a literal table name
-      const { data, error } = await fromDynamic(tableName)
-        .select('stock_code, name')
-        .order('stock_code');
-      
-      if (error) {
-        console.error('Error in direct stock code query:', error);
-        throw error;
-      }
-
-      if (!data) {
-        console.warn(`No stock codes found in table ${tableName}`);
-        return [];
-      }
-      
-      // Extract stock codes with proper type safety
-      const stocks: StockInfo[] = (data as any[])
-        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .map(item => ({
-          code: String(item.stock_code),
-          name: item.name ? String(item.name) : String(item.stock_code)
-        }));
-      
-      console.log(`Direct query found ${stocks.length} stock codes`);
-      return stocks;
-    } catch (error) {
-      console.error(`Failed in direct stock query for ${tableName}:`, error);
-      return [];
-    }
-  },
-  
-  /**
-   * Get stock data from a specific table and stock code
-   */
-  async getStockData(tableName: string, stockCode: string, period: string | undefined = undefined, limit: number = 300): Promise<any[]> {
-    try {
-      if (!tableName || !stockCode) {
-        throw new Error('Table name and stock code are required');
-      }
-      
-      // Get date range based on period
-      if (period) {
-        const dateRange = getDateRangeForPeriod(period);
-        console.info(`Getting stock data for ${stockCode} from ${tableName} with period ${period}`);
-        console.info(`Date range: ${dateRange.startDate} to ${dateRange.endDate}`);
-        
-        // Use the period-filtered method
-        return await this.getStockDataDirectWithPeriod(tableName, stockCode, dateRange.startDate, dateRange.endDate);
-      } else {
-        console.info(`Getting stock data for ${stockCode} from ${tableName} without period filtering (using limit: ${limit})`);
-        return await this.getStockDataDirect(tableName, stockCode, limit);
-      }
-    } catch (error) {
-      console.error('Failed to get stock data:', error);
-      return [];
-    }
-  },
-  
-  /**
-   * Fallback method to get stock data directly from the table
-   */
-  async getStockDataDirect(tableName: string, stockCode: string, limit: number = 300): Promise<any[]> {
-    try {
-      console.log(`Trying direct query to get stock data for ${stockCode} from ${tableName}`);
-      
-      const { data, error } = await fromDynamic(tableName)
-        .select('*')
-        .eq('stock_code', stockCode)
-        .order('date', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('Error in direct stock data query:', error);
-        throw error;
-      }
-
-      if (!data || !Array.isArray(data)) {
-        console.warn(`No data found for ${stockCode} in table ${tableName}`);
-        return [];
-      }
-      return data as any[];
-    } catch (error) {
-      console.error(`Failed in direct stock data query for ${stockCode}:`, error);
-      return [];
-    }
-  },
-  
-  /**
-   * Get stock data with period filtering
-   */
-  async getStockDataDirectWithPeriod(
-    tableName: string, 
-    stockCode: string, 
-    startDate: string, 
-    endDate: string
-  ): Promise<any[]> {
-    try {
-      console.info(`Fetching stock data for ${stockCode} from ${tableName} between ${startDate} and ${endDate}`);
-      
-      const { data, error } = await fromDynamic(tableName)
-        .select('*')
-        .eq('stock_code', stockCode)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true }); // Change to ascending order for chronological processing
-      
-      if (error) {
-        console.error('Error in period-filtered stock data query:', error);
-        throw error;
-      }
-      
-      if (!data || !Array.isArray(data)) {
-        console.warn(`No data found for ${stockCode} in table ${tableName} for the specified period`);
-        return [];
-      }
-      
-      console.info(`Found ${data.length} records for ${stockCode} in the specified period`);
-      return data as any[];
-
-    } catch (error) {
-      console.error(`Failed to fetch period-filtered data for ${stockCode}:`, error);
-      return [];
-    }
-  }
-};
-
-// Export the API services
-export const api = {
-  auth,
-  marketData,
-  analysis
 };
