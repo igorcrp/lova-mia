@@ -543,25 +543,40 @@ const analysis = {
    * Fallback method to get stocks directly from the table
    */
   async getAvailableStocksDirect(tableName: string): Promise<StockInfo[]> {
-    try {
-      console.log(`Trying direct query to get stock codes from ${tableName}`);
+  try {
+    console.log(`Trying direct query to get stock codes from ${tableName}`);
       
       // Use fromDynamic to handle the dynamic table name
       // This resolves the TypeScript error where supabase.from() expects a literal table name
-      const { data, error } = await fromDynamic(tableName)
-        .select('stock_code, name')
-        .order('stock_code');
+    const { data, error } = await fromDynamic(tableName)
+      .select('stock_code') // <-- CORRIGIDO: Selecionar a coluna correta
+      .groupBy('stock_code') // <-- CORRIGIDO: Agrupar pela coluna correta
+      .order('stock_code');
       
-      if (error) {
-        console.error('Error in direct stock code query:', error);
-        throw error;
-      }
+    if (error) {
+      console.error(`Direct query error for ${tableName}:`, error);
+      return [];
+    }
 
-      if (!data) {
-        console.warn(`No stock codes found in table ${tableName}`);
-        return [];
-      }
-      
+    if (!data || data.length === 0) {
+      console.warn(`No stock codes found via direct query for ${tableName}`);
+      return [];
+    }
+          // Mapear para StockInfo, usando stock_code como code e name
+    const stocks: StockInfo[] = data.map((item: any) => ({
+      code: String(item.stock_code),
+      name: String(item.stock_code), // Usar o código como nome
+      // Adicione fullName: null ou deixe indefinido se não houver
+    }));
+
+    console.log(`Found ${stocks.length} stocks via direct query for ${tableName}`);
+    return stocks;
+  } catch (error) {
+    console.error(`Failed direct query for ${tableName}:`, error);
+    return [];
+  }
+},
+  
       // Extract stock codes with proper type safety
       const stocks: StockInfo[] = (data as any[])
         .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
