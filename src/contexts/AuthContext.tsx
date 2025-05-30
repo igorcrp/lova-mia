@@ -69,10 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log("Checking status for user:", userEmail);
       
-      // Query the public.users table for user data using the RPC function
-      const { data: userData, error } = await supabase.rpc('check_user_by_email', {
-        p_email: userEmail
-      });
+      // CORRIGIDO: Consulta direta à tabela public.users
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('status_users, level_id')
+        .eq('email', userEmail)
+        .maybeSingle(); // Use maybeSingle() para obter um único objeto ou null
 
       if (error) {
         console.error("Error checking user status:", error);
