@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function LoginPage() {
   const { login, register, loginWithGoogle } = useAuth();

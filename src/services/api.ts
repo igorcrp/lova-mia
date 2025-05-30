@@ -310,8 +310,8 @@ export const api = {
     async checkTableExists(tableName: string): Promise<boolean> {
       try {
         // Use RPC call to check table existence safely
-        const { data, error } = await supabase.rpc('check_table_exists', {
-          table_name: tableName
+        const { data, error } = await supabase.rpc('table_exists', {
+          p_table_name: tableName
         });
 
         if (error) {
@@ -332,7 +332,7 @@ export const api = {
         
         // Use RPC call for dynamic table queries
         const { data, error } = await supabase.rpc('get_unique_stock_codes', {
-          table_name: tableName
+          p_table_name: tableName
         });
 
         if (error) {
@@ -355,7 +355,7 @@ export const api = {
         // Get date range from period
         const { startDate, endDate } = getDateRange(params.period);
         
-        // Use RPC call for dynamic table queries
+        // Use RPC call for dynamic table queries with the corrected parameter names
         const { data, error } = await supabase.rpc('get_stock_data', {
           table_name: tableName,
           stock_code_param: stockCode,

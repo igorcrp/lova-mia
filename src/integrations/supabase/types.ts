@@ -179,7 +179,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_stock_data: {
+        Args: {
+          table_name: string
+          stock_code_param: string
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          date: string
+          open: number
+          high: number
+          low: number
+          close: number
+          volume: number
+          stock_code: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
