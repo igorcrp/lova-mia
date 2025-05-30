@@ -241,6 +241,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const result = await api.auth.register(email, password, fullName);
       
+      // Adicionado: Redirecionar para login e mostrar mensagem
+      toast.success("Cadastro realizado com sucesso!");
+      toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
+      navigate("/login"); // Redireciona para a página de login
+      
       return result;
     } catch (error) {
       console.error("Registration failed", error);
