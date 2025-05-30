@@ -15,18 +15,10 @@ export const auth = {
     try {
       console.log(`Attempting to login with email: ${email}`);
       
-      // First check if user exists and is active in public.users table
-      const { data: userData, error: userError } = await supabase.rpc('check_user_by_email', {
-        p_email: email
-      });
+      // REMOVIDO: Bloco que chamava RPC inexistente 'check_user_by_email'
+      // A verificação de status agora é feita no AuthContext após o login do Supabase Auth
 
-      if (userError) {
-        console.error("Error checking user:", userError);
-        throw new Error("Erro ao verificar usuário");
-      }
-
-      // If user doesn't exist or has no status, proceed with normal login
-      // The auth will fail naturally if credentials are wrong
+      // Autentica com Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -34,20 +26,17 @@ export const auth = {
 
       if (error) {
         console.error("Login error:", error);
-        throw error;
-      }
-
-      // After successful auth login, check user status
-      if (userData && userData.length > 0) {
-        const userStatus = userData[0];
-        
-        // If user exists but is pending, throw specific error
-        if (userStatus.status_users === 'pending') {
-          throw new Error("PENDING_CONFIRMATION");
+        // Verifica se o erro é por email não confirmado
+        if (error.message.includes("Email not confirmed")) {
+          throw new Error("PENDING_CONFIRMATION"); // Lança erro específico para tratamento no AuthContext
         }
+        throw error; // Lança outros erros de autenticação
       }
 
-      console.log("Login successful:", data);
+      // REMOVIDO: Bloco que verificava status 'pending' após login bem-sucedido
+      // Essa lógica agora está no AuthContext
+
+      console.log("Supabase Auth Login successful:", data);
       return {
         user: data.user,
         session: data.session,
@@ -83,6 +72,31 @@ export const auth = {
       }
 
       console.log("Auth registration successful:", authData);
+
+      // Insert user data into public.users table with level_id=1 and status_user='pending'
+      if (authData.user) {
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: authData.user.id,
+              email: email,
+              name: fullName,
+              level_id: 1,
+              status_users: 'pending',
+              created_at: new Date().toISOString(),
+            }
+          ]);
+
+        if (userError) {
+          console.error("User data insertion error:", userError);
+          // Don't throw here, as the auth user is already created
+          // Just log the error and continue
+          console.warn("User created in auth but not in public.users table");
+        } else {
+          console.log("User registration successful in public.users table");
+        }
+      }
 
       return {
         user: authData.user,
