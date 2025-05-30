@@ -1,248 +1,366 @@
-
-import { useState, useEffect } from "react";
-import { api } from "@/services/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { api } from "@/services/api";
+import { User } from "@/types";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Plus, UserPlus } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  full_name?: string;
-  status_users: string;
-  status?: string;
-  level_id: number;
-  email_verified: boolean;
-  account_type?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "pending" | "inactive">("all");
+  
+  const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [newUser, setNewUser] = useState({
+    full_name: "",
     email: "",
-    name: "",
     level_id: 1,
-    status_users: "pending"
+    status: "active" as "active" | "inactive" | "pending",
+    email_verified: false,
+    account_type: "free" as "free" | "premium"
   });
-
+  
   useEffect(() => {
-    loadUsers();
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true);
+        const data = await api.users.getAll();
+        
+        // Ensure users have the correct status type
+        const typedUsers: User[] = data.map(user => ({
+          ...user,
+          status: (user.status === 'active' || user.status === 'pending' || user.status === 'inactive') 
+            ? user.status 
+            : 'active' as 'active' | 'pending' | 'inactive',
+          account_type: (user.account_type === 'free' || user.account_type === 'premium') 
+            ? user.account_type 
+            : 'free' as 'free' | 'premium'
+        }));
+        
+        setUsers(typedUsers);
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+        toast.error("Failed to fetch users");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUsers();
   }, []);
-
-  const loadUsers = async () => {
+  
+  const filteredUsers = users.filter((user) => {
+    if (activeTab === "all") return true;
+    return user.status === activeTab;
+  });
+  
+  const handleAddUser = async () => {
     try {
       setIsLoading(true);
-      const userData = await api.users.getAll();
-      setUsers(userData);
-    } catch (error) {
-      console.error("Failed to load users:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load users"
+      const createdUser = await api.users.create(newUser);
+      setUsers([createdUser, ...users]);
+      setShowNewUserDialog(false);
+      toast.success("User added successfully");
+      
+      // Reset form
+      setNewUser({
+        full_name: "",
+        email: "",
+        level_id: 1,
+        status: "active",
+        email_verified: false,
+        account_type: "free"
       });
+    } catch (error) {
+      console.error("Failed to add user", error);
+      toast.error("Failed to add user");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      const userData = {
-        ...newUser,
-        full_name: newUser.name,
-        status: newUser.status_users,
-        account_type: 'free',
-        email_verified: false
-      };
-      
-      await api.users.create(userData);
-      
-      toast({
-        title: "Success",
-        description: "User created successfully"
-      });
-      
-      setIsDialogOpen(false);
-      setNewUser({
-        email: "",
-        name: "",
-        level_id: 1,
-        status_users: "pending"
-      });
-      
-      loadUsers();
-    } catch (error) {
-      console.error("Failed to create user:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to create user"
-      });
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusColors = {
-      active: "bg-green-100 text-green-800",
-      pending: "bg-yellow-100 text-yellow-800",
-      inactive: "bg-gray-100 text-gray-800"
-    };
-    
-    return (
-      <Badge className={statusColors[status as keyof typeof statusColors] || statusColors.inactive}>
-        {status}
-      </Badge>
-    );
-  };
-
-  const getLevelBadge = (level: number) => {
-    return (
-      <Badge variant={level === 2 ? "default" : "secondary"}>
-        {level === 2 ? "Admin" : "Investor"}
-      </Badge>
-    );
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading users...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground">
-            Manage user accounts and permissions
-          </p>
-        </div>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">User Management</h1>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
-              <DialogDescription>
-                Add a new user to the system. They will receive an email with login instructions.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="level">User Level</Label>
-                <select
-                  id="level"
-                  className="w-full p-2 border rounded-md"
-                  value={newUser.level_id}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, level_id: Number(e.target.value) }))}
-                >
-                  <option value={1}>Investor</option>
-                  <option value={2}>Admin</option>
-                </select>
-              </div>
-              <Button type="submit" className="w-full">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Create User
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setShowNewUserDialog(true)}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Add New User
+        </Button>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>
-            A list of all users in your system including their email, status, and role.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
+      
+      <div className="flex space-x-4 mb-6">
+        <Button
+          variant={activeTab === "all" ? "default" : "outline"}
+          onClick={() => setActiveTab("all")}
+          className="relative"
+        >
+          All Users
+          <Badge variant="secondary" className="ml-2 bg-secondary">{users.length}</Badge>
+        </Button>
+        <Button
+          variant={activeTab === "pending" ? "default" : "outline"}
+          onClick={() => setActiveTab("pending")}
+          className="relative"
+        >
+          Pending Verification
+          <Badge variant="secondary" className="ml-2 bg-secondary">
+            {users.filter(user => user.status === "pending").length}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeTab === "active" ? "default" : "outline"}
+          onClick={() => setActiveTab("active")}
+          className="relative"
+        >
+          Active
+          <Badge variant="secondary" className="ml-2 bg-secondary">
+            {users.filter(user => user.status === "active").length}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeTab === "inactive" ? "default" : "outline"}
+          onClick={() => setActiveTab("inactive")}
+          className="relative"
+        >
+          Inactive
+          <Badge variant="secondary" className="ml-2 bg-secondary">
+            {users.filter(user => user.status === "inactive").length}
+          </Badge>
+        </Button>
+      </div>
+      
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">
+                <Checkbox className="ml-2" />
+              </TableHead>
+              <TableHead className="w-12"></TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Email Verification</TableHead>
+              <TableHead>Account Type</TableHead>
+              <TableHead>Level</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Last Login</TableHead>
+              <TableHead className="text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Email Verified</TableHead>
-                <TableHead>Created</TableHead>
+                <TableCell colSpan={10} className="text-center py-8">
+                  <div className="flex items-center justify-center">
+                    <div className="loading-circle" />
+                    <span className="ml-3">Loading users...</span>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
+            ) : filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredUsers.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    {user.name || user.full_name || "N/A"}
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    {getStatusBadge(user.status_users || user.status || "inactive")}
+                    <Checkbox />
                   </TableCell>
                   <TableCell>
-                    {getLevelBadge(user.level_id)}
+                    <div className="w-8 h-8 rounded-full bg-alphaquant-600 flex items-center justify-center text-white text-sm font-medium">
+                      {user.avatar_url || user.full_name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.email_verified ? "default" : "destructive"}>
-                      {user.email_verified ? "Verified" : "Unverified"}
+                    <div className="font-medium">{user.full_name}</div>
+                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline"
+                      className={cn(
+                        user.status === "active" && "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20",
+                        user.status === "pending" && "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20",
+                        user.status === "inactive" && "text-red-600 border-red-600 bg-red-50 dark:bg-red-950/20",
+                      )}
+                    >
+                      {user.status === "active" ? "Active" : 
+                       user.status === "pending" ? "Pending" : "Inactive"}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline"
+                      className={user.email_verified
+                        ? "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20"
+                        : "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20"
+                      }
+                    >
+                      {user.email_verified ? "Verified" : "Ativo sem verificação"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {user.account_type === "premium" ? "Premium" : "Free"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {user.level_id === 2 ? "Admin" : "Investidor"}
                   </TableCell>
                   <TableCell>
                     {new Date(user.created_at).toLocaleDateString()}
                   </TableCell>
+                  <TableCell>
+                    {user.last_login ? new Date(user.last_login).toLocaleDateString() : "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm">
+                      <span className="sr-only">Open menu</span>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        className="w-5 h-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z"
+                        />
+                      </svg>
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {users.length === 0 && (
-            <div className="text-center py-6 text-muted-foreground">
-              No users found. Create your first user to get started.
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Add User Dialog */}
+      <Dialog open={showNewUserDialog} onOpenChange={setShowNewUserDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div>
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                value={newUser.full_name}
+                onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="level">User Level</Label>
+              <Select
+                value={String(newUser.level_id)}
+                onValueChange={(value) => setNewUser({ ...newUser, level_id: Number(value) })}
+              >
+                <SelectTrigger id="level">
+                  <SelectValue placeholder="Select level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Investor</SelectItem>
+                  <SelectItem value="2">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={newUser.status}
+                onValueChange={(value) => 
+                  setNewUser({ ...newUser, status: value as "active" | "inactive" | "pending" })
+                }
+              >
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="account_type">Account Type</Label>
+              <Select
+                value={newUser.account_type}
+                onValueChange={(value) => 
+                  setNewUser({ ...newUser, account_type: value as "free" | "premium" })
+                }
+              >
+                <SelectTrigger id="account_type">
+                  <SelectValue placeholder="Select account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="premium">Premium</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="email_verified" 
+                checked={newUser.email_verified}
+                onCheckedChange={(checked) => 
+                  setNewUser({ ...newUser, email_verified: checked as boolean })
+                }
+              />
+              <Label htmlFor="email_verified">Email verified</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowNewUserDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleAddUser} 
+              disabled={!newUser.full_name || !newUser.email}
+            >
+              Add User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
