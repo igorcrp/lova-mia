@@ -561,7 +561,7 @@ const handleDecimalInputChange = (value: string, onChange: (val: number | string
       onChange(value);
     } else {
       const numValue = parseFloat(value);
-      if (!isNaN(numValue) {
+      if (!isNaN(numValue)) {
         onChange(numValue);
       }
     }
