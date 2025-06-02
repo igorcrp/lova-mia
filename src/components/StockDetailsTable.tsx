@@ -404,11 +404,7 @@ export function StockDetailsTable({
                 currentData.map((item) => (
                   <TableRow 
                     key={`${item.date}-${item.profitLoss}`}
-                    className={
-                      item.trade === "Buy" ? "bg-green-50 hover:bg-green-100" :
-                      item.trade === "Sell" ? "bg-red-50 hover:bg-red-100" :
-                      "hover:bg-muted/50"
-                    }
+                    className={"hover:bg-muted/50"}
                   >
                     {columns.map((column) => {
                       const value = item[column.id as keyof TradeHistoryItem];
@@ -423,6 +419,9 @@ export function StockDetailsTable({
                           formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
+                        } else if (column.id === "trade") {
+                          // Conditionally display 'executed' for daytrade interval
+                          formattedValue = params.interval === 'daytrade' && String(value) === 'Buy' ? 'executed' : String(value);
                         } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
