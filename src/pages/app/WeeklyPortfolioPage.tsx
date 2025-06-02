@@ -23,12 +23,10 @@ export default function WeeklyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  // Helper function to check if it's Friday or last business day of the week
   const isFridayOrLastBusinessDay = (date: Date): boolean => {
     return date.getDay() === 5 || isLastBusinessDayOfWeek(date);
   };
 
-  // Função para processar operações semanais
   const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
     
@@ -44,89 +42,108 @@ export default function WeeklyPortfolioPage() {
     for (let i = 0; i < sortedHistory.length; i++) {
       const trade = sortedHistory[i];
       const tradeDate = new Date(trade.date);
-      const weekKey = getWeekKey(tradeDate);
+      const weekKey = `${tradeDate.getFullYear()}-${tradeDate.getMonth()}-${getWeekNumber(tradeDate)}`;
       if (!tradesByWeek[weekKey]) {
         tradesByWeek[weekKey] = [];
       }
       tradesByWeek[weekKey].push(trade);
     }
     
-    // Process each week - ensuring only one trade per week
+    // Process each week
     Object.keys(tradesByWeek).forEach(weekKey => {
       const weekTrades = tradesByWeek[weekKey];
       let activeTrade: TradeHistoryItem | null = null;
       let stopPriceCalculated: number | null = null;
-      let entryDayFound = false;
+      let entryExecuted = false;
 
       for (let i = 0; i < weekTrades.length; i++) {
         const currentDayData = weekTrades[i];
-        const currentDay = { ...currentDayData, trade: '-' as TradeHistoryItem['trade'], profit: undefined, capital: undefined, stop: '-' as TradeHistoryItem['stop'] }; // Default state
+        const currentDay = { ...currentDayData, trade: '-' as const, profit: undefined, capital: undefined, stop: '-' as const };
         const currentDate = new Date(currentDay.date);
 
-        // Try to open trade on Monday
-        if (!entryDayFound && isMondayOrFirstBusinessDay(currentDate) && !activeTrade) {
+        // Try to open trade only on Monday/first business day if no active trade
+        if (!activeTrade && !entryExecuted && isMondayOrFirstBusinessDay(currentDate)) {
           const previousDay = findPreviousDay(sortedHistory, currentDay.date);
-          if (previousDay && previousDay.exitPrice !== undefined) {
-            const entryPrice = previousDay.exitPrice;
-            activeTrade = { ...currentDay }; // Store entry details
-            
-            // Determine entry signal based on price movement
+          if (previousDay) {
+            const entryPrice = currentDay.open;
             const referencePrice = getReferencePrice(previousDay, params.referencePrice);
             const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
             
-            if ((params.operation === 'buy' && entryPrice >= entryThreshold) ||
-                (params.operation === 'sell' && entryPrice <= entryThreshold)) {
-              activeTrade.suggestedEntryPrice = entryPrice;
-              activeTrade.trade = (params.operation === 'buy' ? 'Buy' : 'Sell') as TradeHistoryItem['trade'];
-              stopPriceCalculated = calculateStopPrice(entryPrice, params);
-              activeTrade.stopPrice = stopPriceCalculated;
+            if ((params.operation === 'buy' && currentDay.high >= entryThreshold) ||
+                (params.operation === 'sell' && currentDay.low <= entryThreshold)) {
               
+              activeTrade = { 
+                ...currentDay,
+                trade: params.operation === 'buy' ? 'Buy' : 'Sell',
+                suggestedEntryPrice: entryPrice,
+                stopPrice: calculateStopPrice(entryPrice, params)
+              };
+              
+              stopPriceCalculated = activeTrade.stopPrice;
+              entryExecuted = true;
+              
+              // Update current day with trade info
               currentDay.trade = activeTrade.trade;
               currentDay.suggestedEntryPrice = activeTrade.suggestedEntryPrice;
               currentDay.stopPrice = activeTrade.stopPrice;
-              entryDayFound = true; // Mark entry day found for this week
-            } else {
-              activeTrade = null; // No entry signal
             }
           }
         }
 
-        // If a trade is active
-        if (activeTrade && stopPriceCalculated && currentDay.date !== activeTrade.date) {
+        // If a trade is active, check for exit conditions
+        if (activeTrade && stopPriceCalculated) {
           // Check Stop Loss
           const stopHit = checkStopLoss(currentDay, stopPriceCalculated, params.operation);
           if (stopHit) {
             const exitPrice = stopPriceCalculated;
-            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
-            currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
+            currentDay.trade = 'Close';
+            currentDay.stop = 'Executed';
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
-            tradePairs.push({ open: activeTrade, close: { ...currentDay, exitPrice: exitPrice } });
-            activeTrade = null; // Close trade
+            
+            tradePairs.push({ 
+              open: activeTrade, 
+              close: { ...currentDay, exitPrice: exitPrice } 
+            });
+            
+            activeTrade = null;
             stopPriceCalculated = null;
-          } else if (isFridayOrLastBusinessDay(currentDate)) {
-            // Check End of Week
-            const exitPrice = currentDay.exitPrice;
-            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
+          } 
+          // Check End of Week (Friday/last business day)
+          else if (isFridayOrLastBusinessDay(currentDate)) {
+            const exitPrice = currentDay.close;
+            currentDay.trade = 'Close';
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
-            tradePairs.push({ open: activeTrade, close: { ...currentDay } });
-            activeTrade = null; // Close trade
+            
+            tradePairs.push({ 
+              open: activeTrade, 
+              close: { ...currentDay, exitPrice: exitPrice } 
+            });
+            
+            activeTrade = null;
             stopPriceCalculated = null;
           }
         }
         
         // Add current day to processed history
         if (currentDay.trade !== 'Close') {
-           currentDay.capital = activeTrade ? undefined : currentCapital; // Show capital only after close or if no trade active
+          currentDay.capital = activeTrade ? undefined : currentCapital;
         }
         processedHistory.push(currentDay);
       }
     });
     
     return { processedHistory, tradePairs };
+  };
+
+  // Helper function to get week number
+  const getWeekNumber = (date: Date): number => {
+    const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
   };
 
   const runAnalysis = async (params: StockAnalysisParams) => {
@@ -165,28 +182,21 @@ export default function WeeklyPortfolioPage() {
         setProgress(20 + currentProgress * 0.7);
       });
       
-      // Processa cada resultado para obter detalhes e filtrar operações semanais
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
-            // Obtém detalhes para filtrar as operações
             const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
-              // Processa as operações semanais
               const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, params);
-              
-              // Filtra apenas os trades com operações (Buy/Sell e Close)
               const filteredTrades = processedHistory.filter(t => t.trade === 'Buy' || t.trade === 'Sell' || t.trade === 'Close');
               const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
               
-              // Recalcula as métricas com base nos pares de operações
               const trades = tradePairsFiltered.length;
               const profits = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
               const losses = tradePairsFiltered.filter(pair => pair.close.profit < 0).length;
-              const stops = tradePairsFiltered.filter(pair => pair.close.stop === 'Close').length;
+              const stops = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
               
-              // Calcula o capital final e lucro
               let currentCapital = params.initialCapital;
               tradePairsFiltered.forEach(pair => {
                 currentCapital += pair.close.profit;
@@ -195,7 +205,6 @@ export default function WeeklyPortfolioPage() {
               const profit = currentCapital - params.initialCapital;
               const profitPercentage = (profit / params.initialCapital) * 100;
               
-              // Calcula médias de ganho e perda
               const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
               const lossTrades = tradePairsFiltered.filter(pair => pair.close.profit < 0);
               const averageGain = gainTrades.length > 0 
@@ -205,14 +214,12 @@ export default function WeeklyPortfolioPage() {
                 ? lossTrades.reduce((sum, pair) => sum + Math.abs(pair.close.profit), 0) / lossTrades.length 
                 : 0;
               
-              // Calcula métricas de risco
               const maxDrawdown = calculateMaxDrawdown(tradePairsFiltered.map(pair => pair.close), params.initialCapital);
               const volatility = calculateVolatility(tradePairsFiltered.map(pair => pair.close));
               const sharpeRatio = calculateSharpeRatio(tradePairsFiltered.map(pair => pair.close), profitPercentage);
               const sortinoRatio = calculateSortinoRatio(tradePairsFiltered.map(pair => pair.close), profitPercentage);
               const recoveryFactor = maxDrawdown !== 0 ? Math.abs(profit / maxDrawdown) : 0;
               
-              // Atualiza o resultado com as métricas recalculadas
               return {
                 ...result,
                 tradingDays: processedHistory.length,
@@ -291,32 +298,27 @@ export default function WeeklyPortfolioPage() {
       
       const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
       
-      // Processa as operações semanais
       if (detailedData && detailedData.tradeHistory) {
         const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
         detailedData.tradeHistory = processedHistory;
         detailedData.tradingDays = processedHistory.length;
         
-        // Filtra apenas os trades com operações (Buy/Sell e Close)
         const filteredTrades = processedHistory.filter(t => t.trade === 'Buy' || t.trade === 'Sell' || t.trade === 'Close');
         const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
         
-        // Agrupa em pares de operações (abertura e fechamento)
         for (let i = 0; i < filteredTrades.length; i++) {
           if (filteredTrades[i].trade === 'Buy' || filteredTrades[i].trade === 'Sell') {
-            // Procura o fechamento correspondente
             const closeIndex = filteredTrades.findIndex((t, idx) => idx > i && t.trade === 'Close');
             if (closeIndex !== -1) {
               tradePairs.push({
                 open: filteredTrades[i],
                 close: filteredTrades[closeIndex]
               });
-              i = closeIndex; // Avança para depois do fechamento
+              i = closeIndex;
             }
           }
         }
         
-        // Recalcula a evolução do capital
         if (tradePairs.length > 0) {
           let currentCapital = paramsWithTable.initialCapital;
           detailedData.capitalEvolution = tradePairs.map(pair => {
@@ -327,13 +329,11 @@ export default function WeeklyPortfolioPage() {
             };
           });
           
-          // Adiciona o ponto inicial
           detailedData.capitalEvolution.unshift({
             date: tradePairs[0]?.open.date || new Date().toISOString(),
             capital: paramsWithTable.initialCapital
           });
           
-          // Recalcula métricas de risco
           const profit = currentCapital - paramsWithTable.initialCapital;
           const profitPercentage = (profit / paramsWithTable.initialCapital) * 100;
           
@@ -381,28 +381,22 @@ export default function WeeklyPortfolioPage() {
       
       setAnalysisParams(paramsWithTable);
       
-      // Executa a análise novamente com os novos parâmetros
       const results = await api.analysis.runAnalysis(paramsWithTable);
       
-      // Processa os resultados para filtrar operações semanais
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
             const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
-              // Processa as operações semanais
               const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
-              
-              // Filtra apenas os trades com operações (Buy/Sell e Close)
               const filteredTrades = processedHistory.filter(t => t.trade === 'Buy' || t.trade === 'Sell' || t.trade === 'Close');
               const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
               
-              // Recalcula as métricas
               const trades = tradePairsFiltered.length;
               const profits = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
               const losses = tradePairsFiltered.filter(pair => pair.close.profit < 0).length;
-              const stops = tradePairsFiltered.filter(pair => pair.close.stop === 'Close').length;
+              const stops = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
               
               let currentCapital = params.initialCapital;
               tradePairsFiltered.forEach(pair => {
@@ -421,7 +415,6 @@ export default function WeeklyPortfolioPage() {
                 ? lossTrades.reduce((sum, pair) => sum + Math.abs(pair.close.profit), 0) / lossTrades.length 
                 : 0;
               
-              // Calcula métricas de risco
               const maxDrawdown = calculateMaxDrawdown(tradePairsFiltered.map(pair => pair.close), params.initialCapital);
               const volatility = calculateVolatility(tradePairsFiltered.map(pair => pair.close));
               const sharpeRatio = calculateSharpeRatio(tradePairsFiltered.map(pair => pair.close), profitPercentage);
@@ -461,35 +454,29 @@ export default function WeeklyPortfolioPage() {
       
       setAnalysisResults(processedResults);
       
-      // Atualiza os detalhes para o ativo selecionado
       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
       
       if (detailedData && detailedData.tradeHistory) {
-        // Processa as operações semanais
         const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
         detailedData.tradeHistory = processedHistory;
         detailedData.tradingDays = processedHistory.length;
         
-        // Filtra apenas os trades com operações (Buy/Sell e Close)
         const filteredTrades = processedHistory.filter(t => t.trade === 'Buy' || t.trade === 'Sell' || t.trade === 'Close');
         const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
         
-        // Agrupa em pares de operações (abertura e fechamento)
         for (let i = 0; i < filteredTrades.length; i++) {
           if (filteredTrades[i].trade === 'Buy' || filteredTrades[i].trade === 'Sell') {
-            // Procura o fechamento correspondente
             const closeIndex = filteredTrades.findIndex((t, idx) => idx > i && t.trade === 'Close');
             if (closeIndex !== -1) {
               tradePairs.push({
                 open: filteredTrades[i],
                 close: filteredTrades[closeIndex]
               });
-              i = closeIndex; // Avança para depois do fechamento
+              i = closeIndex;
             }
           }
         }
         
-        // Recalcula a evolução do capital
         if (tradePairs.length > 0) {
           let currentCapital = paramsWithTable.initialCapital;
           detailedData.capitalEvolution = tradePairs.map(pair => {
@@ -500,13 +487,11 @@ export default function WeeklyPortfolioPage() {
             };
           });
           
-          // Adiciona o ponto inicial
           detailedData.capitalEvolution.unshift({
             date: tradePairs[0]?.open.date || new Date().toISOString(),
             capital: paramsWithTable.initialCapital
           });
           
-          // Recalcula métricas de risco
           const profit = currentCapital - paramsWithTable.initialCapital;
           const profitPercentage = (profit / paramsWithTable.initialCapital) * 100;
           
@@ -541,7 +526,6 @@ export default function WeeklyPortfolioPage() {
     setSelectedAsset(null);
   };
   
-  // Funções para cálculo de métricas de risco
   const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number): number => {
     if (trades.length === 0) return 0;
     
@@ -581,7 +565,7 @@ export default function WeeklyPortfolioPage() {
   const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturn: number): number => {
     if (trades.length === 0) return 0;
     
-    const riskFreeRate = 2.0; // 2% risk-free rate
+    const riskFreeRate = 2.0;
     const volatility = calculateVolatility(trades);
     
     if (volatility === 0) return 0;
@@ -603,7 +587,7 @@ export default function WeeklyPortfolioPage() {
     
     if (downside === 0) return 0;
     
-    const riskFreeRate = 2.0; // 2% risk-free rate
+    const riskFreeRate = 2.0;
     return (totalReturn - riskFreeRate) / downside;
   };
 
@@ -647,13 +631,6 @@ export default function WeeklyPortfolioPage() {
       )}
     </div>
   );
-}
-
-function getWeekKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function isMondayOrFirstBusinessDay(date: Date): boolean {
