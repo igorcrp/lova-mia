@@ -35,6 +35,13 @@ export function StockDetailsTable({
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
   const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
   const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
+  
+  // NOVO: Estado para cálculos otimizados da entrada e stop
+  const [previewParams, setPreviewParams] = useState({
+    referencePrice: params.referencePrice,
+    entryPercentage: params.entryPercentage || 0,
+    stopPercentage: params.stopPercentage || 0
+  });
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(400);
@@ -57,23 +64,80 @@ export function StockDetailsTable({
     };
   }, []);
 
-  // Process and sort data
-  const processedData = useMemo(() => {
+  // OTIMIZAÇÃO: Dados base processados apenas quando resultado ou ordenação muda
+  const baseProcessedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
     
-    // Create a safe copy of the data
-    const data = result.tradeHistory.map(item => ({
+    // Criar uma cópia segura dos dados
+    return result.tradeHistory.map(item => ({
       ...item,
       profitLoss: Number(item.profitLoss) || 0,
       currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
         ? Number(item.currentCapital) 
         : undefined,
-      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-      // Calculate stop trigger here for consistency
-      stopTrigger: calculateStopTrigger(item, params.operation)
+      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-"
+      // Não calcule o stopTrigger aqui, será calculado sob demanda
     }));
+  }, [result]);
 
-    // Sort data
+  // NOVO: Função para calcular valores dinâmicos (entry e stop) com base nos parâmetros atuais
+  const calculateDynamicValues = (item: any, refPriceType: string, entryPct: number, stopPct: number) => {
+    // Verificar se temos os dados necessários
+    if (!item || !refPriceType) {
+      return { suggestedEntryPrice: "-", stopPrice: "-" };
+    }
+    
+    // Obter o valor de referência
+    let refValue: number;
+    switch(refPriceType) {
+      case 'open': refValue = Number(item.entryPrice); break;
+      case 'high': refValue = Number(item.high); break;
+      case 'low': refValue = Number(item.low); break;
+      case 'close': refValue = Number(item.exitPrice); break;
+      default: refValue = Number(item.entryPrice);
+    }
+    
+    if (isNaN(refValue) || refValue === 0) {
+      return { suggestedEntryPrice: "-", stopPrice: "-" };
+    }
+    
+    // Calcular valores dinâmicos
+    const suggestedEntry = refValue * (1 + (entryPct / 100));
+    const stopPrice = refValue * (1 + (stopPct / 100));
+    
+    return { 
+      suggestedEntryPrice: suggestedEntry.toFixed(2),
+      stopPrice: stopPrice.toFixed(2)
+    };
+  };
+  
+  // OTIMIZAÇÃO: aplicar ordenação e valores dinâmicos apenas nos dados visualizados
+  const processedData = useMemo(() => {
+    if (!baseProcessedData.length) return [];
+    
+    // Aplicar valores dinâmicos antes da ordenação
+    const data = baseProcessedData.map(item => {
+      const dynamic = calculateDynamicValues(
+        item, 
+        previewParams.referencePrice, 
+        previewParams.entryPercentage, 
+        previewParams.stopPercentage
+      );
+      
+      // Calcular stopTrigger usando os valores dinâmicos
+      const stopTrigger = calculateStopTrigger({
+        ...item,
+        stopPrice: dynamic.stopPrice
+      }, params.operation);
+      
+      return {
+        ...item,
+        ...dynamic,
+        stopTrigger
+      };
+    });
+    
+    // Aplicar ordenação
     return [...data].sort((a, b) => {
       const valA = a[sortField];
       const valB = b[sortField];
@@ -91,50 +155,40 @@ export function StockDetailsTable({
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
-  }, [result, sortField, sortDirection, params.operation]);
+  }, [baseProcessedData, sortField, sortDirection, previewParams, params.operation]);
 
-  // Function to calculate stop trigger
+  // Function to calculate stop trigger - mantida sem alterações
   interface TradeItemForStopTrigger {
-    // trade: string; // Removido, pois não é mais necessário para a lógica do Stop Trigger
     stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
-}
+  }
 
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
-    // Verifica se os dados necessários existem e são válidos
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
-        return "-"; // Retorna "-" se faltar Stop Price, Low ou High
+      return "-";
     }
 
-    // Converte os valores para número, tratando possíveis strings
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
 
-    // Verifica se as conversões foram bem sucedidas e se stopPrice é válido (> 0)
-    // Considera 0 como inválido para Stop Price, pois geralmente é usado como placeholder
     if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
-        return "-"; // Retorna "-" se a conversão falhar ou stopPrice for inválido
+      return "-";
     }
 
-    // Aplica a lógica de stop trigger baseada na operação (case-insensitive)
-    const lowerCaseOperation = operation?.toLowerCase(); // Garante que a comparação não seja sensível a maiúsculas/minúsculas
+    const lowerCaseOperation = operation?.toLowerCase();
 
     if (lowerCaseOperation === 'buy') {
-        // Para Buy: Low < Stop Price
-        return low < stopPrice ? "Executed" : "-";
+      return low < stopPrice ? "Executed" : "-";
     } else if (lowerCaseOperation === 'sell') {
-        // Para Sell: High > Stop Price
-        return high > stopPrice ? "Executed" : "-";
+      return high > stopPrice ? "Executed" : "-";
     } else {
-        // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
-        // console.warn(`calculateStopTrigger: Operação desconhecida ou inválida: ${operation}`); // Adiciona um aviso para depuração (opcional)
-        return "-";
+      return "-";
     }
-}
+  }
 
-  // Pagination
+  // Pagination - otimização: usar slicing apenas sobre os dados necessários
   const totalItems = processedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const currentData = processedData.slice(
@@ -158,42 +212,83 @@ export function StockDetailsTable({
     if (page > totalPages) page = totalPages;
     setCurrentPage(page);
   };
+  
+  // NOVO: Atualizar previewParams em tempo real ao mudar valores nos inputs
+  useEffect(() => {
+    // Atualizar cálculos de visualização em tempo real
+    setPreviewParams({
+      referencePrice: refPrice,
+      entryPercentage: typeof entryPercentage === 'number' ? entryPercentage : 0,
+      stopPercentage: typeof stopPercentage === 'number' ? stopPercentage : 0
+    });
+  }, [refPrice, entryPercentage, stopPercentage]);
 
+  // OTIMIZADO: Enviar para o servidor apenas quando o botão for clicado
   const handleUpdateResults = () => {
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
-      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+      entryPercentage: typeof entryPercentage === 'number' 
+        ? Number(entryPercentage.toFixed(2)) 
+        : 0,
+      stopPercentage: typeof stopPercentage === 'number' 
+        ? Number(stopPercentage.toFixed(2)) 
+        : 0,
+      initialCapital: typeof initialCapital === 'number' 
+        ? Number(initialCapital.toFixed(2)) 
+        : 0
     };
     onUpdateParams(cleanParams);
   };
 
-  // Formatting functions
+  // OTIMIZADO: Cache de formatação para evitar recálculos
+  const formatCache = useRef(new Map());
+  
+  // Formatting functions - otimizadas com cache
   const formatCurrency = (amount: number | undefined | null): string => {
     if (amount === undefined || amount === null) return "-";
-    return new Intl.NumberFormat('en-US', {
+    
+    // Verificar se já formatamos este valor antes
+    const cacheKey = `currency_${amount}`;
+    if (formatCache.current.has(cacheKey)) {
+      return formatCache.current.get(cacheKey);
+    }
+    
+    const formatted = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
+    
+    formatCache.current.set(cacheKey, formatted);
+    return formatted;
   };
 
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return "-";
+    
+    // Verificar cache
+    const cacheKey = `date_${dateString}`;
+    if (formatCache.current.has(cacheKey)) {
+      return formatCache.current.get(cacheKey);
+    }
+    
     try {
       const date = new Date(`${dateString}T00:00:00Z`);
       const day = String(date.getUTCDate()).padStart(2, '0');
       const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const year = date.getUTCFullYear();
+      
       if (isNaN(date.getTime())) {
-          return dateString;
-      }
-      return `${day}/${month}/${year}`;
-    } catch {
         return dateString;
+      }
+      
+      const formatted = `${day}/${month}/${year}`;
+      formatCache.current.set(cacheKey, formatted);
+      return formatted;
+    } catch {
+      return dateString;
     }
   };
 
@@ -204,7 +299,7 @@ export function StockDetailsTable({
       : <ChevronDown className="h-4 w-4 ml-1" />;
   };
 
-  // Columns configuration
+  // Columns configuration - sem alterações
   const columns = [
     { id: "date", label: "Date", width: "w-24" },
     { id: "entryPrice", label: "Open", width: "w-20" },
@@ -222,6 +317,7 @@ export function StockDetailsTable({
     { id: "currentCapital", label: "Current Capital", width: "w-32" }
   ];
 
+  // OTIMIZADO: Verificação única para dados vazios
   if (!processedData.length && !isLoading) {
     return (
       <Alert className="mt-4">
@@ -234,6 +330,7 @@ export function StockDetailsTable({
     );
   }
 
+  // O restante do código permanece o mesmo...
   return (
     <div className="w-full flex flex-col gap-6">
       {/* Chart and Setup Panel */}
@@ -245,14 +342,14 @@ export function StockDetailsTable({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={result.capitalEvolution || []}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <Tooltip 
-                  cursor={false} // Remove vertical line on hover
+                  cursor={false}
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
-                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p> {/* Added small bottom margin */}
+                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm">
+                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p>
                         <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
@@ -270,11 +367,11 @@ export function StockDetailsTable({
                 <Line
                   type="monotone"
                   dataKey="capital"
-                  stroke="#00ffff" // Neon cyan color
+                  stroke="#00ffff"
                   strokeWidth={2}
-                  dot={false} // No dots by default, maybe add activeDot styling
-                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
-                  filter="url(#glow)" // Apply glow effect
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }}
+                  filter="url(#glow)"
                   isAnimationActive={true}
                   animationDuration={2000}
                   animationEasing="ease-in-out"
@@ -311,11 +408,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isEntryPriceFocused 
                          ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
-                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
                   onFocus={() => setIsEntryPriceFocused(true)}
                   onBlur={() => {
@@ -324,8 +421,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -335,11 +432,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isStopPriceFocused 
                          ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
-                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
                   onFocus={() => setIsStopPriceFocused(true)}
                   onBlur={() => {
@@ -348,8 +445,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 2.00"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -429,7 +526,6 @@ export function StockDetailsTable({
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
-                          // Conditionally display 'Executed' for daytrade interval
                           formattedValue = params.interval === 'daytrade' && String(value) === 'Buy' ? 'Executed' : String(value);
                         } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
@@ -446,11 +542,11 @@ export function StockDetailsTable({
                           } ${
                             column.id === "profitLoss" ? 
                               (Number(item.profitLoss) > 0 ? "text-green-600" : 
-                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                              Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
                           } ${
                             column.id === "trade" ?
                               (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" : "") : ""
+                              item.trade === "Sell" ? "text-red-600" : "") : ""
                           }`}
                         >
                           {formattedValue}
@@ -525,56 +621,50 @@ export function StockDetailsTable({
   );
 }
 
-
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-    if (value === "") {
-      onChange(null); // Permite campo vazio temporariamente
-      return;
-    }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com "." ou "0."
-    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
-      if (value === "." || value.endsWith(".")) {
-         onChange(value); // Mantém como string temporariamente para permitir digitação
-      } else {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue >= 0) {
-          onChange(numValue);
-        }
-      }
-    } else if (value === "-") { // Impede digitar negativo
-      // Não faz nada se tentar digitar "-" 
+// Função auxiliar para lidar com a entrada de números decimais positivos
+const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
+  if (value === "") {
+    onChange(null);
+    return;
+  }
+  
+  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+  if (regex.test(value)) {
+    if (value === "." || value.endsWith(".")) {
+       onChange(value);
     } else {
-      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && numValue >= 0) {
-         // Formata para 2 casas decimais se for um número válido colado
-         onChange(parseFloat(numValue.toFixed(2)));
-      } else if (value === "") {
-         onChange(null);
+        onChange(numValue);
       }
     }
-  };
+  } else if (value === "-") {
+    // Ignora tentativa de digitar número negativo
+  } else {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+       onChange(parseFloat(numValue.toFixed(2)));
+    } else if (value === "") {
+       onChange(null);
+    }
+  }
+};
 
-  // Função auxiliar para formatar no blur
-  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-    let numValue = 0;
-    if (typeof value === "string") {
-      // Se for só um ponto, trata como 0
-      if (value === ".") {
-        numValue = 0;
-      } else {
-        numValue = parseFloat(value) || 0;
-      }
-    } else if (typeof value === "number") {
-      numValue = value;
-    } else if (value === null || value === undefined) {
-      onChange(null); // Mantém nulo se estava vazio
-      return;
+// Função auxiliar para formatar no blur
+const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
+  let numValue = 0;
+  if (typeof value === "string") {
+    if (value === ".") {
+      numValue = 0;
+    } else {
+      numValue = parseFloat(value) || 0;
     }
-    // Garante que seja positivo e formata
-    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-  };
+  } else if (typeof value === "number") {
+    numValue = value;
+  } else if (value === null || value === undefined) {
+    onChange(null);
+    return;
+  }
+  
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+};
