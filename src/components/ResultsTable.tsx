@@ -58,7 +58,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-
+const sortedResults = [...results].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
