@@ -527,10 +527,17 @@ const analysis = {
       console.log(`Found ${data.length} unique stock codes`);
       
       // Transform the data into StockInfo objects
-      const stocks: StockInfo[] = data.map(code => ({
-        code: String(code),
-        name: String(code), // Use code as name if no name is available
-      }));
+      // Corrected to handle potential object return from RPC
+      const stocks: StockInfo[] = data.map(item => {
+        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                          ? String(item.stock_code) 
+                          : String(item); // Fallback if it's just a string
+        return {
+          code: stockCode,
+          name: stockCode, // Use code as name if no name is available
+        };
+      });
       
       return stocks;
     } catch (error) {
@@ -649,7 +656,6 @@ const analysis = {
     endDate: string
   ): Promise<any[]> {
     try {
-       console.log("Debug stockCode:", typeof stockCode, stockCode); // 
       console.info(`Fetching stock data for ${stockCode} from ${tableName} between ${startDate} and ${endDate}`);
       
       const { data, error } = await fromDynamic(tableName)
