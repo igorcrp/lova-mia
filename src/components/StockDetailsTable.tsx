@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
@@ -35,13 +35,6 @@ export function StockDetailsTable({
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
   const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
   const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
-  
-  // NOVO: Estado para cálculos otimizados da entrada e stop
-  const [previewParams, setPreviewParams] = useState({
-    referencePrice: params.referencePrice,
-    entryPercentage: params.entryPercentage || 0,
-    stopPercentage: params.stopPercentage || 0
-  });
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
   const [chartHeight, setChartHeight] = useState(400);
@@ -64,11 +57,10 @@ export function StockDetailsTable({
     };
   }, []);
 
-  // OTIMIZAÇÃO: Dados base processados apenas quando resultado ou ordenação muda
+  // Process base data (static fields)
   const baseProcessedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
     
-    // Criar uma cópia segura dos dados
     return result.tradeHistory.map(item => ({
       ...item,
       profitLoss: Number(item.profitLoss) || 0,
@@ -76,69 +68,44 @@ export function StockDetailsTable({
         ? Number(item.currentCapital) 
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-"
-      // Não calcule o stopTrigger aqui, será calculado sob demanda
     }));
   }, [result]);
 
-  // NOVO: Função para calcular valores dinâmicos (entry e stop) com base nos parâmetros atuais
-  const calculateDynamicValues = (item: any, refPriceType: string, entryPct: number, stopPct: number) => {
-    // Verificar se temos os dados necessários
-    if (!item || !refPriceType) {
-      return { suggestedEntryPrice: "-", stopPrice: "-" };
-    }
-    
-    // Obter o valor de referência
-    let refValue: number;
-    switch(refPriceType) {
-      case 'open': refValue = Number(item.entryPrice); break;
-      case 'high': refValue = Number(item.high); break;
-      case 'low': refValue = Number(item.low); break;
-      case 'close': refValue = Number(item.exitPrice); break;
-      default: refValue = Number(item.entryPrice);
-    }
-    
-    if (isNaN(refValue) || refValue === 0) {
-      return { suggestedEntryPrice: "-", stopPrice: "-" };
-    }
-    
-    // Calcular valores dinâmicos
-    const suggestedEntry = refValue * (1 + (entryPct / 100));
-    const stopPrice = refValue * (1 + (stopPct / 100));
-    
-    return { 
-      suggestedEntryPrice: suggestedEntry.toFixed(2),
-      stopPrice: stopPrice.toFixed(2)
-    };
-  };
-  
-  // OTIMIZAÇÃO: aplicar ordenação e valores dinâmicos apenas nos dados visualizados
-  const processedData = useMemo(() => {
-    if (!baseProcessedData.length) return [];
-    
-    // Aplicar valores dinâmicos antes da ordenação
-    const data = baseProcessedData.map(item => {
-      const dynamic = calculateDynamicValues(
-        item, 
-        previewParams.referencePrice, 
-        previewParams.entryPercentage, 
-        previewParams.stopPercentage
-      );
+  // Process sensitive fields (depend on params)
+  const sensitiveFieldsData = useMemo(() => {
+    return baseProcessedData.map(item => {
+      const referenceValue = item[params.referencePrice as keyof TradeHistoryItem] as number;
+      const entryPct = Number(entryPercentage) || 0;
+      const stopPct = Number(stopPercentage) || 0;
       
-      // Calcular stopTrigger usando os valores dinâmicos
-      const stopTrigger = calculateStopTrigger({
-        ...item,
-        stopPrice: dynamic.stopPrice
-      }, params.operation);
-      
+      const suggestedEntryPrice = referenceValue * (1 + (entryPct / 100));
+      const stopPrice = params.operation?.toLowerCase() === 'buy'
+        ? suggestedEntryPrice * (1 - (stopPct / 100))
+        : suggestedEntryPrice * (1 + (stopPct / 100));
+
       return {
-        ...item,
-        ...dynamic,
-        stopTrigger
+        suggestedEntryPrice,
+        stopPrice,
+        stopTrigger: calculateStopTrigger({
+          stopPrice,
+          low: item.low,
+          high: item.high
+        }, params.operation)
       };
     });
-    
-    // Aplicar ordenação
-    return [...data].sort((a, b) => {
+  }, [baseProcessedData, params.referencePrice, params.operation, entryPercentage, stopPercentage]);
+
+  // Combine data
+  const combinedData = useMemo(() => {
+    return baseProcessedData.map((item, index) => ({
+      ...item,
+      ...sensitiveFieldsData[index]
+    }));
+  }, [baseProcessedData, sensitiveFieldsData]);
+
+  // Sort data
+  const processedData = useMemo(() => {
+    return [...combinedData].sort((a, b) => {
       const valA = a[sortField];
       const valB = b[sortField];
 
@@ -150,21 +117,14 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields
       const numA = Number(valA) || 0;
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
-  }, [baseProcessedData, sortField, sortDirection, previewParams, params.operation]);
+  }, [combinedData, sortField, sortDirection]);
 
-  // Function to calculate stop trigger - mantida sem alterações
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
-  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+  // Function to calculate stop trigger
+  function calculateStopTrigger(item: { stopPrice: number | string | null; low: number | string | null; high: number | string | null }, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
       return "-";
     }
@@ -188,7 +148,7 @@ export function StockDetailsTable({
     }
   }
 
-  // Pagination - otimização: usar slicing apenas sobre os dados necessários
+  // Pagination
   const totalItems = processedData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const currentData = processedData.slice(
@@ -212,83 +172,51 @@ export function StockDetailsTable({
     if (page > totalPages) page = totalPages;
     setCurrentPage(page);
   };
-  
-  // NOVO: Atualizar previewParams em tempo real ao mudar valores nos inputs
-  useEffect(() => {
-    // Atualizar cálculos de visualização em tempo real
-    setPreviewParams({
-      referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? entryPercentage : 0,
-      stopPercentage: typeof stopPercentage === 'number' ? stopPercentage : 0
-    });
-  }, [refPrice, entryPercentage, stopPercentage]);
 
-  // OTIMIZADO: Enviar para o servidor apenas quando o botão for clicado
-  const handleUpdateResults = () => {
+  const handleUpdateResults = useCallback(() => {
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' 
-        ? Number(entryPercentage.toFixed(2)) 
-        : 0,
-      stopPercentage: typeof stopPercentage === 'number' 
-        ? Number(stopPercentage.toFixed(2)) 
-        : 0,
-      initialCapital: typeof initialCapital === 'number' 
-        ? Number(initialCapital.toFixed(2)) 
-        : 0
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
-    onUpdateParams(cleanParams);
-  };
+    
+    // Only trigger update if sensitive params changed
+    if (params.referencePrice !== cleanParams.referencePrice || 
+        params.entryPercentage !== cleanParams.entryPercentage ||
+        params.stopPercentage !== cleanParams.stopPercentage) {
+      onUpdateParams(cleanParams);
+    } else {
+      // Update local state without triggering full recalculation
+      setParams(cleanParams);
+    }
+  }, [refPrice, entryPercentage, stopPercentage, initialCapital, params, onUpdateParams]);
 
-  // OTIMIZADO: Cache de formatação para evitar recálculos
-  const formatCache = useRef(new Map());
-  
-  // Formatting functions - otimizadas com cache
+  // Formatting functions (unchanged)
   const formatCurrency = (amount: number | undefined | null): string => {
     if (amount === undefined || amount === null) return "-";
-    
-    // Verificar se já formatamos este valor antes
-    const cacheKey = `currency_${amount}`;
-    if (formatCache.current.has(cacheKey)) {
-      return formatCache.current.get(cacheKey);
-    }
-    
-    const formatted = new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
-    
-    formatCache.current.set(cacheKey, formatted);
-    return formatted;
   };
 
   const formatDate = (dateString: string | undefined | null): string => {
     if (!dateString) return "-";
-    
-    // Verificar cache
-    const cacheKey = `date_${dateString}`;
-    if (formatCache.current.has(cacheKey)) {
-      return formatCache.current.get(cacheKey);
-    }
-    
     try {
       const date = new Date(`${dateString}T00:00:00Z`);
       const day = String(date.getUTCDate()).padStart(2, '0');
       const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const year = date.getUTCFullYear();
-      
       if (isNaN(date.getTime())) {
-        return dateString;
+          return dateString;
       }
-      
-      const formatted = `${day}/${month}/${year}`;
-      formatCache.current.set(cacheKey, formatted);
-      return formatted;
+      return `${day}/${month}/${year}`;
     } catch {
-      return dateString;
+        return dateString;
     }
   };
 
@@ -299,7 +227,7 @@ export function StockDetailsTable({
       : <ChevronDown className="h-4 w-4 ml-1" />;
   };
 
-  // Columns configuration - sem alterações
+  // Columns configuration (unchanged)
   const columns = [
     { id: "date", label: "Date", width: "w-24" },
     { id: "entryPrice", label: "Open", width: "w-20" },
@@ -317,7 +245,6 @@ export function StockDetailsTable({
     { id: "currentCapital", label: "Current Capital", width: "w-32" }
   ];
 
-  // OTIMIZADO: Verificação única para dados vazios
   if (!processedData.length && !isLoading) {
     return (
       <Alert className="mt-4">
@@ -330,7 +257,7 @@ export function StockDetailsTable({
     );
   }
 
-  // O restante do código permanece o mesmo...
+  // JSX (unchanged except for the handleUpdateResults usage)
   return (
     <div className="w-full flex flex-col gap-6">
       {/* Chart and Setup Panel */}
@@ -542,11 +469,11 @@ export function StockDetailsTable({
                           } ${
                             column.id === "profitLoss" ? 
                               (Number(item.profitLoss) > 0 ? "text-green-600" : 
-                              Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
                           } ${
                             column.id === "trade" ?
                               (item.trade === "Buy" ? "text-green-600" :
-                              item.trade === "Sell" ? "text-red-600" : "") : ""
+                               item.trade === "Sell" ? "text-red-600" : "") : ""
                           }`}
                         >
                           {formattedValue}
@@ -621,7 +548,7 @@ export function StockDetailsTable({
   );
 }
 
-// Função auxiliar para lidar com a entrada de números decimais positivos
+// Funções auxiliares inalteradas
 const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
   if (value === "") {
     onChange(null);
@@ -631,40 +558,34 @@ const handleDecimalInputChange = (value: string, onChange: (val: number | string
   const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
   if (regex.test(value)) {
     if (value === "." || value.endsWith(".")) {
-       onChange(value);
+      onChange(value);
     } else {
       const numValue = parseFloat(value);
-      if (!isNaN(numValue) && numValue >= 0) {
+      if (!isNaN(numValue) {
         onChange(numValue);
       }
     }
   } else if (value === "-") {
-    // Ignora tentativa de digitar número negativo
+    // Do nothing
   } else {
     const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 0) {
-       onChange(parseFloat(numValue.toFixed(2)));
+    if (!isNaN(numValue)) {
+      onChange(parseFloat(numValue.toFixed(2)));
     } else if (value === "") {
-       onChange(null);
+      onChange(null);
     }
   }
 };
 
-// Função auxiliar para formatar no blur
 const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
   let numValue = 0;
   if (typeof value === "string") {
-    if (value === ".") {
-      numValue = 0;
-    } else {
-      numValue = parseFloat(value) || 0;
-    }
+    numValue = value === "." ? 0 : parseFloat(value) || 0;
   } else if (typeof value === "number") {
     numValue = value;
   } else if (value === null || value === undefined) {
     onChange(null);
     return;
   }
-  
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 };
