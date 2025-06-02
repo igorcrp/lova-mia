@@ -43,7 +43,7 @@ const calculateAffectedColumns = (
 
 // Função para calcular stop trigger
 function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
-  if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+  if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
     return "-";
   }
 
