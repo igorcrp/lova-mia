@@ -58,45 +58,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Function to calculate all metrics based on tradeDetails
-  const calculateMetrics = (result: AnalysisResult) => {
-    // Add null check for tradeDetails
-    const tradeDetails = result.tradeDetails || [];
-    
-    const profits = tradeDetails.filter(
-      detail => detail.profitLoss > 0 && detail.trade === "Executed" && !detail.stop
-    ).length;
-    
-    const losses = tradeDetails.filter(
-      detail => detail.profitLoss < 0 && detail.trade === "Executed" && !detail.stop
-    ).length;
-    
-    const stops = tradeDetails.filter(
-      detail => detail.profitLoss < 0 && detail.trade === "Executed" && detail.stop === "Executed"
-    ).length;
-    
-    const profitPercentage = result.trades > 0 ? (profits / result.trades) * 100 : 0;
-    const lossPercentage = result.trades > 0 ? (losses / result.trades) * 100 : 0;
-    const stopPercentage = result.trades > 0 ? (stops / result.trades) * 100 : 0;
-    
-    return {
-      profits,
-      profitPercentage,
-      losses,
-      lossPercentage,
-      stops,
-      stopPercentage
-    };
-  };
 
-  // Add metrics to results for sorting
-  const resultsWithMetrics = results.map(result => ({
-    ...result,
-    ...calculateMetrics(result)
-  }));
-
-  // Sort results
-  const sortedResults = [...resultsWithMetrics].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
