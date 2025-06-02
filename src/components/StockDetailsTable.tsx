@@ -584,7 +584,7 @@ const handleBlurFormatting = (value: number | string | null | undefined, onChang
     onChange(null);
     return;
   }
-  onChange(Math.max(0, parseFloat(numValue.toFixed(2)));
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 };
 
 interface TradeItemForStopTrigger {
