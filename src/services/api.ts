@@ -649,6 +649,7 @@ const analysis = {
     endDate: string
   ): Promise<any[]> {
     try {
+       console.log("Debug stockCode:", typeof stockCode, stockCode); // 
       console.info(`Fetching stock data for ${stockCode} from ${tableName} between ${startDate} and ${endDate}`);
       
       const { data, error } = await fromDynamic(tableName)
