@@ -430,8 +430,8 @@ export function StockDetailsTable({
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
                           // Conditionally display 'Executed' for daytrade interval
-                          formattedValue = params.interval === 'daytrade' && String(value) === 'Executed' ? 'Executed' : String(value);
-                        } else if (typeof value === "number") {
+                          formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
+                        }else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
                           formattedValue = String(value);
