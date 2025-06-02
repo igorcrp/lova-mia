@@ -95,33 +95,42 @@ export function StockDetailsTable({
 
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
-    trade: string;
+    // trade: string; // Removido, pois não é mais necessário para a lógica do Stop Trigger
     stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
 }
-  
+
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
-    // Verifica se o item é válido e se a trade foi executada
-    if (!item || item.trade !== "Executed" || item.stopPrice === '-' || item.stopPrice === null) {
-        return "-";
+    // Verifica se os dados necessários existem e são válidos
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+        return "-"; // Retorna "-" se faltar Stop Price, Low ou High
     }
 
-    // Converte os valores para número
+    // Converte os valores para número, tratando possíveis strings
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
 
-    // Verifica se as conversões foram bem sucedidas
-    if (isNaN(stopPrice) || isNaN(low) || isNaN(high)) {
-        return "-";
+    // Verifica se as conversões foram bem sucedidas e se stopPrice é válido (> 0)
+    // Considera 0 como inválido para Stop Price, pois geralmente é usado como placeholder
+    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
+        return "-"; // Retorna "-" se a conversão falhar ou stopPrice for inválido
     }
 
-    // Aplica a lógica de stop trigger baseada na operação
-    if (operation === 'buy') {
+    // Aplica a lógica de stop trigger baseada na operação (case-insensitive)
+    const lowerCaseOperation = operation?.toLowerCase(); // Garante que a comparação não seja sensível a maiúsculas/minúsculas
+
+    if (lowerCaseOperation === 'buy') {
+        // Para Buy: Low < Stop Price
         return low < stopPrice ? "Executed" : "-";
-    } else {
+    } else if (lowerCaseOperation === 'sell') {
+        // Para Sell: High > Stop Price
         return high > stopPrice ? "Executed" : "-";
+    } else {
+        // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
+        // console.warn(`calculateStopTrigger: Operação desconhecida ou inválida: ${operation}`); // Adiciona um aviso para depuração (opcional)
+        return "-";
     }
 }
 
