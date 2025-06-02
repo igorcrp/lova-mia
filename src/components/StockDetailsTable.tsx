@@ -448,7 +448,7 @@ export function StockDetailsTable({
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
-                          formattedValue = params.interval === 'daytrade' && String(value) === 'Buy' ? 'Executed' : String(value);
+                          formattedValue = params.interval === 'daytrade' && String(value) === 'Executed' ? 'Executed' : String(value);
                         } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
