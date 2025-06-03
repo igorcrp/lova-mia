@@ -506,11 +506,11 @@ const api = {
           return [];
         }
 
-        // Remove duplicates and ensure stock_code exists
+        // Remove duplicates and ensure stock_code exists with proper null checking
         const uniqueStocks = Array.from(new Set(
           data
-            .filter(item => item && typeof item === 'object' && 'stock_code' in item)
-            .map(item => item.stock_code)
+            .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code != null)
+            .map(item => item.stock_code as string)
         ));
         
         return uniqueStocks.map(code => ({
