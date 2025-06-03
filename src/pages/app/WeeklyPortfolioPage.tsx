@@ -43,8 +43,7 @@ function getReferencePrice(day: TradeHistoryItem, referencePriceKey: string): nu
 
 function calculateStopPrice(entryPrice: number, params: StockAnalysisParams): number {
   const stopPercent = params.stopPercentage ?? 0;
-  const result = entryPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
-  return typeof result === 'number' ? result : 0;
+  return entryPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
 }
 
 function checkStopLoss(currentDay: TradeHistoryItem, stopPrice: number, operation: string): boolean {
@@ -144,10 +143,9 @@ export default function WeeklyPortfolioPage() {
             const referencePrice = getReferencePrice(previousDay, params.referencePrice);
             const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
             if ((params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold)) {
-              const stopPrice = calculateStopPrice(potentialEntryPrice, params);
-              const entryDayRecord: TradeHistoryItem = { ...currentDayData, trade: (params.operation === 'buy' ? 'Buy' : 'Sell'), suggestedEntryPrice: potentialEntryPrice, actualPrice: potentialEntryPrice, stopPrice: stopPrice, lotSize: currentCapital / potentialEntryPrice, stop: '-', profit: undefined, capital: undefined };
+              const entryDayRecord: TradeHistoryItem = { ...currentDayData, trade: (params.operation === 'buy' ? 'Buy' : 'Sell'), suggestedEntryPrice: potentialEntryPrice, actualPrice: potentialEntryPrice, stopPrice: calculateStopPrice(potentialEntryPrice, params), lotSize: currentCapital / potentialEntryPrice, stop: '-', profit: undefined, capital: undefined };
               activeTradeEntry = entryDayRecord;
-              stopPriceCalculated = stopPrice;
+              stopPriceCalculated = entryDayRecord.stopPrice;
               finalProcessedHistory.push(entryDayRecord);
             }
           }
@@ -406,3 +404,4 @@ export default function WeeklyPortfolioPage() {
     </div>
   );
 }
+

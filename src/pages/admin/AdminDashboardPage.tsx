@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/services/api";
 import { useEffect, useState } from "react";
@@ -59,14 +60,15 @@ export default function AdminDashboardPage() {
         const usersData = await api.users.getUserStats();
         const assetsTotal = await api.assets.getTotalCount();
         
-        // Create a complete UserStats object matching the API response
+        // Create a complete UserStats object with all required properties
+        // Making sure we provide default values for all required fields
         const completeUserStats: UserStats = {
-          total: usersData.totalUsers || 0,
-          active: usersData.activeUsers || 0,
-          pending: usersData.pendingUsers || 0,
-          inactive: (usersData.totalUsers - usersData.activeUsers - usersData.pendingUsers) || 0,
-          premium: usersData.adminUsers,
-          new: 0 // Not provided by API, defaulting to 0
+          total: usersData.total || 0,
+          active: usersData.active || 0,
+          pending: usersData.pending || 0, // Default to 0 if not provided
+          inactive: usersData.inactive || 0, // Default to 0 if not provided
+          premium: usersData.premium,
+          new: usersData.new
         };
         
         setUserStats(completeUserStats);

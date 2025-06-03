@@ -36,11 +36,10 @@ function getReferencePrice(day: TradeHistoryItem, referencePriceKey: string): nu
   return typeof price === 'number' ? price : 0;
 }
 
-// Helper function to calculate stop price - ensure number return type
+// Helper function to calculate stop price
 function calculateStopPrice(entryPrice: number, params: StockAnalysisParams): number {
   const stopPercent = params.stopPercentage ?? 0;
-  const result = entryPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
-  return typeof result === 'number' ? result : 0;
+  return entryPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
 }
 
 // Helper function to check if stop loss is hit
@@ -87,7 +86,7 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
 };
 
 const calculateVolatility = (trades: TradeHistoryItem[]): number => {
-    const profits = trades.filter(t => t.trade === 'Closed' && t.profitLoss !== undefined).map(t => t.profitLoss as number);
+    const profits = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined).map(t => t.profit as number);
     if (profits.length < 2) return 0;
     const mean = profits.reduce((sum, p) => sum + p, 0) / profits.length;
     const variance = profits.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / (profits.length - 1);
@@ -103,7 +102,7 @@ const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturnPercentage:
 
 const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02;
-    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profitLoss !== undefined && t.profitLoss < 0).map(t => t.profitLoss as number);
+    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number);
     if (negativeReturns.length === 0) return Infinity;
     const meanNegative = 0; // Target return
     const downsideVariance = negativeReturns.reduce((sum, p) => sum + Math.pow(p - meanNegative, 2), 0) / negativeReturns.length;
@@ -168,20 +167,19 @@ export default function MonthlyPortfolioPage() {
             const shouldEnter = (params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold);
 
             if (shouldEnter) {
-              const stopPrice = calculateStopPrice(potentialEntryPrice, params);
               const entryDayRecord: TradeHistoryItem = {
                 ...currentDayData,
                 trade: (params.operation === 'buy' ? 'Buy' : 'Sell'),
                 suggestedEntryPrice: potentialEntryPrice,
                 actualPrice: potentialEntryPrice,
-                stopPrice: stopPrice,
+                stopPrice: calculateStopPrice(potentialEntryPrice, params),
                 lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
                 stop: '-',
                 profitLoss: undefined, // CORREÇÃO: ProfitLoss undefined nos dias de entrada
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value
               };
               activeTradeEntry = entryDayRecord;
-              stopPriceCalculated = stopPrice;
+              stopPriceCalculated = entryDayRecord.stopPrice;
               finalProcessedHistory.push(entryDayRecord);
             }
           }

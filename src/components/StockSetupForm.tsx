@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -71,7 +70,7 @@ export function StockSetupForm({
     async function loadCountries() {
       setLoadingState(prev => ({ ...prev, countries: true }));
       try {
-        const fetchedCountries = await api.marketData.getAvailableCountries();
+        const fetchedCountries = await api.marketData.getCountries();
         if (fetchedCountries && fetchedCountries.length > 0) {
           setCountries(fetchedCountries);
           console.log("Loaded countries:", fetchedCountries);
@@ -108,7 +107,7 @@ export function StockSetupForm({
     async function loadStockMarkets() {
       setLoadingState(prev => ({ ...prev, stockMarkets: true }));
       try {
-        const fetchedMarkets = await api.marketData.getAvailableStockMarkets(country);
+        const fetchedMarkets = await api.marketData.getStockMarkets(country);
         
         if (fetchedMarkets && fetchedMarkets.length > 0) {
           setStockMarkets(fetchedMarkets);
@@ -156,7 +155,7 @@ export function StockSetupForm({
     async function loadAssetClasses() {
       setLoadingState(prev => ({ ...prev, assetClasses: true }));
       try {
-        const fetchedAssetClasses = await api.marketData.getAvailableAssetClasses(country, stockMarket);
+        const fetchedAssetClasses = await api.marketData.getAssetClasses(country, stockMarket);
         
         if (fetchedAssetClasses && fetchedAssetClasses.length > 0) {
           setAssetClasses(fetchedAssetClasses);
