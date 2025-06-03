@@ -102,106 +102,154 @@ export default function MonthlyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  const processMonthlyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams) => {
-    if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
+ // Helper functions remain the same...
 
-    const processedHistory: TradeHistoryItem[] = [];
-    const tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] = [];
-    const sortedHistory = [...fullHistory].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+const processMonthlyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { 
+    processedHistory: TradeHistoryItem[], 
+    tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] 
+} => {
+    if (!fullHistory || fullHistory.length === 0) {
+        return { processedHistory: [], tradePairs: [] };
+    }
+
+    const finalProcessedHistory: TradeHistoryItem[] = [];
+    const finalTradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] = [];
+    const sortedHistory = [...fullHistory].sort((a, b) =>
+        new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
     );
-
+    
     let currentCapital = params.initialCapital;
     let activeTrade: TradeHistoryItem | null = null;
 
-    // Group by month
-    const tradesByMonth: Record<string, TradeHistoryItem[]> = {};
+    // Agrupar por mês
+    const tradesByMonth: { [monthKey: string]: TradeHistoryItem[] } = {};
     sortedHistory.forEach(trade => {
-      const monthKey = getMonthKey(new Date(trade.date));
-      if (!tradesByMonth[monthKey]) tradesByMonth[monthKey] = [];
-      tradesByMonth[monthKey].push(trade);
+        const tradeDate = new Date(trade.date + 'T00:00:00Z');
+        if (isNaN(tradeDate.getTime())) return;
+        const monthKey = getMonthKey(tradeDate);
+        if (!tradesByMonth[monthKey]) tradesByMonth[monthKey] = [];
+        tradesByMonth[monthKey].push(trade);
     });
 
-    // Process each month
+    // Processar cada mês
     Object.keys(tradesByMonth).sort().forEach(monthKey => {
-      const monthTrades = tradesByMonth[monthKey];
-      let entryAttempted = false;
+        const monthTrades = tradesByMonth[monthKey];
+        let entryAttemptMade = false;
 
-      for (let i = 0; i < monthTrades.length; i++) {
-        const currentDay = monthTrades[i];
-        const currentDate = new Date(currentDay.date);
+        for (let i = 0; i < monthTrades.length; i++) {
+            const currentDay = monthTrades[i];
+            const currentDate = new Date(currentDay.date + 'T00:00:00Z');
 
-        // Try to enter only on first business day
-        if (!activeTrade && !entryAttempted && isFirstBusinessDayOfMonth(currentDate)) {
-          entryAttempted = true;
-          const prevDay = findPreviousDay(sortedHistory, currentDay.date);
-          
-          if (prevDay) {
-            const entryPrice = prevDay.close;
-            const refPrice = getReferencePrice(prevDay, params.referencePrice);
-            const threshold = refPrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
-            
-            if ((params.operation === 'buy' && entryPrice >= threshold) || 
-                (params.operation === 'sell' && entryPrice <= threshold)) {
-              
-              const entryTrade: TradeHistoryItem = {
-                ...currentDay,
-                trade: params.operation === 'buy' ? 'Buy' : 'Sell',
-                suggestedEntryPrice: entryPrice,
-                actualPrice: entryPrice,
-                stopPrice: calculateStopPrice(entryPrice, params),
-                lotSize: currentCapital / entryPrice,
-                stop: '-',
-                profit: undefined,
-                capital: currentCapital
-              };
-              
-              activeTrade = entryTrade;
-              processedHistory.push(entryTrade);
+            // 1. Tentar entrada apenas no primeiro dia útil do mês e se não houver trade ativo
+            if (!activeTrade && !entryAttemptMade && isFirstBusinessDayOfMonth(currentDate)) {
+                entryAttemptMade = true;
+                const previousDay = findPreviousDay(sortedHistory, currentDay.date);
+                
+                if (previousDay) {
+                    const potentialEntryPrice = previousDay.close;
+                    const referencePrice = getReferencePrice(previousDay, params.referencePrice);
+                    const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
+                    
+                    if ((params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || 
+                        (params.operation === 'sell' && potentialEntryPrice <= entryThreshold)) {
+                        
+                        // Criar entrada sem calcular lucro/perda e mantendo o capital anterior
+                        const entryTrade: TradeHistoryItem = {
+                            ...currentDay,
+                            trade: params.operation === 'buy' ? 'Buy' : 'Sell',
+                            suggestedEntryPrice: potentialEntryPrice,
+                            actualPrice: potentialEntryPrice,
+                            stopPrice: calculateStopPrice(potentialEntryPrice, params),
+                            lotSize: currentCapital / potentialEntryPrice,
+                            stop: '-',
+                            profit: undefined,        // Não calcula lucro na entrada
+                            capital: currentCapital   // Mantém o capital anterior
+                        };
+                        
+                        activeTrade = entryTrade;
+                        finalProcessedHistory.push(entryTrade);
+                    }
+                }
             }
-          }
-        }
 
-        // Manage active trade
-        if (activeTrade && currentDay.date !== activeTrade.date) {
-          const stopHit = checkStopLoss(currentDay, activeTrade.stopPrice, params.operation);
-          const isLastDay = isLastBusinessDayOfMonth(currentDate);
-          
-          if (stopHit || isLastDay) {
-            const exitPrice = stopHit ? activeTrade.stopPrice : currentDay.close;
+            // 2. Gerenciar trade ativo
+            if (activeTrade && currentDay.date !== activeTrade.date) {
+                const stopHit = checkStopLoss(currentDay, activeTrade.stopPrice, params.operation);
+                const isLastDay = isLastBusinessDayOfMonth(currentDate);
+                
+                // Fechar posição apenas se atingiu stop ou é último dia útil
+                if (stopHit || isLastDay) {
+                    const exitPrice = stopHit ? activeTrade.stopPrice : currentDay.close;
+                    const profit = calculateProfit(
+                        activeTrade.actualPrice,
+                        exitPrice,
+                        params.operation,
+                        activeTrade.lotSize
+                    );
+                    
+                    // Criar trade de fechamento com cálculo de lucro/perda e atualização do capital
+                    const closeTrade: TradeHistoryItem = {
+                        ...currentDay,
+                        trade: 'Closed',
+                        stop: stopHit ? 'Executed' : '-',
+                        suggestedEntryPrice: activeTrade.suggestedEntryPrice,
+                        actualPrice: activeTrade.actualPrice,
+                        stopPrice: activeTrade.stopPrice,
+                        lotSize: activeTrade.lotSize,
+                        exitPrice: exitPrice,
+                        profit: profit,           // Calcula lucro apenas no fechamento
+                        capital: currentCapital + profit  // Atualiza capital apenas no fechamento
+                    };
+                    
+                    finalProcessedHistory.push(closeTrade);
+                    finalTradePairs.push({ open: activeTrade, close: closeTrade });
+                    
+                    // Atualizar capital somente após o fechamento
+                    currentCapital += profit;
+                    
+                    // Resetar trade ativo
+                    activeTrade = null;
+                    
+                    // Se foi stop, sair do loop do mês
+                    if (stopHit) break;
+                }
+            }
+        }
+        
+        // Verificar se há trade ativo não fechado ao final do mês
+        if (activeTrade) {
+            const lastDayOfMonth = monthTrades[monthTrades.length - 1];
+            // Forçar fechamento com o preço de fechamento do último dia
+            const exitPrice = lastDayOfMonth.close;
             const profit = calculateProfit(
-              activeTrade.actualPrice,
-              exitPrice,
-              params.operation,
-              activeTrade.lotSize
+                activeTrade.actualPrice,
+                exitPrice,
+                params.operation,
+                activeTrade.lotSize
             );
             
-            const closeTrade: TradeHistoryItem = {
-              ...currentDay,
-              trade: 'Closed',
-              stop: stopHit ? 'Executed' : '-',
-              suggestedEntryPrice: activeTrade.suggestedEntryPrice,
-              actualPrice: activeTrade.actualPrice,
-              stopPrice: activeTrade.stopPrice,
-              lotSize: activeTrade.lotSize,
-              exitPrice: exitPrice,
-              profit: profit,
-              capital: currentCapital + profit
+            const forcedCloseTrade: TradeHistoryItem = {
+                ...lastDayOfMonth,
+                trade: 'Closed',
+                stop: '-',
+                suggestedEntryPrice: activeTrade.suggestedEntryPrice,
+                actualPrice: activeTrade.actualPrice,
+                stopPrice: activeTrade.stopPrice,
+                lotSize: activeTrade.lotSize,
+                exitPrice: exitPrice,
+                profit: profit,
+                capital: currentCapital + profit
             };
             
-            processedHistory.push(closeTrade);
-            tradePairs.push({ open: activeTrade, close: closeTrade });
+            finalProcessedHistory.push(forcedCloseTrade);
+            finalTradePairs.push({ open: activeTrade, close: forcedCloseTrade });
             currentCapital += profit;
             activeTrade = null;
-            
-            if (stopHit) break;
-          }
         }
-      }
     });
 
-    return { processedHistory, tradePairs };
-  };
+    return { processedHistory: finalProcessedHistory, tradePairs: finalTradePairs };
+};
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
