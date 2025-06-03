@@ -60,7 +60,8 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
     let peakCapital = initialCapital;
     let currentCapital = initialCapital;
     trades.forEach(trade => {
-      if (trade.profit !== undefined && trade.trade === 'Closed') { // Use 'Closed'
+      // Only consider 'Closed' trades for capital calculation
+      if (trade.profit !== undefined && trade.trade === 'Closed') { 
         currentCapital += trade.profit;
         if (currentCapital > peakCapital) peakCapital = currentCapital;
         const drawdown = peakCapital === 0 ? 0 : (peakCapital - currentCapital) / peakCapital;
@@ -70,7 +71,8 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
     return maxDrawdown * 100; // Percentage
 };
 const calculateVolatility = (trades: TradeHistoryItem[]): number => {
-    const profits = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined).map(t => t.profit as number); // Use 'Closed'
+    // Only consider 'Closed' trades for volatility calculation
+    const profits = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined).map(t => t.profit as number); 
     if (profits.length < 2) return 0;
     const mean = profits.reduce((sum, p) => sum + p, 0) / profits.length;
     const variance = profits.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / (profits.length - 1);
@@ -78,13 +80,15 @@ const calculateVolatility = (trades: TradeHistoryItem[]): number => {
 };
 const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02; // Annualized
-    const volatility = calculateVolatility(trades); // Uses 'Closed'
+    // Volatility calculation already uses only 'Closed' trades
+    const volatility = calculateVolatility(trades); 
     if (volatility === 0) return 0;
     return (totalReturnPercentage / 100 - riskFreeRate) / volatility; // Simplified
 };
 const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02;
-    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number); // Use 'Closed'
+    // Only consider 'Closed' trades for Sortino calculation
+    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number); 
     if (negativeReturns.length === 0) return Infinity;
     const meanNegative = 0; // Target return
     const downsideVariance = negativeReturns.reduce((sum, p) => sum + Math.pow(p - meanNegative, 2), 0) / negativeReturns.length;
@@ -103,7 +107,7 @@ export default function MonthlyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  // Função para processar operações mensais - CORRIGIDA v3 (Profit/Capital on Closed only, Text 'Closed')
+  // Função para processar operações mensais - Lógica já corrigida (v3)
   const processMonthlyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
 
@@ -112,7 +116,7 @@ export default function MonthlyPortfolioPage() {
     const sortedHistory = [...fullHistory].sort((a, b) =>
       new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
     );
-    let capitalBeforeCurrentTrade = params.initialCapital; // Tracks capital *before* each trade entry
+    let capitalBeforeCurrentTrade = params.initialCapital; // Rastreia o capital *antes* de cada entrada
 
     const tradesByMonth: { [monthKey: string]: TradeHistoryItem[] } = {};
     sortedHistory.forEach(trade => {
@@ -134,14 +138,16 @@ export default function MonthlyPortfolioPage() {
         const currentDate = new Date(currentDayData.date + 'T00:00:00Z');
         if (isNaN(currentDate.getTime())) continue;
 
-        // --- 1. Attempt Entry ONLY on First Business Day --- 
+        // --- 1. Tentar Entrada APENAS no Primeiro Dia Útil --- 
+        // Verifica se NÃO há trade ativo E se NÃO houve tentativa de entrada neste mês E se é o primeiro dia útil
         if (!activeTradeEntry && !entryAttemptMadeThisMonth && isFirstBusinessDayOfMonth(currentDate)) {
-          entryAttemptMadeThisMonth = true;
+          entryAttemptMadeThisMonth = true; // Marca que a tentativa foi feita neste mês
           const previousDay = findPreviousDay(sortedHistory, currentDayData.date);
           if (previousDay && previousDay.exitPrice !== undefined) {
             const potentialEntryPrice = previousDay.exitPrice;
             const referencePrice = getReferencePrice(previousDay, params.referencePrice);
             const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
+            // Verifica condição de entrada
             if ((params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold)) {
               const entryDayRecord: TradeHistoryItem = {
                 ...currentDayData,
@@ -149,21 +155,22 @@ export default function MonthlyPortfolioPage() {
                 suggestedEntryPrice: potentialEntryPrice,
                 actualPrice: potentialEntryPrice,
                 stopPrice: calculateStopPrice(potentialEntryPrice, params),
-                // *** CORRECTION v3: Calculate Lot Size based on capital *before* entry ***
+                // Calcula Lot Size baseado no capital ANTES da entrada
                 lotSize: capitalBeforeCurrentTrade / potentialEntryPrice, 
                 stop: '-', 
-                // *** CORRECTION v3: Profit and Capital are UNDEFINED on entry ***
+                // *** CORREÇÃO APLICADA: Profit e Capital são indefinidos na entrada ***
                 profit: undefined, 
                 capital: undefined 
               };
-              activeTradeEntry = entryDayRecord;
+              activeTradeEntry = entryDayRecord; // Marca o trade como ativo
               stopPriceCalculated = entryDayRecord.stopPrice;
               finalProcessedHistory.push(entryDayRecord);
             }
           }
         }
 
-        // --- 2. Manage Active Trade (Check Stop or End of Month) --- 
+        // --- 2. Gerenciar Trade Ativo (Verificar Stop ou Fim do Mês) --- 
+        // Verifica se existe um trade ativo E se o dia atual é diferente do dia de entrada
         if (activeTradeEntry && stopPriceCalculated && currentDayData.date !== activeTradeEntry.date) {
           let closedToday = false;
           let exitPrice: number | undefined = undefined;
@@ -172,17 +179,17 @@ export default function MonthlyPortfolioPage() {
 
           const stopHit = checkStopLoss(currentDayData, stopPriceCalculated, params.operation);
           
+          // Se o Stop foi atingido
           if (stopHit) {
             exitPrice = stopPriceCalculated;
+            // *** CORREÇÃO APLICADA: Cálculo de Profit/Capital SOMENTE no fechamento ***
             profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
             closeRecord = {
               ...currentDayData,
-              // *** CORRECTION v3: Use 'Closed' text ***
-              trade: 'Closed', 
+              trade: 'Closed', // Marca como fechado
               stop: 'Executed', 
-              // *** CORRECTION v3: Profit and Capital calculated ONLY on close ***
               profit: profit,
-              capital: capitalBeforeCurrentTrade + profit, 
+              capital: capitalBeforeCurrentTrade + profit, // Atualiza capital
               suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
               actualPrice: activeTradeEntry.actualPrice, 
               stopPrice: activeTradeEntry.stopPrice,
@@ -190,21 +197,21 @@ export default function MonthlyPortfolioPage() {
               exitPrice: exitPrice
             };
             closedToday = true;
-            // Update capital tracker *after* recording the closing state
+            // Atualiza o capital para o próximo trade *após* registrar o fechamento
             capitalBeforeCurrentTrade += profit; 
             
+          // Se é o último dia útil do mês e o stop não foi atingido
           } else if (isLastBusinessDayOfMonth(currentDate)) {
             exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
             if (exitPrice !== undefined) {
+              // *** CORREÇÃO APLICADA: Cálculo de Profit/Capital SOMENTE no fechamento ***
               profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
               closeRecord = {
                 ...currentDayData,
-                // *** CORRECTION v3: Use 'Closed' text ***
-                trade: 'Closed', 
+                trade: 'Closed', // Marca como fechado
                 stop: '-', 
-                // *** CORRECTION v3: Profit and Capital calculated ONLY on close ***
                 profit: profit,
-                capital: capitalBeforeCurrentTrade + profit, 
+                capital: capitalBeforeCurrentTrade + profit, // Atualiza capital
                 suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
                 actualPrice: activeTradeEntry.actualPrice, 
                 stopPrice: activeTradeEntry.stopPrice,
@@ -212,31 +219,34 @@ export default function MonthlyPortfolioPage() {
                 exitPrice: exitPrice
               };
               closedToday = true;
-              // Update capital tracker *after* recording the closing state
+              // Atualiza o capital para o próximo trade *após* registrar o fechamento
               capitalBeforeCurrentTrade += profit; 
             } else {
               console.warn(`Missing exit price on last business day ${currentDayData.date}`);
             }
           }
 
-          // If a close happened today, record it and reset
+          // Se um fechamento ocorreu hoje, registra e reseta o trade ativo
           if (closedToday && closeRecord) {
             finalProcessedHistory.push(closeRecord);
             finalTradePairs.push({ open: activeTradeEntry, close: closeRecord });
-            activeTradeEntry = null;
+            // *** CORREÇÃO APLICADA: Reseta trade ativo, impedindo nova entrada sem fechamento ***
+            activeTradeEntry = null; 
             stopPriceCalculated = null;
+            // Se fechou por stop, sai do loop do mês (não tenta mais operar)
             if (stopHit) {
-              break; // Exit month's loop if closed by stop
+              break; 
             }
           }
         }
-      } // End of day loop
-    }); // End of month loop
+      } // Fim do loop de dias
+    }); // Fim do loop de meses
 
+    // Retorna o histórico processado e os pares de trades (abertura/fechamento)
     return { processedHistory: finalProcessedHistory, tradePairs: finalTradePairs };
   };
 
-  // runAnalysis function (uses corrected v3 processMonthlyTrades)
+  // Função runAnalysis (usa processMonthlyTrades corrigido)
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
       setIsLoading(true);
@@ -247,7 +257,7 @@ export default function MonthlyPortfolioPage() {
       if (!isValidPeriodForMonthly(params.period)) {
         toast({ variant: "default", title: "Period Selection", description: "For monthly analysis, select a period of 2 months or more." });
       }
-      console.info("Running monthly analysis (v3 - final corrections) with params:", params);
+      console.info("Running monthly analysis (v3 logic - corrections applied) with params:", params);
       setProgress(10);
       let dataTableName = params.dataTableName || await api.marketData.getDataTableName(params.country, params.stockMarket, params.assetClass);
       if (!dataTableName) throw new Error("Failed to identify data source");
@@ -260,11 +270,11 @@ export default function MonthlyPortfolioPage() {
           try {
             const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             if (detailedData && detailedData.tradeHistory) {
-              // *** Use CORRECTED v3 processMonthlyTrades function ***
+              // *** Usa a função processMonthlyTrades já corrigida ***
               const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
               const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
               const trades = tradePairsFiltered.length;
-              // --- Recalculate metrics based on monthly trade pairs --- 
+              // --- Recalcula métricas baseado nos pares de trades mensais --- 
               if (trades === 0) return { ...result, tradingDays: processedHistory.length, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
               const profitsCount = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
               const lossesCount = trades - profitsCount;
@@ -276,12 +286,12 @@ export default function MonthlyPortfolioPage() {
               const lossTrades = tradePairsFiltered.filter(pair => pair.close.profit < 0);
               const averageGain = gainTrades.length > 0 ? gainTrades.reduce((sum, pair) => sum + pair.close.profit, 0) / gainTrades.length : 0;
               const averageLoss = lossTrades.length > 0 ? lossTrades.reduce((sum, pair) => sum + Math.abs(pair.close.profit), 0) / lossTrades.length : 0;
-              // Use processedHistory (only 'Closed' trades have profit) for risk calcs
+              // Usa processedHistory (que tem profit/capital apenas em 'Closed') para cálculos de risco
               const maxDrawdown = calculateMaxDrawdown(processedHistory, params.initialCapital);
               const sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
               const sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
               const recoveryFactor = maxDrawdown !== 0 ? Math.abs(totalProfit / (maxDrawdown / 100 * params.initialCapital)) : (totalProfit > 0 ? Infinity : 0);
-              // --- End Recalculation --- 
+              // --- Fim Recalculation --- 
               return { ...result, tradingDays: processedHistory.length, trades, profits: profitsCount, losses: lossesCount, stops: stopsCount, finalCapital, profit: totalProfit, successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, averageGain, averageLoss, maxDrawdown, sharpeRatio, sortinoRatio, recoveryFactor };
             }
             return result;
@@ -296,7 +306,7 @@ export default function MonthlyPortfolioPage() {
     finally { setTimeout(() => setIsLoading(false), 500); }
   };
 
-  // viewDetails function (uses corrected v3 processMonthlyTrades)
+  // Função viewDetails (usa processMonthlyTrades corrigido)
   const viewDetails = async (assetCode: string) => {
     if (!analysisParams) return;
     try {
@@ -306,21 +316,23 @@ export default function MonthlyPortfolioPage() {
       if (!paramsWithTable.dataTableName) throw new Error("Could not determine data table name");
       const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
       if (detailedData && detailedData.tradeHistory) {
-        // *** Use CORRECTED v3 processMonthlyTrades function ***
+        // *** Usa a função processMonthlyTrades já corrigida ***
         const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
-        detailedData.tradeHistory = processedHistory; 
+        detailedData.tradeHistory = processedHistory; // Atualiza o histórico com o processado
         detailedData.tradingDays = processedHistory.length;
         const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
-        // Recalculate capital evolution based on 'Closed' trades
+        // Recalcula a evolução do capital baseado APENAS nos trades 'Closed'
         if (tradePairsFiltered.length > 0) {
           detailedData.capitalEvolution = tradePairsFiltered.map(pair => ({
             date: pair.close.date,
             capital: pair.close.capital ?? paramsWithTable.initialCapital 
           }));
+          // Adiciona o capital inicial no começo da evolução
           detailedData.capitalEvolution.unshift({ date: tradePairsFiltered[0]?.open.date || processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital });
           const finalCapital = detailedData.capitalEvolution[detailedData.capitalEvolution.length - 1]?.capital ?? paramsWithTable.initialCapital;
           const totalProfit = finalCapital - paramsWithTable.initialCapital;
           const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
+          // Recalcula métricas de risco com base no histórico processado
           detailedData.maxDrawdown = calculateMaxDrawdown(processedHistory, paramsWithTable.initialCapital);
           detailedData.sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
           detailedData.sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
@@ -340,7 +352,7 @@ export default function MonthlyPortfolioPage() {
     }
   };
 
-  // updateAnalysis function (uses corrected v3 processMonthlyTrades)
+  // Função updateAnalysis (usa processMonthlyTrades corrigido)
   const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
      if (!selectedAsset) return;
      try {
@@ -349,12 +361,12 @@ export default function MonthlyPortfolioPage() {
        if (!paramsWithTable.dataTableName) throw new Error("Could not determine data table name for update");
        const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
        if (detailedData && detailedData.tradeHistory) {
-         // *** Use CORRECTED v3 processMonthlyTrades function ***
+         // *** Usa a função processMonthlyTrades já corrigida ***
          const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
-         detailedData.tradeHistory = processedHistory;
+         detailedData.tradeHistory = processedHistory; // Atualiza o histórico
          detailedData.tradingDays = processedHistory.length;
          const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
-         // --- Recalculate metrics --- 
+         // --- Recalcula métricas --- 
          if (tradePairsFiltered.length > 0) {
             detailedData.capitalEvolution = tradePairsFiltered.map(pair => ({
                 date: pair.close.date,
@@ -364,6 +376,7 @@ export default function MonthlyPortfolioPage() {
             const finalCapital = detailedData.capitalEvolution[detailedData.capitalEvolution.length - 1]?.capital ?? paramsWithTable.initialCapital;
             const totalProfit = finalCapital - paramsWithTable.initialCapital;
             const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
+            // Recalcula métricas de risco
             detailedData.maxDrawdown = calculateMaxDrawdown(processedHistory, paramsWithTable.initialCapital);
             detailedData.sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
             detailedData.sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
@@ -372,7 +385,7 @@ export default function MonthlyPortfolioPage() {
            detailedData.capitalEvolution = [{ date: processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital }];
            detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
          }
-         // --- End Recalculation --- 
+         // --- Fim Recalculation --- 
        }
        setDetailedResult(detailedData);
        setAnalysisParams(paramsWithTable);
@@ -381,14 +394,14 @@ export default function MonthlyPortfolioPage() {
      finally { setIsLoadingDetails(false); }
   };
 
-  // closeDetails function (kept from weekly v4)
+  // Função closeDetails (mantida)
   const closeDetails = () => {
     setShowDetailView(false);
     setDetailedResult(null);
     setSelectedAsset(null);
   };
 
-  // --- RETURN JSX (kept from weekly v4) --- 
+  // --- RETURN JSX (mantido) --- 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Monthly Portfolio</h1>
@@ -405,14 +418,16 @@ export default function MonthlyPortfolioPage() {
             </div>
           )}
           {analysisResults.length > 0 && !isLoading && (
+            // A ResultsTable recebe os resultados processados
             <ResultsTable results={analysisResults} onViewDetails={viewDetails} />
           )}
         </div>
       ) : (
         detailedResult && analysisParams && (
           <div className="bg-card p-6 rounded-lg border">
+            {/* A StockDetailView recebe o histórico já processado */}
             <StockDetailView
-              result={detailedResult}
+              result={detailedResult} 
               params={analysisParams}
               onClose={closeDetails}
               onUpdateParams={updateAnalysis}
