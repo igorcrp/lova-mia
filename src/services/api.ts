@@ -20,6 +20,24 @@ const api = {
       return data;
     },
 
+    async googleLogin() {
+      console.info("Attempting Google login");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/app`
+        }
+      });
+      
+      if (error) {
+        console.error("Google login error:", error);
+        throw error;
+      }
+      
+      console.info("Google login initiated");
+      return data;
+    },
+
     async register(email: string, password: string, fullName: string) {
       console.info("Attempting registration for:", email);
       const { data, error } = await supabase.auth.signUp({
@@ -53,6 +71,21 @@ const api = {
       }
       
       console.info("Password reset email sent");
+    },
+
+    async resendConfirmationEmail(email: string) {
+      console.info("Resending confirmation email for:", email);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+      
+      if (error) {
+        console.error("Resend confirmation error:", error);
+        throw error;
+      }
+      
+      console.info("Confirmation email resent");
     },
 
     async logout() {
@@ -187,6 +220,49 @@ const api = {
       }
       
       console.info("User updated successfully");
+    },
+
+    async create(userData: Partial<User>) {
+      console.info("Creating new user");
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          email: userData.email,
+          name: userData.full_name,
+          status_users: userData.status || 'active',
+          level_id: userData.level_id || 1,
+          email_verified: userData.email_verified || false
+        });
+      
+      if (error) {
+        console.error("User creation error:", error);
+        throw error;
+      }
+      
+      console.info("User created successfully");
+    },
+
+    async getUserStats() {
+      console.info("Fetching user statistics");
+      const { data, error } = await supabase
+        .from('users')
+        .select('status_users, level_id');
+      
+      if (error) {
+        console.error("Error fetching user stats:", error);
+        throw error;
+      }
+      
+      const totalUsers = data.length;
+      const activeUsers = data.filter(user => user.status_users === 'active').length;
+      const adminUsers = data.filter(user => user.level_id === 2).length;
+      
+      return {
+        totalUsers,
+        activeUsers,
+        adminUsers,
+        pendingUsers: totalUsers - activeUsers
+      };
     }
   },
 
@@ -212,6 +288,39 @@ const api = {
         asset_class: source.asset_class,
         status: 'active' as const
       })) as Asset[];
+    },
+
+    async create(assetData: Partial<Asset>) {
+      console.info("Creating new asset");
+      const { error } = await supabase
+        .from('market_data_sources')
+        .insert({
+          country: assetData.country,
+          stock_market: assetData.stock_market,
+          asset_class: assetData.asset_class,
+          stock_table: `${assetData.country?.toLowerCase()}_${assetData.stock_market?.toLowerCase()}_${assetData.asset_class?.toLowerCase()}`
+        });
+      
+      if (error) {
+        console.error("Asset creation error:", error);
+        throw error;
+      }
+      
+      console.info("Asset created successfully");
+    },
+
+    async getTotalCount() {
+      console.info("Fetching total asset count");
+      const { count, error } = await supabase
+        .from('market_data_sources')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) {
+        console.error("Error fetching asset count:", error);
+        throw error;
+      }
+      
+      return count || 0;
     }
   },
 
@@ -264,6 +373,11 @@ const api = {
       }
     },
 
+    // Alias methods for backward compatibility
+    async getCountries(): Promise<string[]> {
+      return this.getAvailableCountries();
+    },
+
     async getAvailableStockMarkets(country: string): Promise<string[]> {
       console.info("Fetching stock markets for country:", country);
       
@@ -288,6 +402,11 @@ const api = {
       }
     },
 
+    // Alias methods for backward compatibility
+    async getStockMarkets(country: string): Promise<string[]> {
+      return this.getAvailableStockMarkets(country);
+    },
+
     async getAvailableAssetClasses(country: string, stockMarket: string): Promise<string[]> {
       console.info("Fetching asset classes for:", { country, stockMarket });
       
@@ -310,6 +429,31 @@ const api = {
       } catch (error) {
         console.error("Exception in getAvailableAssetClasses:", error);
         return [];
+      }
+    },
+
+    // Alias methods for backward compatibility
+    async getAssetClasses(country: string, stockMarket: string): Promise<string[]> {
+      return this.getAvailableAssetClasses(country, stockMarket);
+    },
+
+    async checkTableExists(tableName: string): Promise<boolean> {
+      console.info("Checking if table exists:", tableName);
+      
+      try {
+        const { data, error } = await supabase.rpc('table_exists', {
+          p_table_name: tableName
+        });
+
+        if (error) {
+          console.error("Error checking table existence:", error);
+          return false;
+        }
+
+        return data || false;
+      } catch (error) {
+        console.error("Exception in checkTableExists:", error);
+        return false;
       }
     },
 
@@ -372,6 +516,10 @@ const api = {
   },
 
   analysis: {
+    async getAvailableStocks(tableName: string): Promise<StockInfo[]> {
+      return api.marketData.getAvailableStocks(tableName);
+    },
+
     async runAnalysis(params: StockAnalysisParams, progressCallback?: (progress: number) => void): Promise<AnalysisResult[]> {
       console.info("Starting analysis with params:", params);
       
@@ -497,8 +645,7 @@ const api = {
           lotSize: undefined,
           stopPrice: undefined,
           capital: undefined,
-          currentCapital: undefined,
-          stopTrigger: undefined
+          currentCapital: undefined
         }));
 
         // Create mock detailed result
