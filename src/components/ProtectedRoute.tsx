@@ -1,8 +1,8 @@
+
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet } from "react-router-dom";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface ProtectedRouteProps {
   requireLevel?: number;
@@ -12,31 +12,46 @@ export function ProtectedRoute({ requireLevel }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   
   useEffect(() => {
-    if (!isLoading && user && user.status !== 'active') {
+    if (user && user.status !== 'active') {
       toast.warning("Por favor, confirme seu email para ativar sua conta.");
     }
-  }, [user, isLoading]);
-
+    
+    // Log user permissions for debugging
+    if (user) {
+      console.log("Current user permissions:", {
+        email: user.email,
+        status: user.status,
+        level_id: user.level_id
+      });
+    }
+  }, [user]);
+  
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-        <span className="ml-3">Carregando...</span>
+        <div className="loading-circle" />
+        <span className="ml-3">Loading...</span>
       </div>
     );
   }
   
+  // Not authenticated
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-  
-  if (user.status !== 'active') {
+    console.log("User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
   
+  // User is not active
+  if (user.status !== 'active') {
+    console.log("User not active, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+  
+  // Check required level
   if (requireLevel !== undefined && user.level_id < requireLevel) {
-    const redirectPath = user.level_id === 1 ? "/app" : "/admin";
-    return <Navigate to={redirectPath} replace />;
+    console.log(`User level ${user.level_id} is insufficient, required: ${requireLevel}`);
+    // Redirect to appropriate dashboard based on user level
+    return <Navigate to={user.level_id === 1 ? "/app" : "/admin"} replace />;
   }
   
   return <Outlet />;
