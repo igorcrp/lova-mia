@@ -175,7 +175,7 @@ export default function MonthlyPortfolioPage() {
                 stopPrice: calculateStopPrice(potentialEntryPrice, params),
                 lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
                 stop: '-',
-                profit: undefined, // CORREÇÃO: Profit undefined nos dias de entrada
+                profitLoss: undefined, // CORREÇÃO: ProfitLoss undefined nos dias de entrada
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value
               };
               activeTradeEntry = entryDayRecord;
@@ -200,7 +200,7 @@ export default function MonthlyPortfolioPage() {
               ...currentDayData,
               trade: 'Closed',
               stop: 'Executed',
-              profit: profit, // CORREÇÃO: Profit calculado apenas em 'Closed'
+              profitLoss: profit, // CORREÇÃO: ProfitLoss calculado apenas em 'Closed'
               capital: capitalBeforeCurrentTrade + profit,
               suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
               actualPrice: activeTradeEntry.actualPrice,
@@ -212,14 +212,14 @@ export default function MonthlyPortfolioPage() {
             capitalBeforeCurrentTrade += profit;
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
-            exitPrice = typeof currentDayData.close === 'number' ? currentDayData.close : undefined;
+            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
             if (exitPrice !== undefined) {
               profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
               closeRecord = {
                 ...currentDayData,
                 trade: 'Closed',
                 stop: '-',
-                profit: profit, // CORREÇÃO: Profit calculado apenas em 'Closed'
+                profitLoss: profit, // CORREÇÃO: ProfitLoss calculado apenas em 'Closed'
                 capital: capitalBeforeCurrentTrade + profit,
                 suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
                 actualPrice: activeTradeEntry.actualPrice,
@@ -279,14 +279,14 @@ export default function MonthlyPortfolioPage() {
             if (detailedData && detailedData.tradeHistory) {
               // Use the corrected processMonthlyTrades
               const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
-              const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
+              const tradePairsFiltered = tradePairs.filter(pair => pair.close.profitLoss !== undefined);
               const trades = tradePairsFiltered.length;
               
               if (trades === 0) {
                 return { ...result, tradingDays: processedHistory.length, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
               }
               
-              const profitsCount = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
+              const profitsCount = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss > 0).length;
               const lossesCount = trades - profitsCount;
               const stopsCount = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
               
@@ -295,10 +295,10 @@ export default function MonthlyPortfolioPage() {
               const totalProfit = finalCapital - params.initialCapital;
               const profitPercentageTotal = params.initialCapital === 0 ? 0 : (totalProfit / params.initialCapital) * 100;
               
-              const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
-              const lossTrades = tradePairsFiltered.filter(pair => pair.close.profit < 0);
-              const totalGain = gainTrades.reduce((sum, pair) => sum + pair.close.profit, 0);
-              const totalLoss = lossTrades.reduce((sum, pair) => sum + pair.close.profit, 0);
+              const gainTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss > 0);
+              const lossTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss < 0);
+              const totalGain = gainTrades.reduce((sum, pair) => sum + (pair.close.profitLoss || 0), 0);
+              const totalLoss = lossTrades.reduce((sum, pair) => sum + (pair.close.profitLoss || 0), 0);
               const averageGain = gainTrades.length > 0 ? totalGain / gainTrades.length : 0;
               const averageLoss = lossTrades.length > 0 ? totalLoss / lossTrades.length : 0;
               
@@ -387,7 +387,7 @@ export default function MonthlyPortfolioPage() {
            
            // Add initial capital point logic
            // Need original full history for the very first date point
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || []; // Fallback
+           const originalHistoryForAsset = detailedData.tradeHistory || []; // Use processed history
            const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
               new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
            );
@@ -409,7 +409,7 @@ export default function MonthlyPortfolioPage() {
 
         } else {
            // Handle case with no processed trades
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || [];
+           const originalHistoryForAsset = detailedData.tradeHistory || [];
            const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
            detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsForDetails.initialCapital }];
            detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
@@ -424,7 +424,7 @@ export default function MonthlyPortfolioPage() {
       } else {
         // Handle case where no detailed data/history is found
         console.warn(`[v6] No detailed data or trade history found for ${assetCode}.`);
-        toast({ variant: "warning", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
+        toast({ variant: "default", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
         setDetailedResult(null);
         setShowDetailView(false); // Ensure view is hidden
         setSelectedAsset(null); // Deselect asset
@@ -478,7 +478,7 @@ export default function MonthlyPortfolioPage() {
               .map(trade => ({ date: trade.date, capital: trade.capital as number }));
               
             // Add initial capital point logic (needs original history)
-            const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
+            const originalHistoryForAsset = detailedData.tradeHistory || [];
             const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
                new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
             );
@@ -499,7 +499,7 @@ export default function MonthlyPortfolioPage() {
             detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
             
          } else {
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
+           const originalHistoryForAsset = detailedData.tradeHistory || [];
            const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
            detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsWithTable.initialCapital }];
            detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
@@ -513,7 +513,7 @@ export default function MonthlyPortfolioPage() {
          
        } else {
          console.warn(`[v6] No detailed data or trade history found during update for ${selectedAsset}.`);
-         toast({ variant: "warning", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
+         toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
        }
      } catch (error) { 
        console.error(`[v6] Failed to update detailed analysis for ${selectedAsset}`, error); 

@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   email: string;
@@ -43,6 +42,7 @@ export interface StockAnalysisParams {
   dataTableName?: string;
   period: string; // Period parameter (now required)
   comparisonStocks?: string[]; // Added comparisonStocks parameter
+  interval?: string; // Added interval parameter for DaytradePage
 }
 
 export interface AnalysisResult {
@@ -82,17 +82,19 @@ export interface TradeHistoryItem {
   profit?: number;
   profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | 'Closed' | '-'; // Added 'Closed' to trade types
   stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
   volume?: number;
   high?: number;
   low?: number;
+  close?: number; // Added close property
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
-  stopPrice?: number;
+  stopPrice?: number | string; // Allow both number and string
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
+  stopTrigger?: string; // Added stopTrigger property
 }
 
 export interface CapitalPoint {
@@ -113,3 +115,9 @@ export interface TradeDetail {
   stop: string;
 }
 
+// Add StockQuote interface for StockTicker
+export interface StockQuote {
+  symbol: string;
+  price: number;
+  change: number;
+}
