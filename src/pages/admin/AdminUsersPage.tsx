@@ -72,7 +72,22 @@ export default function AdminUsersPage() {
   const handleAddUser = async () => {
     try {
       setIsLoading(true);
-      const createdUser = await api.users.create(newUser);
+      await api.users.create(newUser);
+      
+      // Create a new user object manually since create() returns void
+      const createdUser: User = {
+        id: Date.now().toString(), // Simple ID generation
+        email: newUser.email,
+        full_name: newUser.full_name,
+        level_id: newUser.level_id,
+        status: newUser.status,
+        email_verified: newUser.email_verified,
+        account_type: newUser.account_type,
+        created_at: new Date().toISOString(),
+        last_login: undefined,
+        avatar_url: undefined
+      };
+      
       setUsers([createdUser, ...users]);
       setShowNewUserDialog(false);
       toast.success("User added successfully");
@@ -86,6 +101,19 @@ export default function AdminUsersPage() {
         email_verified: false,
         account_type: "free"
       });
+      
+      // Refresh the users list
+      const updatedUsers = await api.users.getAll();
+      const typedUsers: User[] = updatedUsers.map(user => ({
+        ...user,
+        status: (user.status === 'active' || user.status === 'pending' || user.status === 'inactive') 
+          ? user.status 
+          : 'active' as 'active' | 'pending' | 'inactive',
+        account_type: (user.account_type === 'free' || user.account_type === 'premium') 
+          ? user.account_type 
+          : 'free' as 'free' | 'premium'
+      }));
+      setUsers(typedUsers);
     } catch (error) {
       console.error("Failed to add user", error);
       toast.error("Failed to add user");

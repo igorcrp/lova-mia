@@ -118,15 +118,21 @@ export default function AdminAssetsPage() {
   
   const handleAddAsset = async () => {
     try {
-      const createdAsset = await api.assets.create(newAsset);
+      setIsLoading(true);
+      await api.assets.create(newAsset);
       
-      // Ensure the created asset has proper types
-      const typedAsset: Asset = {
-        ...createdAsset,
-        status: createdAsset.status === 'active' ? 'active' : 'inactive'
+      // Create a new asset object manually since create() returns void
+      const createdAsset: Asset = {
+        id: Date.now().toString(), // Simple ID generation
+        code: newAsset.code || "",
+        name: newAsset.name || "",
+        country: newAsset.country || "",
+        stock_market: newAsset.stock_market || "",
+        asset_class: newAsset.asset_class || "",
+        status: newAsset.status || "active"
       };
       
-      setAssets([...assets, typedAsset]);
+      setAssets([...assets, createdAsset]);
       setShowNewAssetDialog(false);
       toast.success("Asset added successfully");
       
@@ -139,9 +145,19 @@ export default function AdminAssetsPage() {
         asset_class: "",
         status: "active"
       });
+      
+      // Refresh the assets list
+      const updatedAssets = await api.assets.getAll();
+      const typedAssets: Asset[] = updatedAssets.map(asset => ({
+        ...asset,
+        status: asset.status === 'active' ? 'active' : 'inactive'
+      }));
+      setAssets(typedAssets);
     } catch (error) {
       console.error("Failed to add asset", error);
       toast.error("Failed to add asset");
+    } finally {
+      setIsLoading(false);
     }
   };
   

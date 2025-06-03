@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AnalysisResult, DetailedResult, StockAnalysisParams, StockInfo, TradeHistoryItem, User, Asset } from "@/types";
 
@@ -501,8 +500,19 @@ const api = {
           return [];
         }
 
-        // Remove duplicates
-        const uniqueStocks = Array.from(new Set(data.map(item => item.stock_code)));
+        // Ensure data is an array and has the expected structure
+        if (!Array.isArray(data)) {
+          console.error("Unexpected data format:", data);
+          return [];
+        }
+
+        // Remove duplicates and ensure stock_code exists
+        const uniqueStocks = Array.from(new Set(
+          data
+            .filter(item => item && typeof item === 'object' && 'stock_code' in item)
+            .map(item => item.stock_code)
+        ));
+        
         return uniqueStocks.map(code => ({
           code,
           name: code,
