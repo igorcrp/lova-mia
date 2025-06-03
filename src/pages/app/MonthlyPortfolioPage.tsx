@@ -137,7 +137,7 @@ const generateFullDailyHistory = (
     });
 
     const displayHistory: TradeHistoryItem[] = [];
-    let lastKnownCapital = initialCapital; // Initialize with initial capital
+    let previousDayCapital = initialCapital; // Initialize with initial capital for the loop logic
 
     for (let i = 0; i < sortedOriginal.length; i++) {
         const currentDayOriginal = sortedOriginal[i];
@@ -145,36 +145,54 @@ const generateFullDailyHistory = (
         const tradeEvent = tradeEventMap.get(currentDateStr);
 
         let dayRecord: TradeHistoryItem;
+        let currentDayProfitLoss = 0; // Default profit/loss for the day
 
         if (tradeEvent) {
-            // If there's a trade event (Buy or Closed), use its data
-            dayRecord = { ...tradeEvent }; // Copy the trade event data
-            // Ensure capital is defined, otherwise carry forward (should be defined in trade events)
-            lastKnownCapital = tradeEvent.capital !== undefined ? tradeEvent.capital : lastKnownCapital;
+            // If there's a trade event (Buy or Closed), use its data as base
+            dayRecord = { ...tradeEvent };
+            // Get profit/loss from the trade event if defined
+            currentDayProfitLoss = tradeEvent.profitLoss !== undefined ? Number(tradeEvent.profitLoss) : 0;
         } else {
             // If no trade event, create a default record for the day
             dayRecord = {
                 ...currentDayOriginal, // Include basic OHLCV data
-                trade: '-', // Indicate no trade action
+                trade: '-',
                 suggestedEntryPrice: undefined,
                 actualPrice: undefined,
                 lotSize: undefined,
                 stopPrice: undefined,
                 stop: '-',
-                profitLoss: undefined,
-                capital: lastKnownCapital, // Carry forward the capital from the previous day
-                exitPrice: undefined // Ensure exitPrice is undefined if no trade
+                profitLoss: 0, // Explicitly set profitLoss to 0 for non-trade days
+                capital: undefined, // Capital will be calculated below
+                exitPrice: undefined
             };
+            currentDayProfitLoss = 0; // Ensure it's 0 for non-trade days
         }
 
-        // **CORRECTION 2: Set initial capital for the very first day**
+        // --- CORRECTED CAPITAL CALCULATION --- 
+        let currentDayCapital: number;
         if (i === 0) {
-            dayRecord.capital = initialCapital;
-            lastKnownCapital = initialCapital; // Ensure lastKnownCapital starts correctly
+            // First day uses initial capital
+            currentDayCapital = initialCapital;
+        } else {
+            // Subsequent days: Previous day's capital + current day's profit/loss
+            // Ensure previousDayCapital is a valid number
+            const validPreviousCapital = typeof previousDayCapital === 'number' && !isNaN(previousDayCapital) ? previousDayCapital : initialCapital; // Fallback if something went wrong
+            currentDayCapital = validPreviousCapital + currentDayProfitLoss;
         }
-        
-        // Ensure capital is always a number or undefined
-        dayRecord.capital = dayRecord.capital !== undefined ? Number(dayRecord.capital) : undefined;
+
+        // Assign the calculated capital to the record
+        dayRecord.capital = currentDayCapital;
+
+        // Update previousDayCapital for the next iteration
+        previousDayCapital = currentDayCapital;
+        // --- END OF CORRECTION ---
+
+        // Ensure profitLoss is explicitly set (might be redundant but safe)
+        dayRecord.profitLoss = currentDayProfitLoss;
+
+        // Ensure capital is always a number
+        dayRecord.capital = Number(dayRecord.capital);
 
         displayHistory.push(dayRecord);
     }
@@ -316,7 +334,7 @@ export default function MonthlyPortfolioPage() {
             tradeActionHistory.push(closeRecord); // Add to action history
             finalTradePairs.push({ open: activeTradeEntry, close: closeRecord });
             activeTradeEntry = null;
-            stopPriceCalculated = null;
+            stopPriceCalculated = null; // Reset stop price
           }
         }
       } // End of day loop
@@ -609,83 +627,61 @@ export default function MonthlyPortfolioPage() {
          detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfitFromTrades / maxDrawdownAmount) : (totalProfitFromTrades > 0 ? Infinity : 0);
          detailedData.trades = tradesCount;
          detailedData.profit = totalProfitFromTrades;
-         // ... assign other metrics ...
+         // ... assign other relevant metrics ...
 
-         // --- End Recalculation --- 
-         console.log(`[v7] Processing update complete for ${selectedAsset}. Setting state.`);
-         setDetailedResult(detailedData); // Update the detailed results
-         setAnalysisParams(paramsWithTable); // Update the analysis params used for this view
-         toast({ title: "Analysis Updated", description: "Detailed view updated (monthly v7 logic)." });
-         console.log(`[v7] State updated for ${selectedAsset}.`);
-         
+         // 5. Set state
+         console.log(`[v7] Update processing complete for ${selectedAsset}. Setting state.`);
+         setDetailedResult(detailedData);
+         setAnalysisParams(paramsWithTable); // Update the main params state as well
+         setShowDetailView(true); // Ensure detail view remains visible
+
        } else {
-         console.warn(`[v7] No detailed data or trade history found during update for ${selectedAsset}.`);
-         toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
-         // Optionally clear or keep old data
+         console.warn(`[v7] No detailed data found for update on ${selectedAsset}.`);
+         toast({ variant: "default", title: "No Details", description: `No detailed trade history found for ${selectedAsset} to update.` });
+         // Decide if we should clear the view or keep the old data
          // setDetailedResult(null); 
+         // setShowDetailView(false); 
        }
-     } catch (error) { 
-       console.error(`[v7] Failed to update detailed analysis for ${selectedAsset}`, error); 
-       toast({ variant: "destructive", title: "Update Failed", description: error instanceof Error ? error.message : "Unknown error" }); 
-       // Optionally clear or keep old data
-       // setDetailedResult(null); 
-     }
-     finally { 
-       setTimeout(() => setIsLoadingDetails(false), 300); 
-       console.log(`[v7] Finished update attempt for ${selectedAsset}. Loading state off.`);
+
+     } catch (error) {
+       console.error(`[v7] Failed to update analysis for ${selectedAsset}`, error);
+       toast({ variant: "destructive", title: "Failed to update details", description: error instanceof Error ? error.message : "An unknown error occurred" });
+       // Decide if we should clear the view or keep the old data
+     } finally {
+       setTimeout(() => setIsLoadingDetails(false), 300);
+       console.log(`[v7] Finished updateAnalysis attempt for ${selectedAsset}. Loading state off.`);
      }
   };
 
-  // --- Close Details Function --- 
-  const closeDetails = () => {
-    console.log("[v7] Closing details view.");
-    setShowDetailView(false);
-    setDetailedResult(null);
-    setSelectedAsset(null);
-  };
-
-  // --- RETURN JSX --- 
+  // --- Render Logic --- 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Monthly Portfolio</h1>
-      {/* Conditional Rendering based on showDetailView state */}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Monthly Portfolio Analysis (v7 - Full History)</h1>
+      
       {!showDetailView ? (
-        // View 1: Setup Form and Results Table
-        <div className="bg-card p-6 rounded-lg border">
+        <>
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
-          {isLoading && (
-            <div className="mt-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span>Processing monthly analysis...</span>
-                <span>{progress.toFixed(0)}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
-          {/* Render ResultsTable only if not loading AND results exist */}
-          {!isLoading && analysisResults.length > 0 && (
+          {isLoading && <Progress value={progress} className="w-full mt-4" />}
+          {analysisResults.length > 0 && !isLoading && (
             <ResultsTable 
               results={analysisResults} 
-              onViewDetails={viewDetails} // Pass the corrected viewDetails function
+              onViewDetails={viewDetails} 
+              isLoadingDetails={isLoadingDetails} 
+              selectedAsset={selectedAsset} 
             />
           )}
-        </div>
+        </>
       ) : (
-        // View 2: Stock Detail View
-        // Render StockDetailView only if detailedResult and analysisParams exist
         detailedResult && analysisParams && (
-          <div className="bg-card p-6 rounded-lg border">
-            <StockDetailView 
-              result={detailedResult} 
-              params={analysisParams} 
-              onClose={closeDetails} 
-              onUpdate={updateAnalysis} // Pass update function
-              isLoading={isLoadingDetails}
-            />
-          </div>
+          <StockDetailView 
+            result={detailedResult} 
+            params={analysisParams} 
+            onBack={() => { setShowDetailView(false); setSelectedAsset(null); setDetailedResult(null); }} 
+            onUpdateParams={updateAnalysis} 
+            isLoading={isLoadingDetails} 
+          />
         )
       )}
     </div>
   );
 }
-
