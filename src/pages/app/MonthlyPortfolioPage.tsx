@@ -122,7 +122,7 @@ export default function MonthlyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  // Function to process trades according to monthly logic (v5 - Profit/Capital logic verified)
+  // Function to process trades according to monthly logic (Corrected Profit/Loss logic)
   const processMonthlyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
 
@@ -175,7 +175,7 @@ export default function MonthlyPortfolioPage() {
                 stopPrice: calculateStopPrice(potentialEntryPrice, params),
                 lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
                 stop: '-',
-                profit: undefined, // Profit undefined on entry
+                profit: undefined, // CORREÇÃO: Profit undefined nos dias de entrada
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value
               };
               activeTradeEntry = entryDayRecord;
@@ -200,8 +200,8 @@ export default function MonthlyPortfolioPage() {
               ...currentDayData,
               trade: 'Closed',
               stop: 'Executed',
-              profit: profit, // Profit calculated on close
-              capital: capitalBeforeCurrentTrade + profit, // Capital updated on close
+              profit: profit, // CORREÇÃO: Profit calculado apenas em 'Closed'
+              capital: capitalBeforeCurrentTrade + profit,
               suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
               actualPrice: activeTradeEntry.actualPrice,
               stopPrice: activeTradeEntry.stopPrice,
@@ -209,7 +209,7 @@ export default function MonthlyPortfolioPage() {
               exitPrice: exitPrice
             };
             closedToday = true;
-            capitalBeforeCurrentTrade += profit; // Update tracker for next potential trade
+            capitalBeforeCurrentTrade += profit;
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
             exitPrice = typeof currentDayData.close === 'number' ? currentDayData.close : undefined;
@@ -219,8 +219,8 @@ export default function MonthlyPortfolioPage() {
                 ...currentDayData,
                 trade: 'Closed',
                 stop: '-',
-                profit: profit, // Profit calculated on close
-                capital: capitalBeforeCurrentTrade + profit, // Capital updated on close
+                profit: profit, // CORREÇÃO: Profit calculado apenas em 'Closed'
+                capital: capitalBeforeCurrentTrade + profit,
                 suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
                 actualPrice: activeTradeEntry.actualPrice,
                 stopPrice: activeTradeEntry.stopPrice,
@@ -228,7 +228,7 @@ export default function MonthlyPortfolioPage() {
                 exitPrice: exitPrice
               };
               closedToday = true;
-              capitalBeforeCurrentTrade += profit; // Update tracker for next potential trade
+              capitalBeforeCurrentTrade += profit;
             } else {
               console.warn(`Missing exit price (close) on last business day ${currentDayData.date} for active trade.`);
             }
@@ -239,7 +239,6 @@ export default function MonthlyPortfolioPage() {
             finalTradePairs.push({ open: activeTradeEntry, close: closeRecord });
             activeTradeEntry = null;
             stopPriceCalculated = null;
-            // if (stopHit) { break; } // Optional: Stop further actions in month after stop hit
           }
         }
       } // End of day loop
@@ -278,7 +277,7 @@ export default function MonthlyPortfolioPage() {
             const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
-              // Use the verified processMonthlyTrades (v5 logic)
+              // Use the corrected processMonthlyTrades
               const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
               const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
               const trades = tradePairsFiltered.length;
@@ -358,8 +357,6 @@ export default function MonthlyPortfolioPage() {
         const tableName = await api.marketData.getDataTableName(paramsForDetails.country, paramsForDetails.stockMarket, paramsForDetails.assetClass);
         if (!tableName) throw new Error("Could not determine data table name for details view");
         paramsForDetails = { ...paramsForDetails, dataTableName: tableName };
-        // Update the main state if needed, though maybe not necessary just for viewing
-        // setAnalysisParams(paramsForDetails); 
       }
 
       // 3. Fetch detailed analysis data
@@ -370,7 +367,7 @@ export default function MonthlyPortfolioPage() {
       // 4. Process data if received successfully
       if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
         console.log(`[v6] Processing trade history for ${assetCode}...`);
-        // *** Use the CORRECTED processMonthlyTrades (v5 logic) ***
+        // *** Use the CORRECTED processMonthlyTrades ***
         const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsForDetails);
 
         // Assign processed history back
@@ -448,7 +445,7 @@ export default function MonthlyPortfolioPage() {
   };
 
   // --- Update Analysis Function (from Detail View) --- 
-  // This function likely needs the same v5 trade processing logic if it recalculates
+  // This function likely needs the same corrected trade processing logic if it recalculates
   const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
      if (!selectedAsset || !analysisParams) return; 
      console.log(`[v6] Updating analysis for ${selectedAsset} with new params:`, updatedParams);
@@ -465,7 +462,7 @@ export default function MonthlyPortfolioPage() {
 
        if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
          console.log(`[v6] Processing updated trade history for ${selectedAsset}...`);
-         // *** Use the CORRECTED processMonthlyTrades (v5 logic) ***
+         // *** Use the CORRECTED processMonthlyTrades ***
          const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
          detailedData.tradeHistory = processedHistory;
          detailedData.tradingDays = processedHistory.length;
@@ -580,4 +577,3 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
-
