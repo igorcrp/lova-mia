@@ -9,7 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { 
   isFirstBusinessDayOfMonth, 
   isLastBusinessDayOfMonth, 
-  isValidPeriodForMonthly
+  isValidPeriodForMonthly,
+  formatDateToYYYYMMDD // Assuming this utility exists or needs to be created
 } from "@/utils/dateUtils";
 
 // Helper function to get month key (e.g., YYYY-MM)
@@ -20,6 +21,8 @@ function getMonthKey(date: Date): string {
 }
 
 // Helper function to find the previous day's data with defined capital
+// This might not be needed if we iterate linearly and carry forward
+/*
 function findPreviousDayWithCapital(history: TradeHistoryItem[], currentDateStr: string): TradeHistoryItem | null {
   const currentDateIndex = history.findIndex(item => item.date === currentDateStr);
   for (let i = currentDateIndex - 1; i >= 0; i--) {
@@ -29,6 +32,7 @@ function findPreviousDayWithCapital(history: TradeHistoryItem[], currentDateStr:
   }
   return null; // No previous day with capital found
 }
+*/
 
 // Helper function to get the reference price
 function getReferencePrice(day: TradeHistoryItem, referencePriceKey: string): number {
@@ -58,58 +62,126 @@ function calculateProfit(entryPrice: number | undefined, exitPrice: number | und
   return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
 }
 
-// Risk Calculation Functions (Using Processed History)
+// Risk Calculation Functions (Using Processed History - Ensure input is correct)
 const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number): number => {
-    if (!trades || trades.length === 0) return 0;
+    // Filter for days with actual capital values before calculation
+    const capitalHistory = trades.filter(t => t.capital !== undefined).map(t => t.capital as number);
+    if (!capitalHistory || capitalHistory.length === 0) return 0;
+    
     let maxDrawdown = 0;
     let peakCapital = initialCapital;
-    // Use the capital from the first record if available, otherwise initial
-    let currentCapital = trades[0]?.capital ?? initialCapital;
-    peakCapital = Math.max(peakCapital, currentCapital); // Initialize peak correctly
+    let currentCapital = initialCapital; // Start with initial capital
 
-    trades.forEach(trade => {
-        // Update capital only if it's defined in the record
-        if (trade.capital !== undefined) {
-            currentCapital = trade.capital;
-            // Update peak capital encountered so far
-            if (currentCapital > peakCapital) {
-                peakCapital = currentCapital;
-            }
-            // Calculate drawdown from the current peak
-            const drawdown = peakCapital === 0 ? 0 : (peakCapital - currentCapital) / peakCapital;
-            if (drawdown > maxDrawdown) {
-                maxDrawdown = drawdown;
-            }
+    // Add initial capital as the starting point if not already present
+    // This ensures the first day's capital is considered for peak
+    const evolution = [initialCapital, ...capitalHistory];
+
+    evolution.forEach(capitalValue => {
+        currentCapital = capitalValue;
+        if (currentCapital > peakCapital) {
+            peakCapital = currentCapital;
+        }
+        const drawdown = peakCapital === 0 ? 0 : (peakCapital - currentCapital) / peakCapital;
+        if (drawdown > maxDrawdown) {
+            maxDrawdown = drawdown;
         }
     });
     return maxDrawdown * 100; // Return as percentage
 };
 
-const calculateVolatility = (trades: TradeHistoryItem[]): number => {
-    const profits = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined).map(t => t.profit as number);
+// Volatility, Sharpe, Sortino likely need tradePairs, not just daily history
+const calculateVolatility = (tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[]): number => {
+    const profits = tradePairs.map(pair => pair.close.profitLoss as number).filter(p => p !== undefined);
     if (profits.length < 2) return 0;
     const mean = profits.reduce((sum, p) => sum + p, 0) / profits.length;
     const variance = profits.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / (profits.length - 1);
     return Math.sqrt(variance);
 };
 
-const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
+const calculateSharpeRatio = (tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02; // Annualized
-    const volatility = calculateVolatility(trades);
+    const volatility = calculateVolatility(tradePairs);
     if (volatility === 0) return 0;
-    return (totalReturnPercentage / 100 - riskFreeRate) / volatility;
+    // Ensure totalReturnPercentage is annualized if volatility is based on non-annualized periods
+    // For simplicity, assuming totalReturnPercentage aligns with the period volatility is calculated over
+    return (totalReturnPercentage / 100 - riskFreeRate) / volatility; 
 };
 
-const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
+const calculateSortinoRatio = (tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02;
-    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number);
-    if (negativeReturns.length === 0) return Infinity;
-    const meanNegative = 0; // Target return
+    const negativeReturns = tradePairs.map(pair => pair.close.profitLoss as number).filter(p => p !== undefined && p < 0);
+    if (negativeReturns.length === 0) return Infinity; // Or a large number / 0 depending on convention
+    const meanNegative = 0; // Target return (usually risk-free rate or 0)
     const downsideVariance = negativeReturns.reduce((sum, p) => sum + Math.pow(p - meanNegative, 2), 0) / negativeReturns.length;
     const downsideDeviation = Math.sqrt(downsideVariance);
-    if (downsideDeviation === 0) return Infinity;
+    if (downsideDeviation === 0) return Infinity; // Or handle division by zero
     return (totalReturnPercentage / 100 - riskFreeRate) / downsideDeviation;
 };
+
+// --- NEW Function: Generate Full Daily History --- 
+const generateFullDailyHistory = (
+    originalFullHistory: TradeHistoryItem[], 
+    processedTradeEvents: TradeHistoryItem[], // Output from processMonthlyTrades
+    initialCapital: number
+): TradeHistoryItem[] => {
+    if (!originalFullHistory || originalFullHistory.length === 0) return [];
+
+    const sortedOriginal = [...originalFullHistory].sort((a, b) =>
+        new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
+    );
+
+    // Create a map for quick lookup of processed trade events by date
+    const tradeEventMap = new Map<string, TradeHistoryItem>();
+    processedTradeEvents.forEach(event => {
+        tradeEventMap.set(event.date, event);
+    });
+
+    const displayHistory: TradeHistoryItem[] = [];
+    let lastKnownCapital = initialCapital; // Initialize with initial capital
+
+    for (let i = 0; i < sortedOriginal.length; i++) {
+        const currentDayOriginal = sortedOriginal[i];
+        const currentDateStr = currentDayOriginal.date;
+        const tradeEvent = tradeEventMap.get(currentDateStr);
+
+        let dayRecord: TradeHistoryItem;
+
+        if (tradeEvent) {
+            // If there's a trade event (Buy or Closed), use its data
+            dayRecord = { ...tradeEvent }; // Copy the trade event data
+            // Ensure capital is defined, otherwise carry forward (should be defined in trade events)
+            lastKnownCapital = tradeEvent.capital !== undefined ? tradeEvent.capital : lastKnownCapital;
+        } else {
+            // If no trade event, create a default record for the day
+            dayRecord = {
+                ...currentDayOriginal, // Include basic OHLCV data
+                trade: '-', // Indicate no trade action
+                suggestedEntryPrice: undefined,
+                actualPrice: undefined,
+                lotSize: undefined,
+                stopPrice: undefined,
+                stop: '-',
+                profitLoss: undefined,
+                capital: lastKnownCapital, // Carry forward the capital from the previous day
+                exitPrice: undefined // Ensure exitPrice is undefined if no trade
+            };
+        }
+
+        // **CORRECTION 2: Set initial capital for the very first day**
+        if (i === 0) {
+            dayRecord.capital = initialCapital;
+            lastKnownCapital = initialCapital; // Ensure lastKnownCapital starts correctly
+        }
+        
+        // Ensure capital is always a number or undefined
+        dayRecord.capital = dayRecord.capital !== undefined ? Number(dayRecord.capital) : undefined;
+
+        displayHistory.push(dayRecord);
+    }
+
+    return displayHistory;
+};
+
 
 // --- Main Component --- 
 export default function MonthlyPortfolioPage() {
@@ -122,11 +194,11 @@ export default function MonthlyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  // Function to process trades according to monthly logic (Corrected Profit/Loss logic)
+  // Function to process trades according to monthly logic (Focuses on identifying trade actions)
   const processMonthlyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
 
-    const finalProcessedHistory: TradeHistoryItem[] = [];
+    const tradeActionHistory: TradeHistoryItem[] = []; // Stores only Buy/Closed events
     const finalTradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] = [];
     const sortedHistory = [...fullHistory].sort((a, b) =>
       new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
@@ -157,7 +229,6 @@ export default function MonthlyPortfolioPage() {
         // --- 1. Attempt Entry ---
         if (!activeTradeEntry && !entryAttemptMadeThisMonth && isFirstBusinessDayOfMonth(currentDate)) {
           entryAttemptMadeThisMonth = true;
-          // Find previous day in the *full sorted history* to get exit price
           const previousDayOriginal = sortedHistory.find((_, idx, arr) => arr[idx+1]?.date === currentDayData.date);
 
           if (previousDayOriginal && previousDayOriginal.exitPrice !== undefined) {
@@ -167,20 +238,22 @@ export default function MonthlyPortfolioPage() {
             const shouldEnter = (params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold);
 
             if (shouldEnter) {
+              const lotSize = capitalBeforeCurrentTrade / potentialEntryPrice;
+              const stopPrice = calculateStopPrice(potentialEntryPrice, params);
               const entryDayRecord: TradeHistoryItem = {
-                ...currentDayData,
+                ...currentDayData, // Base data for the day
                 trade: (params.operation === 'buy' ? 'Buy' : 'Sell'),
                 suggestedEntryPrice: potentialEntryPrice,
                 actualPrice: potentialEntryPrice,
-                stopPrice: calculateStopPrice(potentialEntryPrice, params),
-                lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
+                stopPrice: stopPrice,
+                lotSize: lotSize,
                 stop: '-',
-                profitLoss: undefined, // CORREÇÃO: ProfitLoss undefined nos dias de entrada
-                capital: capitalBeforeCurrentTrade // Capital is pre-entry value
+                profitLoss: 0, // Profit/Loss is 0 on entry day
+                capital: capitalBeforeCurrentTrade // Capital *before* this trade
               };
               activeTradeEntry = entryDayRecord;
               stopPriceCalculated = entryDayRecord.stopPrice;
-              finalProcessedHistory.push(entryDayRecord);
+              tradeActionHistory.push(entryDayRecord); // Add to action history
             }
           }
         }
@@ -196,12 +269,14 @@ export default function MonthlyPortfolioPage() {
           if (stopHit) {
             exitPrice = stopPriceCalculated;
             profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
+            const capitalAfterClose = capitalBeforeCurrentTrade + profit;
             closeRecord = {
-              ...currentDayData,
+              ...currentDayData, // Base data for the day
               trade: 'Closed',
               stop: 'Executed',
-              profitLoss: profit, // CORREÇÃO: ProfitLoss calculado apenas em 'Closed'
-              capital: capitalBeforeCurrentTrade + profit,
+              profitLoss: profit,
+              capital: capitalAfterClose,
+              // Carry over details from the entry record for clarity
               suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
               actualPrice: activeTradeEntry.actualPrice,
               stopPrice: activeTradeEntry.stopPrice,
@@ -209,18 +284,20 @@ export default function MonthlyPortfolioPage() {
               exitPrice: exitPrice
             };
             closedToday = true;
-            capitalBeforeCurrentTrade += profit;
+            capitalBeforeCurrentTrade = capitalAfterClose; // Update capital for next potential trade
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
-            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
+            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined; // Use the day's exit price (often close)
             if (exitPrice !== undefined) {
               profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
+              const capitalAfterClose = capitalBeforeCurrentTrade + profit;
               closeRecord = {
-                ...currentDayData,
+                ...currentDayData, // Base data for the day
                 trade: 'Closed',
                 stop: '-',
-                profitLoss: profit, // CORREÇÃO: ProfitLoss calculado apenas em 'Closed'
-                capital: capitalBeforeCurrentTrade + profit,
+                profitLoss: profit,
+                capital: capitalAfterClose,
+                 // Carry over details from the entry record for clarity
                 suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
                 actualPrice: activeTradeEntry.actualPrice,
                 stopPrice: activeTradeEntry.stopPrice,
@@ -228,14 +305,15 @@ export default function MonthlyPortfolioPage() {
                 exitPrice: exitPrice
               };
               closedToday = true;
-              capitalBeforeCurrentTrade += profit;
+              capitalBeforeCurrentTrade = capitalAfterClose; // Update capital for next potential trade
             } else {
               console.warn(`Missing exit price (close) on last business day ${currentDayData.date} for active trade.`);
+              // Decide how to handle this - close anyway? Carry over? For now, it doesn't close.
             }
           }
 
           if (closedToday && closeRecord) {
-            finalProcessedHistory.push(closeRecord);
+            tradeActionHistory.push(closeRecord); // Add to action history
             finalTradePairs.push({ open: activeTradeEntry, close: closeRecord });
             activeTradeEntry = null;
             stopPriceCalculated = null;
@@ -244,7 +322,8 @@ export default function MonthlyPortfolioPage() {
       } // End of day loop
     }); // End of month loop
 
-    return { processedHistory: finalProcessedHistory, tradePairs: finalTradePairs };
+    // Return only the days with trade actions and the pairs
+    return { processedHistory: tradeActionHistory, tradePairs: finalTradePairs }; 
   };
 
   // --- Analysis Execution --- 
@@ -258,8 +337,10 @@ export default function MonthlyPortfolioPage() {
     try {
       if (!isValidPeriodForMonthly(params.period)) {
         toast({ variant: "default", title: "Period Selection", description: "For monthly analysis, select a period of 2 months or more." });
+        // Optional: return here if invalid period should stop execution
+        // return;
       }
-      console.info("Running monthly analysis (v6 - viewDetails reverted) with params:", params);
+      console.info("Running monthly analysis (v7 - Full History Display) with params:", params);
       setProgress(10);
       
       let dataTableName = params.dataTableName || await api.marketData.getDataTableName(params.country, params.stockMarket, params.assetClass);
@@ -269,51 +350,81 @@ export default function MonthlyPortfolioPage() {
       const paramsWithTable = { ...params, dataTableName };
       setAnalysisParams(paramsWithTable); // Set final params used
       
+      // Fetch results for all assets
       const results = await api.analysis.runAnalysis(paramsWithTable, (p) => setProgress(20 + p * 0.7));
       
+      // Process summary metrics for the results table (still based on trade pairs)
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
+            // Fetch detailed history just to get trade pairs for summary calculation
             const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
-              // Use the corrected processMonthlyTrades
-              const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+              // Get trade actions and pairs using the existing logic
+              const { processedHistory: tradeActions, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+              
+              // Filter pairs for valid profit/loss for calculations
               const tradePairsFiltered = tradePairs.filter(pair => pair.close.profitLoss !== undefined);
               const trades = tradePairsFiltered.length;
               
               if (trades === 0) {
-                return { ...result, tradingDays: processedHistory.length, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
+                // If no trades, return default metrics
+                return { ...result, tradingDays: detailedData.tradeHistory.length, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
               }
               
-              const profitsCount = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss > 0).length;
+              // Calculate summary metrics based *only* on completed trade pairs
+              const profitsCount = tradePairsFiltered.filter(pair => pair.close.profitLoss! > 0).length;
               const lossesCount = trades - profitsCount;
               const stopsCount = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
               
-              const lastTradeRecord = processedHistory.length > 0 ? processedHistory[processedHistory.length - 1] : null;
-              const finalCapital = lastTradeRecord?.capital ?? params.initialCapital;
+              // Final capital is based on the last trade action's capital
+              const lastTradeAction = tradeActions.length > 0 ? tradeActions[tradeActions.length - 1] : null;
+              const finalCapital = lastTradeAction?.capital ?? params.initialCapital;
               const totalProfit = finalCapital - params.initialCapital;
               const profitPercentageTotal = params.initialCapital === 0 ? 0 : (totalProfit / params.initialCapital) * 100;
               
-              const gainTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss > 0);
-              const lossTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss && pair.close.profitLoss < 0);
-              const totalGain = gainTrades.reduce((sum, pair) => sum + (pair.close.profitLoss || 0), 0);
-              const totalLoss = lossTrades.reduce((sum, pair) => sum + (pair.close.profitLoss || 0), 0);
+              const gainTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss! > 0);
+              const lossTrades = tradePairsFiltered.filter(pair => pair.close.profitLoss! < 0);
+              const totalGain = gainTrades.reduce((sum, pair) => sum + pair.close.profitLoss!, 0);
+              const totalLoss = lossTrades.reduce((sum, pair) => sum + pair.close.profitLoss!, 0);
               const averageGain = gainTrades.length > 0 ? totalGain / gainTrades.length : 0;
               const averageLoss = lossTrades.length > 0 ? totalLoss / lossTrades.length : 0;
               
-              const maxDrawdown = calculateMaxDrawdown(processedHistory, params.initialCapital);
-              const sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
-              const sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
+              // Risk metrics calculated on trade pairs for consistency with profit/loss metrics
+              // NOTE: Max Drawdown calculation might be more accurate on the full daily history, 
+              // but for the summary table, consistency with trade-based metrics might be preferred.
+              // Let's use the capital from trade actions for summary drawdown.
+              const maxDrawdown = calculateMaxDrawdown(tradeActions, params.initialCapital);
+              const sharpeRatio = calculateSharpeRatio(tradePairsFiltered, profitPercentageTotal);
+              const sortinoRatio = calculateSortinoRatio(tradePairsFiltered, profitPercentageTotal);
               const maxDrawdownAmount = maxDrawdown / 100 * params.initialCapital;
               const recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
               
-              return { ...result, tradingDays: processedHistory.length, trades, profits: profitsCount, losses: lossesCount, stops: stopsCount, finalCapital, profit: totalProfit, successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, averageGain, averageLoss, maxDrawdown, sharpeRatio, sortinoRatio, recoveryFactor };
+              return { 
+                  ...result, 
+                  tradingDays: detailedData.tradeHistory.length, // Total days in period
+                  trades, 
+                  profits: profitsCount, 
+                  losses: lossesCount, 
+                  stops: stopsCount, 
+                  finalCapital, 
+                  profit: totalProfit, 
+                  successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, 
+                  averageGain, 
+                  averageLoss, 
+                  maxDrawdown, 
+                  sharpeRatio, 
+                  sortinoRatio, 
+                  recoveryFactor 
+              };
             } else {
+               // No history data for the asset
                return { ...result, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
             }
           } catch (error) { 
             console.error(`Error processing summary metrics for ${result.assetCode}:`, error); 
+            // Return default metrics on error
             return { ...result, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 }; 
           }
         })
@@ -322,7 +433,7 @@ export default function MonthlyPortfolioPage() {
       setProgress(95);
       setAnalysisResults(processedResults);
       setProgress(100);
-      toast({ title: "Monthly analysis completed", description: "Analysis was completed successfully (v6 logic)." });
+      toast({ title: "Monthly analysis completed", description: "Analysis was completed successfully (v7 logic)." });
       
     } catch (error) { 
       console.error("Monthly analysis run failed", error); 
@@ -336,198 +447,198 @@ export default function MonthlyPortfolioPage() {
     }
   };
 
-  // --- View Details Function (Reverted Flow Logic - v6) --- 
+  // --- View Details Function (Applies Full History Generation) --- 
   const viewDetails = async (assetCode: string) => {
-    // 1. Check for analysis parameters
     if (!analysisParams) {
       toast({ variant: "destructive", title: "Error", description: "Analysis parameters not available. Please run analysis first." });
       return;
     }
 
-    console.log(`[v6] Attempting to view details for: ${assetCode}`);
+    console.log(`[v7] Attempting to view details for: ${assetCode}`);
     setIsLoadingDetails(true); 
     setSelectedAsset(assetCode); 
-    setDetailedResult(null); // Clear previous result
+    setDetailedResult(null); 
 
     try {
-      // 2. Ensure data table name is available
       let paramsForDetails = analysisParams;
       if (!paramsForDetails.dataTableName) {
-        console.log(`[v6] Data table name missing, fetching...`);
+        console.log(`[v7] Data table name missing, fetching...`);
         const tableName = await api.marketData.getDataTableName(paramsForDetails.country, paramsForDetails.stockMarket, paramsForDetails.assetClass);
         if (!tableName) throw new Error("Could not determine data table name for details view");
         paramsForDetails = { ...paramsForDetails, dataTableName: tableName };
       }
 
-      // 3. Fetch detailed analysis data
-      console.log(`[v6] Fetching detailed analysis for ${assetCode} with params:`, paramsForDetails);
+      console.log(`[v7] Fetching detailed analysis for ${assetCode} with params:`, paramsForDetails);
       const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsForDetails);
-      console.log(`[v6] Fetched detailed data for ${assetCode}:`, detailedData ? 'Data received' : 'No data');
+      console.log(`[v7] Fetched detailed data for ${assetCode}:`, detailedData ? 'Data received' : 'No data');
 
-      // 4. Process data if received successfully
       if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-        console.log(`[v6] Processing trade history for ${assetCode}...`);
-        // *** Use the CORRECTED processMonthlyTrades ***
-        const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsForDetails);
-
-        // Assign processed history back
-        detailedData.tradeHistory = processedHistory;
-        detailedData.tradingDays = processedHistory.length;
-
-        // Sort processed history for capital evolution chart
-        const sortedProcessedHistory = [...processedHistory].sort((a, b) =>
-            new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
+        console.log(`[v7] Processing trade history for ${assetCode}...`);
+        
+        // Step 1: Get the trade actions (Buy/Closed) and pairs using the original logic
+        const { processedHistory: tradeActions, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsForDetails);
+        
+        // Step 2: Generate the full daily history for display
+        // Pass the *original* full history and the identified trade actions
+        const displayHistory = generateFullDailyHistory(
+            detailedData.tradeHistory, // Original full history from API
+            tradeActions,             // Only Buy/Closed events
+            paramsForDetails.initialCapital
         );
 
-        // Recalculate capital evolution and metrics based on processed history
-        if (sortedProcessedHistory.length > 0) {
-           detailedData.capitalEvolution = sortedProcessedHistory
-             .filter(trade => trade.capital !== undefined)
+        // Step 3: Update the detailedData object for the view
+        detailedData.tradeHistory = displayHistory; // Use the full history for the table
+        detailedData.tradingDays = displayHistory.length; // Count all days shown
+
+        // Step 4: Recalculate metrics based on the appropriate data
+        // Capital evolution uses the full display history
+        detailedData.capitalEvolution = displayHistory
+             .filter(trade => trade.capital !== undefined) // Filter out any potential undefined capital
              .map(trade => ({ date: trade.date, capital: trade.capital as number }));
-           
-           // Add initial capital point logic
-           // Need original full history for the very first date point
-           const originalHistoryForAsset = detailedData.tradeHistory || []; // Use processed history
-           const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
-              new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-           );
-           const firstOriginalDate = fullSortedOriginalHistory[0]?.date;
-           if (firstOriginalDate && (detailedData.capitalEvolution.length === 0 || detailedData.capitalEvolution[0]?.date !== firstOriginalDate)) {
-              detailedData.capitalEvolution.unshift({ date: firstOriginalDate, capital: paramsForDetails.initialCapital });
-           }
-
-           const lastTradeRecord = sortedProcessedHistory[sortedProcessedHistory.length - 1];
-           const finalCapital = lastTradeRecord?.capital ?? paramsForDetails.initialCapital;
-           const totalProfit = finalCapital - paramsForDetails.initialCapital;
-           const profitPercentageTotal = paramsForDetails.initialCapital === 0 ? 0 : (totalProfit / paramsForDetails.initialCapital) * 100;
-
-           detailedData.maxDrawdown = calculateMaxDrawdown(sortedProcessedHistory, paramsForDetails.initialCapital);
-           detailedData.sharpeRatio = calculateSharpeRatio(sortedProcessedHistory, profitPercentageTotal);
-           detailedData.sortinoRatio = calculateSortinoRatio(sortedProcessedHistory, profitPercentageTotal);
-           const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsForDetails.initialCapital;
-           detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
-
-        } else {
-           // Handle case with no processed trades
-           const originalHistoryForAsset = detailedData.tradeHistory || [];
-           const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
-           detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsForDetails.initialCapital }];
-           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
+        
+        // Ensure the initial capital point exists for the chart if needed (redundant if generateFullDailyHistory works correctly)
+        /*
+        if (detailedData.capitalEvolution.length > 0 && detailedData.capitalEvolution[0]?.date !== displayHistory[0]?.date) {
+             detailedData.capitalEvolution.unshift({ date: displayHistory[0].date, capital: paramsForDetails.initialCapital });
+        } else if (detailedData.capitalEvolution.length === 0 && displayHistory.length > 0) {
+             detailedData.capitalEvolution.push({ date: displayHistory[0].date, capital: paramsForDetails.initialCapital });
         }
+        */
+
+        // Other metrics (Drawdown, Sharpe, Sortino, Recovery) should ideally be calculated 
+        // based on the *trade pairs* or *trade actions* for consistency with the summary table.
+        // Recalculate them here using the tradePairs/tradeActions obtained in Step 1.
+        const tradePairsFiltered = tradePairs.filter(pair => pair.close.profitLoss !== undefined);
+        const tradesCount = tradePairsFiltered.length;
+        const lastTradeAction = tradeActions.length > 0 ? tradeActions[tradeActions.length - 1] : null;
+        const finalCapitalFromTrades = lastTradeAction?.capital ?? paramsForDetails.initialCapital;
+        const totalProfitFromTrades = finalCapitalFromTrades - paramsForDetails.initialCapital;
+        const profitPercentageTotal = paramsForDetails.initialCapital === 0 ? 0 : (totalProfitFromTrades / paramsForDetails.initialCapital) * 100;
+
+        // Use tradeActions for Drawdown calc in detail view for consistency? Or displayHistory?
+        // Using displayHistory provides a smoother drawdown curve reflecting daily changes.
+        detailedData.maxDrawdown = calculateMaxDrawdown(displayHistory, paramsForDetails.initialCapital);
+        
+        // Use tradePairs for ratio calculations
+        detailedData.sharpeRatio = calculateSharpeRatio(tradePairsFiltered, profitPercentageTotal);
+        detailedData.sortinoRatio = calculateSortinoRatio(tradePairsFiltered, profitPercentageTotal);
+        
+        const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsForDetails.initialCapital;
+        detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfitFromTrades / maxDrawdownAmount) : (totalProfitFromTrades > 0 ? Infinity : 0);
+        
+        // Assign other summary metrics calculated from trades
+        detailedData.trades = tradesCount;
+        detailedData.profit = totalProfitFromTrades;
+        // ... assign other relevant metrics if needed in the detail view ...
 
         // 5. Set state to display results
-        console.log(`[v6] Processing complete for ${assetCode}. Setting state.`);
-        setDetailedResult(detailedData); // Set the processed data
-        setShowDetailView(true); // *** Show the detail view ***
-        console.log(`[v6] State set for ${assetCode}. Should show details now.`);
+        console.log(`[v7] Processing complete for ${assetCode}. Setting state.`);
+        setDetailedResult(detailedData); 
+        setShowDetailView(true); 
+        console.log(`[v7] State set for ${assetCode}. Should show details now.`);
 
       } else {
-        // Handle case where no detailed data/history is found
-        console.warn(`[v6] No detailed data or trade history found for ${assetCode}.`);
+        console.warn(`[v7] No detailed data or trade history found for ${assetCode}.`);
         toast({ variant: "default", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
         setDetailedResult(null);
-        setShowDetailView(false); // Ensure view is hidden
-        setSelectedAsset(null); // Deselect asset
+        setShowDetailView(false); 
+        setSelectedAsset(null); 
       }
 
     } catch (error) {
-      // 6. Handle errors during fetch or processing
-      console.error(`[v6] Failed to fetch or process details for ${assetCode}`, error);
+      console.error(`[v7] Failed to fetch or process details for ${assetCode}`, error);
       toast({ variant: "destructive", title: "Failed to fetch details", description: error instanceof Error ? error.message : "An unknown error occurred" });
-      setDetailedResult(null); // Clear results on error
-      setShowDetailView(false); // Hide view on error
-      setSelectedAsset(null); // Deselect asset on error
+      setDetailedResult(null); 
+      setShowDetailView(false); 
+      setSelectedAsset(null); 
     } finally {
-      // 7. Stop loading indicator
-      setTimeout(() => setIsLoadingDetails(false), 300);
-      console.log(`[v6] Finished viewDetails attempt for ${assetCode}. Loading state off.`);
+      setTimeout(() => setIsLoadingDetails(false), 300); 
+      console.log(`[v7] Finished viewDetails attempt for ${assetCode}. Loading state off.`);
     }
   };
 
-  // --- Update Analysis Function (from Detail View) --- 
-  // This function likely needs the same corrected trade processing logic if it recalculates
+  // --- Update Analysis Function (Needs similar full history logic) --- 
   const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
      if (!selectedAsset || !analysisParams) return; 
-     console.log(`[v6] Updating analysis for ${selectedAsset} with new params:`, updatedParams);
+     console.log(`[v7] Updating analysis for ${selectedAsset} with new params:`, updatedParams);
      setIsLoadingDetails(true);
      try {
+       // Ensure data table name is available
        const tableName = analysisParams.dataTableName || await api.marketData.getDataTableName(updatedParams.country, updatedParams.stockMarket, updatedParams.assetClass);
        if (!tableName) throw new Error("Could not determine data table name for update");
        
        const paramsWithTable = { ...updatedParams, dataTableName: tableName };
 
-       console.log(`[v6] Fetching detailed analysis for update on ${selectedAsset}...`);
+       console.log(`[v7] Fetching detailed analysis for update on ${selectedAsset}...`);
        const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
-       console.log(`[v6] Fetched data for update on ${selectedAsset}:`, detailedData ? 'Data received' : 'No data');
+       console.log(`[v7] Fetched data for update on ${selectedAsset}:`, detailedData ? 'Data received' : 'No data');
 
        if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-         console.log(`[v6] Processing updated trade history for ${selectedAsset}...`);
-         // *** Use the CORRECTED processMonthlyTrades ***
-         const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
-         detailedData.tradeHistory = processedHistory;
-         detailedData.tradingDays = processedHistory.length;
+         console.log(`[v7] Processing updated trade history for ${selectedAsset}...`);
          
-         const sortedProcessedHistory = [...processedHistory].sort((a, b) =>
-            new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
+         // Step 1: Get trade actions and pairs
+         const { processedHistory: tradeActions, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+         
+         // Step 2: Generate full display history
+         const displayHistory = generateFullDailyHistory(
+            detailedData.tradeHistory, 
+            tradeActions, 
+            paramsWithTable.initialCapital
          );
 
-         // --- Recalculate metrics --- 
-         if (sortedProcessedHistory.length > 0) {
-            detailedData.capitalEvolution = sortedProcessedHistory
+         // Step 3: Update detailedData object
+         detailedData.tradeHistory = displayHistory;
+         detailedData.tradingDays = displayHistory.length;
+         
+         // Step 4: Recalculate metrics (similar to viewDetails)
+         detailedData.capitalEvolution = displayHistory
               .filter(trade => trade.capital !== undefined)
               .map(trade => ({ date: trade.date, capital: trade.capital as number }));
-              
-            // Add initial capital point logic (needs original history)
-            const originalHistoryForAsset = detailedData.tradeHistory || [];
-            const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
-               new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-            );
-            const firstOriginalDate = fullSortedOriginalHistory[0]?.date;
-            if (firstOriginalDate && (detailedData.capitalEvolution.length === 0 || detailedData.capitalEvolution[0]?.date !== firstOriginalDate)) {
-               detailedData.capitalEvolution.unshift({ date: firstOriginalDate, capital: paramsWithTable.initialCapital });
-            }
-            
-            const lastTradeRecord = sortedProcessedHistory[sortedProcessedHistory.length - 1];
-            const finalCapital = lastTradeRecord?.capital ?? paramsWithTable.initialCapital;
-            const totalProfit = finalCapital - paramsWithTable.initialCapital;
-            const profitPercentageTotal = paramsWithTable.initialCapital === 0 ? 0 : (totalProfit / paramsWithTable.initialCapital) * 100;
-            
-            detailedData.maxDrawdown = calculateMaxDrawdown(sortedProcessedHistory, paramsWithTable.initialCapital);
-            detailedData.sharpeRatio = calculateSharpeRatio(sortedProcessedHistory, profitPercentageTotal);
-            detailedData.sortinoRatio = calculateSortinoRatio(sortedProcessedHistory, profitPercentageTotal);
-            const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital;
-            detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
-            
-         } else {
-           const originalHistoryForAsset = detailedData.tradeHistory || [];
-           const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
-           detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsWithTable.initialCapital }];
-           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
-         }
+
+         const tradePairsFiltered = tradePairs.filter(pair => pair.close.profitLoss !== undefined);
+         const tradesCount = tradePairsFiltered.length;
+         const lastTradeAction = tradeActions.length > 0 ? tradeActions[tradeActions.length - 1] : null;
+         const finalCapitalFromTrades = lastTradeAction?.capital ?? paramsWithTable.initialCapital;
+         const totalProfitFromTrades = finalCapitalFromTrades - paramsWithTable.initialCapital;
+         const profitPercentageTotal = paramsWithTable.initialCapital === 0 ? 0 : (totalProfitFromTrades / paramsWithTable.initialCapital) * 100;
+
+         detailedData.maxDrawdown = calculateMaxDrawdown(displayHistory, paramsWithTable.initialCapital);
+         detailedData.sharpeRatio = calculateSharpeRatio(tradePairsFiltered, profitPercentageTotal);
+         detailedData.sortinoRatio = calculateSortinoRatio(tradePairsFiltered, profitPercentageTotal);
+         const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital;
+         detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfitFromTrades / maxDrawdownAmount) : (totalProfitFromTrades > 0 ? Infinity : 0);
+         detailedData.trades = tradesCount;
+         detailedData.profit = totalProfitFromTrades;
+         // ... assign other metrics ...
+
          // --- End Recalculation --- 
-         console.log(`[v6] Processing update complete for ${selectedAsset}. Setting state.`);
+         console.log(`[v7] Processing update complete for ${selectedAsset}. Setting state.`);
          setDetailedResult(detailedData); // Update the detailed results
          setAnalysisParams(paramsWithTable); // Update the analysis params used for this view
-         toast({ title: "Analysis Updated", description: "Detailed view updated (monthly v6 logic)." });
-         console.log(`[v6] State updated for ${selectedAsset}.`);
+         toast({ title: "Analysis Updated", description: "Detailed view updated (monthly v7 logic)." });
+         console.log(`[v7] State updated for ${selectedAsset}.`);
          
        } else {
-         console.warn(`[v6] No detailed data or trade history found during update for ${selectedAsset}.`);
+         console.warn(`[v7] No detailed data or trade history found during update for ${selectedAsset}.`);
          toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
+         // Optionally clear or keep old data
+         // setDetailedResult(null); 
        }
      } catch (error) { 
-       console.error(`[v6] Failed to update detailed analysis for ${selectedAsset}`, error); 
+       console.error(`[v7] Failed to update detailed analysis for ${selectedAsset}`, error); 
        toast({ variant: "destructive", title: "Update Failed", description: error instanceof Error ? error.message : "Unknown error" }); 
+       // Optionally clear or keep old data
+       // setDetailedResult(null); 
      }
      finally { 
        setTimeout(() => setIsLoadingDetails(false), 300); 
-       console.log(`[v6] Finished update attempt for ${selectedAsset}. Loading state off.`);
+       console.log(`[v7] Finished update attempt for ${selectedAsset}. Loading state off.`);
      }
   };
 
   // --- Close Details Function --- 
   const closeDetails = () => {
-    console.log("[v6] Closing details view.");
+    console.log("[v7] Closing details view.");
     setShowDetailView(false);
     setDetailedResult(null);
     setSelectedAsset(null);
@@ -564,12 +675,12 @@ export default function MonthlyPortfolioPage() {
         // Render StockDetailView only if detailedResult and analysisParams exist
         detailedResult && analysisParams && (
           <div className="bg-card p-6 rounded-lg border">
-            <StockDetailView
+            <StockDetailView 
               result={detailedResult} 
               params={analysisParams} 
               onClose={closeDetails} 
-              onUpdateParams={updateAnalysis} 
-              isLoading={isLoadingDetails} 
+              onUpdate={updateAnalysis} // Pass update function
+              isLoading={isLoadingDetails}
             />
           </div>
         )
@@ -577,3 +688,4 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
+
