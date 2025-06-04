@@ -56,27 +56,26 @@ export function StockDetailsTable({
 
   // Process and sort data
       const processedData = useMemo(() => {
-        if (!result?.tradeHistory?.length) return [];
-        
-        const data = result.tradeHistory.map(item => ({
-          ...item,
-          // Keep the original values without any transformation
-          high: item.high ?? null,
-          low: item.low ?? null,
-          open: item.open ?? null,
-          close: item.close ?? null,
-          volume: item.volume ?? null,
-          // Only transform numeric fields that need calculation
-          profitLoss: Number(item.profitLoss) || 0,
-          currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
-            ? Number(item.currentCapital) 
-            : undefined,
-          trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-          stopTrigger: calculateStopTrigger(item, params.operation)
-        }));
+          if (!result?.tradeHistory?.length) return [];
+          
+          const data = result.tradeHistory.map(item => ({
+            ...item,
+            // Mantenha os valores originais, sem transformação
+            high: item.high,
+            low: item.low,
+            open: item.open,
+            close: item.close,
+            volume: item.volume,
+            profitLoss: Number(item.profitLoss) || 0,
+            currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
+              ? Number(item.currentCapital) 
+              : undefined,
+            trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
+            stopTrigger: calculateStopTrigger(item, params.operation)
+          }));
       
         // Update sorting to handle null values properly
-        return [...data].sort((a, b) => {
+          return [...data].sort((a, b) => {
           const valA = a[sortField];
           const valB = b[sortField];
           
@@ -388,51 +387,61 @@ export function StockDetailsTable({
                   >
                     {columns.map((column) => {
                         const value = item[column.id as keyof TradeHistoryItem];
-                        let formattedValue = "-";
-                        if (value !== undefined && value !== null) {
-                          if (column.id === "date") {
-                            formattedValue = formatDate(value as string);
-                          } else if (column.id === "profitLoss" || column.id === "currentCapital") {
-                            formattedValue = formatCurrency(value as number);
-                          } else if (column.id === "volume" || column.id === "lotSize") {
-                            formattedValue = (value as number).toLocaleString();
-                          } else if (column.id === "stopTrigger") {
-                            formattedValue = item.stopTrigger || "-";
-                          } else if (column.id === "trade") {
-                            formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                          } else if (
-                            column.id === "open" ||
-                            column.id === "high" ||
-                            column.id === "low" ||
-                            column.id === "close"
-                          ) {
-                            // Aqui está a correção principal
-                            formattedValue = value === "-" ? "-" : typeof value === "number" ? value.toFixed(2) : "-";
-                          } else if (typeof value === "number") {
-                            formattedValue = value.toFixed(2);
-                          } else {
-                            formattedValue = String(value);
+                          let formattedValue = "-";
+                          
+                          if (value !== undefined && value !== null) {
+                            if (column.id === "date") {
+                              formattedValue = formatDate(value as string);
+                            } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                              formattedValue = formatCurrency(value as number);
+                            } else if (column.id === "volume" || column.id === "lotSize") {
+                              formattedValue = (value as number).toLocaleString();
+                            } else if (column.id === "stopTrigger") {
+                              formattedValue = item.stopTrigger || "-";
+                            } else if (column.id === "trade") {
+                              formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
+                            } else if (
+                              column.id === "open" ||
+                              column.id === "high" ||
+                              column.id === "low" ||
+                              column.id === "close"
+                            ) {
+                              // Nova lógica de formatação para valores numéricos
+                              if (value === "-" || value === "" || value === null || value === undefined) {
+                                formattedValue = "-";
+                              } else if (typeof value === "number") {
+                                formattedValue = value.toFixed(2);
+                              } else if (typeof value === "string" && !isNaN(Number(value))) {
+                                formattedValue = Number(value).toFixed(2);
+                              } else {
+                                formattedValue = "-";
+                              }
+                            } else if (typeof value === "number") {
+                              formattedValue = value.toFixed(2);
+                            } else {
+                              formattedValue = String(value);
+                            }
                           }
-                        }
-                        return (
-                          <TableCell 
-                            key={column.id}
-                            className={`text-center px-2 py-2 text-sm ${
-                              column.id === "currentCapital" ? "font-medium" : ""
-                            } ${
-                              column.id === "profitLoss" ? 
-                                (Number(item.profitLoss) > 0 ? "text-green-600" : 
-                                 Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
-                            } ${
-                              column.id === "trade" ?
-                                (item.trade === "Buy" ? "text-green-600" :
-                                 item.trade === "Sell" ? "text-red-600" : "") : ""
-                            }`}
-                          >
-                            {formattedValue}
-                          </TableCell>
-                        );
-                      })}
+                        
+                          return (
+                            <TableCell 
+                              key={column.id}
+                              className={`text-center px-2 py-2 text-sm ${
+                                column.id === "currentCapital" ? "font-medium" : ""
+                              } ${
+                                column.id === "profitLoss" ? 
+                                  (Number(item.profitLoss) > 0 ? "text-green-600" : 
+                                   Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                              } ${
+                                column.id === "trade" ?
+                                  (item.trade === "Buy" ? "text-green-600" :
+                                   item.trade === "Sell" ? "text-red-600" : "") : ""
+                              }`}
+                            >
+                              {formattedValue}
+                            </TableCell>
+                          );
+                        })}
                   </TableRow>
                 ))
               )}
