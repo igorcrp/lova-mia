@@ -277,25 +277,25 @@ const processWeeklyTrades = (
 
     // Garante que a coluna 'close' SEMPRE reflete o valor fiel do banco
     const displayRecord: TradeHistoryItem = {
-      ...rawDayData,
-      date: rawDayData.date,
-      trade: tradeAction?.trade ?? '-',
-      suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
-      actualPrice: tradeAction?.actualPrice,
-      lotSize: tradeAction?.lotSize ?? 0,
-      stopPrice: tradeAction?.stopPrice,
-      stop: tradeAction?.stop ?? '-',
-      profit: tradeAction?.profit,
-      exitPrice: tradeAction?.exitPrice,
-      capital: currentDayCapital,
-      // As linhas abaixo garantem que o valor do banco seja exibido sempre,
-      // mesmo em dias sem operação.
-      open: rawDayData.open,
-      high: rawDayData.high,
-      low: rawDayData.low,
-      close: rawDayData.close,
-      volume: rawDayData.volume,
-    };
+        ...rawDayData,
+        date: rawDayData.date,
+        trade: tradeAction?.trade ?? '-',
+        suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
+        actualPrice: tradeAction?.actualPrice,
+        lotSize: tradeAction?.lotSize ?? 0,
+        stopPrice: tradeAction?.stopPrice,
+        stop: tradeAction?.stop ?? '-',
+        profit: tradeAction?.profit,
+        exitPrice: tradeAction?.exitPrice,
+        capital: currentDayCapital,
+        // As linhas abaixo garantem que o valor do banco seja exibido sempre,
+        // mesmo em dias sem operação.
+        open: rawDayData.open,
+        high: rawDayData.high,
+        low: rawDayData.low,
+        close: rawDayData.close,
+        volume: rawDayData.volume,
+      };
 
     completeHistoryWithCapital.push(displayRecord);
     previousDayCapital = currentDayCapital;
