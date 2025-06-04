@@ -13,6 +13,7 @@ import {
   addDays
 } from "@/utils/dateUtils";
 
+// Helper functions (getWeekKey, etc.)
 function getWeekKey(date: Date): string {
   const startOfWeek = new Date(date);
   startOfWeek.setUTCDate(date.getUTCDate() - date.getUTCDay() + (date.getUTCDay() === 0 ? -6 : 1));
@@ -61,6 +62,7 @@ function calculateProfit(entryPrice: number | undefined, exitPrice: number | und
   return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
 }
 
+// Risk Calculation Placeholders
 const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number): number => {
   if (!trades || trades.length === 0) return 0;
   let maxDrawdown = 0;
@@ -102,6 +104,7 @@ const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage
   return (totalReturnPercentage / 100 - riskFreeRate) / downsideDeviation;
 };
 
+// ---- CORRIGIDA: inclui todos os dias úteis no histórico, mesmo sem operação ----
 const processWeeklyTrades = (
   fullHistory: TradeHistoryItem[],
   params: StockAnalysisParams
@@ -117,6 +120,7 @@ const processWeeklyTrades = (
   let currentCapital = params.initialCapital;
   const tradesByWeek: { [weekKey: string]: TradeHistoryItem[] } = {};
 
+  // Agrupa trades por semana
   sortedHistory.forEach(trade => {
     const tradeDate = new Date(trade.date + 'T00:00:00Z');
     if (isNaN(tradeDate.getTime())) return;
@@ -125,6 +129,7 @@ const processWeeklyTrades = (
     tradesByWeek[weekKey].push(trade);
   });
 
+  // Executa simulação de trades
   Object.keys(tradesByWeek).sort().forEach(weekKey => {
     const weekTrades = tradesByWeek[weekKey];
     let activeTradeEntry: TradeHistoryItem | null = null;
@@ -262,6 +267,7 @@ const processWeeklyTrades = (
     while (currentDate <= lastDate) {
       const currentDateStr = formatDateISO(currentDate);
 
+      // Só mostra dias úteis (segunda a sexta)
       if (currentDate.getUTCDay() !== 0 && currentDate.getUTCDay() !== 6) {
         const rawDayData = rawDataMap.get(currentDateStr);
         const tradeAction = tradeExecutionMap.get(currentDateStr);
@@ -280,14 +286,15 @@ const processWeeklyTrades = (
           }
         }
 
-        // GARANTE QUE OS CAMPOS BASE SÃO SEMPRE OS DADOS ORIGINAIS DA API
         const displayRecord: TradeHistoryItem = {
+          ...(rawDayData || {
+            open: 0,
+            high: 0,
+            low: 0,
+            close: 0,
+            volume: 0
+          }),
           date: currentDateStr,
-          open: rawDayData?.open ?? 0,
-          high: rawDayData?.high ?? 0,
-          low: rawDayData?.low ?? 0,
-          close: rawDayData?.close ?? 0,
-          volume: rawDayData?.volume ?? 0,
           trade: tradeAction?.trade ?? '-',
           suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
           actualPrice: tradeAction?.actualPrice,
@@ -295,7 +302,7 @@ const processWeeklyTrades = (
           stopPrice: tradeAction?.stopPrice,
           stop: tradeAction?.stop ?? '-',
           profit: tradeAction?.profit,
-          exitPrice: rawDayData?.close ?? 0, // <-- SEMPRE O CLOSE DO BANCO/API
+          exitPrice: tradeAction?.exitPrice,
           capital: currentDayCapital,
         };
 
@@ -484,6 +491,7 @@ export default function WeeklyPortfolioPage() {
     setSelectedAsset(null);
   };
 
+  // --- RETURN JSX ---
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Weekly Portfolio</h1>
@@ -519,3 +527,14 @@ export default function WeeklyPortfolioPage() {
     </div>
   );
 }
+
+// --- Mock date utils caso não estejam importados ---
+const formatDateISO = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
