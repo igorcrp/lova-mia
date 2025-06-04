@@ -33,7 +33,7 @@ export function StockDetailsTable({
   const [entryPercentage, setEntryPercentage] = useState<number | string | null>(params.entryPercentage ?? null);
   const [stopPercentage, setStopPercentage] = useState<number | string | null>(params.stopPercentage ?? null);
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
-  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
+  const [isOpenFocused, setIsOpenFocused] = useState(false);
   const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
@@ -343,14 +343,14 @@ export function StockDetailsTable({
                 <Input 
                   type="text"
                   inputMode="decimal"
-                  value={isEntryPriceFocused 
+                  value={isOpenFocused 
                          ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
                          : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
-                  onFocus={() => setIsEntryPriceFocused(true)}
+                  onFocus={() => setIsOpenFocused(true)}
                   onBlur={() => {
                     handleBlurFormatting(entryPercentage, setEntryPercentage);
-                    setIsEntryPriceFocused(false);
+                    setIsOpenFocused(false);
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
