@@ -33,7 +33,7 @@ export function StockDetailsTable({
   const [entryPercentage, setEntryPercentage] = useState<number | string | null>(params.entryPercentage ?? null);
   const [stopPercentage, setStopPercentage] = useState<number | string | null>(params.stopPercentage ?? null);
   const [initialCapital, setInitialCapital] = useState<number | null>(params.initialCapital ?? null);
-  const [isOpenFocused, setIsOpenFocused] = useState(false);
+  const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
   const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
 
   const setupPanelRef = useRef<HTMLDivElement>(null);
@@ -237,10 +237,10 @@ export function StockDetailsTable({
   // Columns configuration
   const columns = [
     { id: "date", label: "Date", width: "w-24" },
-    { id: "open", label: "Open", width: "w-20" },
+    { id: "entryPrice", label: "Open", width: "w-20" },
     { id: "high", label: "High", width: "w-20" },
     { id: "low", label: "Low", width: "w-20" },
-    { id: "close", label: "Close", width: "w-20" },
+    { id: "exitPrice", label: "Close", width: "w-20" },
     { id: "volume", label: "Volume", width: "w-24" },
     { id: "suggestedEntryPrice", label: "Suggested Entry", width: "w-28" },
     { id: "actualPrice", label: "Actual Price", width: "w-24" },
@@ -343,14 +343,14 @@ export function StockDetailsTable({
                 <Input 
                   type="text"
                   inputMode="decimal"
-                  value={isOpenFocused 
+                  value={isEntryPriceFocused 
                          ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
                          : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
-                  onFocus={() => setIsOpenFocused(true)}
+                  onFocus={() => setIsEntryPriceFocused(true)}
                   onBlur={() => {
                     handleBlurFormatting(entryPercentage, setEntryPercentage);
-                    setIsOpenFocused(false);
+                    setIsEntryPriceFocused(false);
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
