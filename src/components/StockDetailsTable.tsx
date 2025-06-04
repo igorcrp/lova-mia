@@ -123,9 +123,9 @@ export function StockDetailsTable({
   function formatTradeValue(trade: string) {
     if (typeof trade !== "string" || !trade) return <span>-</span>;
 
-    if (trade.includes(" / ")) {
+    if (trade.includes("/")) {
       // Exemplo: "Buy/Closed" ou "Sell/Closed"
-      const [firstPart, secondPart] = trade.split(" / ");
+      const [firstPart, secondPart] = trade.split("/");
       return (
         <>
           <span className={
