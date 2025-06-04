@@ -60,13 +60,13 @@ export function StockDetailsTable({
         
         const data = result.tradeHistory.map(item => ({
           ...item,
-          // Mantém os valores originais para high, low, open e close
+          // Keep the original values without any transformation
           high: item.high ?? null,
           low: item.low ?? null,
-          open: item.open ?? null, // Preserva o valor original
-          close: item.close ?? null, // Preserva o valor original
+          open: item.open ?? null,
+          close: item.close ?? null,
           volume: item.volume ?? null,
-          // Converte apenas os campos que devem ser numéricos
+          // Only transform numeric fields that need calculation
           profitLoss: Number(item.profitLoss) || 0,
           currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
             ? Number(item.currentCapital) 
@@ -75,10 +75,11 @@ export function StockDetailsTable({
           stopTrigger: calculateStopTrigger(item, params.operation)
         }));
       
-        // Sort data
+        // Update sorting to handle null values properly
         return [...data].sort((a, b) => {
           const valA = a[sortField];
           const valB = b[sortField];
+          
           if (sortField === "date") {
             const dateA = new Date(valA as string);
             const dateB = new Date(valB as string);
@@ -86,12 +87,14 @@ export function StockDetailsTable({
               ? dateA.getTime() - dateB.getTime() 
               : dateB.getTime() - dateA.getTime();
           }
-          // Para campos numéricos, trata os valores null ou "-" como 0
-          if (["high", "low", "open", "close", "volume"].includes(sortField)) {
-            const numA = valA === "-" || valA === null ? 0 : Number(valA);
-            const numB = valB === "-" || valB === null ? 0 : Number(valB);
+          
+          // Special handling for open, close, high, low fields
+          if (["open", "close", "high", "low"].includes(sortField)) {
+            const numA = valA === null || valA === "-" ? -Infinity : Number(valA);
+            const numB = valB === null || valB === "-" ? -Infinity : Number(valB);
             return sortDirection === "asc" ? numA - numB : numB - numA;
           }
+          
           const numA = Number(valA) || 0;
           const numB = Number(valB) || 0;
           return sortDirection === "asc" ? numA - numB : numB - numA;
