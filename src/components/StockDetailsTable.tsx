@@ -237,10 +237,10 @@ export function StockDetailsTable({
   // Columns configuration
   const columns = [
     { id: "date", label: "Date", width: "w-24" },
-    { id: "entryPrice", label: "Open", width: "w-20" },
+    { id: "open", label: "Open", width: "w-20" },
     { id: "high", label: "High", width: "w-20" },
     { id: "low", label: "Low", width: "w-20" },
-    { id: "exitPrice", label: "Close", width: "w-20" },
+    { id: "close", label: "Close", width: "w-20" }, // <-- corrigido aqui!
     { id: "volume", label: "Volume", width: "w-24" },
     { id: "suggestedEntryPrice", label: "Suggested Entry", width: "w-28" },
     { id: "actualPrice", label: "Actual Price", width: "w-24" },
