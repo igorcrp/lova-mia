@@ -449,10 +449,27 @@ export function StockDetailsTable({
                                Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
                           } ${
                             column.id === "trade" ?
-                              (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" :
-                               item.trade === "Closed" ? "text-yellow-600"
-                               item.trade === "Buy/Closed" ? "Buy" === "text-green-600", "Closed" === "text-yellow-600" : "") : ""
+                              (item.trade.includes("/") ? 
+                                // Para strings com "/" como "Buy/Closed" ou "Sell/Closed"
+                                item.trade.split("/").map((part, index) => (
+                                  <span key={index} className={
+                                    part === "Buy" ? "text-green-600" :
+                                    part === "Sell" ? "text-red-600" :
+                                    part === "Closed" ? "text-yellow-600" : ""
+                                  }>
+                                    {part}{index === 0 ? "/" : ""}
+                                  </span>
+                                ))
+                                :
+                                // Para strings simples como "Buy", "Sell" ou "Closed"
+                                <span className={
+                                  item.trade === "Buy" ? "text-green-600" :
+                                  item.trade === "Sell" ? "text-red-600" :
+                                  item.trade === "Closed" ? "text-yellow-600" : ""
+                                }>
+                                  {item.trade}
+                                </span>
+                              ) : ""
                           }`}
                         >
                           {formattedValue}
