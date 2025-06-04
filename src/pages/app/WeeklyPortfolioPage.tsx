@@ -43,22 +43,39 @@ function getReferencePrice(day: TradeHistoryItem, referencePriceKey: string): nu
   return typeof price === 'number' ? price : 0;
 }
 
+// Formula 5.11: Stop Price Calculation
 function calculateStopPrice(entryPrice: number, params: StockAnalysisParams): number {
   const stopPercent = params.stopPercentage ?? 0;
+  // 5.11.1 Buy: Actual Price – (Actual Price * % Stop)
+  // 5.11.2 Sell: Actual Price + (Actual Price * % Stop)
   return entryPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
 }
 
+// Formula 5.12: Check Stop Trigger Condition
 function checkStopLoss(currentDay: TradeHistoryItem, stopPrice: number, operation: string): boolean {
   const low = typeof currentDay.low === 'number' ? currentDay.low : -Infinity;
   const high = typeof currentDay.high === 'number' ? currentDay.high : Infinity;
+  // 5.12.1 Buy: Se “Low” < “Stop Price” (Using <= for safety)
+  // 5.12.2 Sell: Se “High” > “Stop Price” (Using >= for safety)
   return operation === 'buy' ? low <= stopPrice : high >= stopPrice;
 }
 
-function calculateProfit(entryPrice: number | undefined, exitPrice: number | undefined, operation: string, lotSize: number | undefined): number {
+// Formula 5.13: Profit/Loss Calculation
+function calculateProfit(
+    entryPrice: number | undefined, 
+    exitPrice: number | undefined, 
+    operation: string, 
+    lotSize: number | undefined
+): number {
   if (entryPrice === undefined || exitPrice === undefined || lotSize === undefined || lotSize === 0) return 0;
   const numEntryPrice = Number(entryPrice);
   const numExitPrice = Number(exitPrice);
   if (isNaN(numEntryPrice) || isNaN(numExitPrice)) return 0;
+  
+  // Formula: [(Exit Price – Entry Price) * Lot Size] for Buy
+  // Formula: [(Entry Price - Exit Price) * Lot Size] for Sell (implicitly handled by the subtraction order)
+  // Note: Formula 5.13.1 uses Stop Price as Exit Price, 5.13.2 uses Close as Exit Price.
+  // The exitPrice parameter passed to this function should be the correct one (Stop or Close).
   return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
 }
 
@@ -122,7 +139,7 @@ export default function WeeklyPortfolioPage() {
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
 
-  // --- processWeeklyTrades function - REVISED for Requirements 1, 2, 3 --- 
+  // --- processWeeklyTrades function - REVISED for v4 --- 
   const processWeeklyTrades = (
     fullHistory: TradeHistoryItem[], 
     params: StockAnalysisParams
@@ -130,13 +147,13 @@ export default function WeeklyPortfolioPage() {
     
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
 
-    const tradeExecutionHistory: TradeHistoryItem[] = []; // Stores only actual trade actions (Buy, Sell, Closed, Buy/Closed, Sell/Closed)
+    const tradeExecutionHistory: TradeHistoryItem[] = []; // Stores only actual trade actions
     const finalTradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] = [];
     const sortedHistory = [...fullHistory].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime());
     let currentCapital = params.initialCapital;
     const tradesByWeek: { [weekKey: string]: TradeHistoryItem[] } = {};
 
-    // Group trades by week (using original raw data)
+    // Group trades by week
     sortedHistory.forEach(trade => {
       const tradeDate = new Date(trade.date + 'T00:00:00Z');
       if (isNaN(tradeDate.getTime())) { console.warn(`Invalid date: ${trade.date}`); return; }
@@ -158,27 +175,76 @@ export default function WeeklyPortfolioPage() {
         const currentDate = new Date(currentDayData.date + 'T00:00:00Z');
         if (isNaN(currentDate.getTime())) continue;
 
-        // --- Entry Logic ---
+        // --- Entry Logic (First Business Day) ---
         if (!activeTradeEntry && !entryAttemptMadeThisWeek && !stopHitThisWeek && isMondayOrFirstBusinessDay(currentDate)) {
           entryAttemptMadeThisWeek = true;
           const previousDay = findPreviousDay(sortedHistory, currentDayData.date);
-          if (previousDay && previousDay.exitPrice !== undefined) {
-            const potentialEntryPrice = previousDay.exitPrice;
-            const referencePrice = getReferencePrice(previousDay, params.referencePrice);
-            const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
 
-            if ((params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold)) {
-              const lotSize = currentCapital / potentialEntryPrice;
+          if (previousDay && previousDay.close !== undefined) { // Use previous day's close as reference price basis
+            const refPrice = getReferencePrice(previousDay, params.referencePrice); // Get the actual reference price (e.g., 'close')
+            
+            // Formula 5.7: Suggested Entry Price
+            const suggestedEntryPrice = refPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (params.entryPercentage / 100));
+            
+            // Formula 5.8: Actual Price (Simplified: using suggested price for now, as rule is unclear for Sell)
+            // User rule: "Se o Open <= Suggested Entry, então considera o menor valor (open)" - applies to Buy.
+            // For Sell, the equivalent might be "If Open >= Suggested Entry, use Open".
+            // Let's use the suggestedEntryPrice as the potential entry for condition check, and refine actual price later if needed.
+            const potentialEntryPrice = suggestedEntryPrice; // Using suggested as the trigger point
+            let actualEntryPrice = potentialEntryPrice; // Default actual price
+            let entryConditionMet = false;
+
+            // Formula 5.9: Trade Execution Condition
+            if (params.operation === 'buy') {
+                // 5.9.1 Buy: Se Actual Price <= Suggested Entry ou se low <= Suggested Entry
+                // Let's check Open and Low against Suggested Entry
+                if ((currentDayData.open && currentDayData.open <= suggestedEntryPrice) || (currentDayData.low && currentDayData.low <= suggestedEntryPrice)) {
+                    entryConditionMet = true;
+                    // Rule 5.8 refinement: If Open <= Suggested, use Open if it's lower
+                    if (currentDayData.open && currentDayData.open <= suggestedEntryPrice) {
+                        actualEntryPrice = currentDayData.open; // Use Open as actual entry price
+                    } else {
+                        actualEntryPrice = suggestedEntryPrice; // Otherwise, assume entry at suggested (or low, but using suggested is simpler)
+                    }
+                }
+            } else { // Sell Operation
+                // 5.9.2 Sell: Se Actual Price >= Suggested Entry ou se High >= Suggested Entry
+                // Let's check Open and High against Suggested Entry
+                 if ((currentDayData.open && currentDayData.open >= suggestedEntryPrice) || (currentDayData.high && currentDayData.high >= suggestedEntryPrice)) {
+                    entryConditionMet = true;
+                    // Equivalent of Rule 5.8 for Sell: If Open >= Suggested, use Open
+                     if (currentDayData.open && currentDayData.open >= suggestedEntryPrice) {
+                        actualEntryPrice = currentDayData.open; // Use Open as actual entry price
+                    } else {
+                        actualEntryPrice = suggestedEntryPrice; // Otherwise, assume entry at suggested
+                    }
+                }
+            }
+
+            if (entryConditionMet) {
+              // Formula 5.10: Lot Size (Round down to nearest 10)
+              const calculatedLotSize = (currentCapital / actualEntryPrice);
+              const lotSize = Math.floor(calculatedLotSize / 10) * 10;
+              
+              if (lotSize <= 0) { // Cannot enter trade if lot size is zero or less
+                  console.warn(`Skipping entry on ${currentDayData.date}: Lot size is ${lotSize}`);
+                  activeTradeEntry = null; // Ensure no trade is considered active
+                  continue; // Skip to next day
+              }
+
+              // Formula 5.11: Stop Price
+              const calculatedStopPrice = calculateStopPrice(actualEntryPrice, params);
+              
               const entryDayRecord: TradeHistoryItem = {
-                ...currentDayData, // Base data for the day
-                trade: (params.operation === 'buy' ? 'Buy' : 'Sell'),
-                suggestedEntryPrice: potentialEntryPrice,
-                actualPrice: potentialEntryPrice,
-                stopPrice: calculateStopPrice(potentialEntryPrice, params),
+                ...currentDayData, 
+                trade: (params.operation === 'buy' ? 'Buy' : 'Sell'), // Set trade type
+                suggestedEntryPrice: suggestedEntryPrice,
+                actualPrice: actualEntryPrice, // Use determined actual entry price
+                stopPrice: calculatedStopPrice,
                 lotSize: lotSize,
-                stop: '-',
-                profit: undefined, // Profit calculated on close
-                capital: undefined // Capital calculated later
+                stop: '-', // Initial stop status
+                profit: undefined, 
+                capital: undefined 
               };
               activeTradeEntry = { ...entryDayRecord }; // Store the state when trade was opened
               stopPriceCalculated = entryDayRecord.stopPrice;
@@ -186,20 +252,22 @@ export default function WeeklyPortfolioPage() {
 
               // --- Check for SAME-DAY Stop Loss ---
               if (stopPriceCalculated) {
+                 // Formula 5.12: Check Stop Trigger
                  const stopHitToday = checkStopLoss(currentDayData, stopPriceCalculated, params.operation);
                  if (stopHitToday) {
-                    const exitPrice = stopPriceCalculated;
+                    const exitPrice = stopPriceCalculated; // Formula 5.13.1 uses Stop Price as Exit
+                    // Formula 5.13: Calculate Profit
                     const profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
+                    
                     // Update the previously pushed entry record for this day
                     const entryIndex = tradeExecutionHistory.length - 1;
                     if (tradeExecutionHistory[entryIndex]?.date === currentDayData.date) {
                         tradeExecutionHistory[entryIndex] = {
                             ...tradeExecutionHistory[entryIndex],
                             trade: `${params.operation === 'buy' ? 'Buy' : 'Sell'}/Closed`, // Mark as Buy/Closed or Sell/Closed
-                            stop: 'Executed',
+                            stop: 'Executed', // Formula 5.12 result
                             profit: profit, // Record profit for this day
                             exitPrice: exitPrice,
-                            // Capital will be calculated later
                         };
                          // Create pair for analysis
                         finalTradePairs.push({ open: { ...activeTradeEntry }, close: { ...tradeExecutionHistory[entryIndex] } });
@@ -208,7 +276,7 @@ export default function WeeklyPortfolioPage() {
                     }
                     activeTradeEntry = null; // Trade is closed
                     stopPriceCalculated = null;
-                    stopHitThisWeek = true; // Prevent new entries
+                    stopHitThisWeek = true; // Prevent new entries this week
                  }
               }
             }
@@ -219,16 +287,18 @@ export default function WeeklyPortfolioPage() {
         if (activeTradeEntry && stopPriceCalculated && currentDayData.date !== activeTradeEntry.date) {
           let closedToday = false;
           // --- Check Stop Loss ---
+          // Formula 5.12: Check Stop Trigger
           const stopHit = checkStopLoss(currentDayData, stopPriceCalculated, params.operation);
           if (stopHit) {
-            const exitPrice = stopPriceCalculated;
+            const exitPrice = stopPriceCalculated; // Formula 5.13.1 uses Stop Price as Exit
+            // Formula 5.13: Calculate Profit
             const profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
             const closeRecord: TradeHistoryItem = {
-              ...currentDayData, // Base data for the day
+              ...currentDayData, 
               trade: 'Closed',
-              stop: 'Executed',
+              stop: 'Executed', // Formula 5.12 result
               profit: profit,
-              capital: undefined, // Calculated later
+              capital: undefined, 
               suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
               actualPrice: activeTradeEntry.actualPrice,
               stopPrice: activeTradeEntry.stopPrice,
@@ -246,15 +316,17 @@ export default function WeeklyPortfolioPage() {
 
           // --- Check Friday/Last Day Close ---
           if (!closedToday && isFridayOrLastBusinessDay(currentDate)) {
+            // Formula 5.13.2 uses Close of the current day as Exit Price
             const exitPrice = typeof currentDayData.close === 'number' ? currentDayData.close : undefined;
             if (exitPrice !== undefined) {
+              // Formula 5.13: Calculate Profit
               const profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
               const closeRecord: TradeHistoryItem = {
-                ...currentDayData, // Base data for the day
+                ...currentDayData, 
                 trade: 'Closed',
-                stop: '-',
+                stop: '-', // Not closed by stop trigger
                 profit: profit,
-                capital: undefined, // Calculated later
+                capital: undefined, 
                 suggestedEntryPrice: activeTradeEntry.suggestedEntryPrice,
                 actualPrice: activeTradeEntry.actualPrice,
                 stopPrice: activeTradeEntry.stopPrice,
@@ -274,7 +346,7 @@ export default function WeeklyPortfolioPage() {
       } // End of week's daily loop
     }); // End of weekly loop
 
-    // --- Generate Full History with Capital Calculation (Requirement 1 & 2) --- 
+    // --- Generate Full History with Capital Calculation --- 
     const completeHistoryWithCapital: TradeHistoryItem[] = [];
     const tradeExecutionMap = new Map(tradeExecutionHistory.map(item => [item.date, item]));
     let previousDayCapital = params.initialCapital; // Initialize with initial capital
@@ -293,14 +365,15 @@ export default function WeeklyPortfolioPage() {
             // Skip weekends or days not in raw data (e.g., holidays)
             if (rawDayData) { 
                 const tradeAction = tradeExecutionMap.get(currentDateStr);
-                let dailyProfit = tradeAction?.profit ?? 0;
+                // Profit is ONLY defined in tradeAction if a trade closed on this day
+                let dailyProfit = tradeAction?.profit ?? 0; 
                 let currentDayCapital: number;
 
-                // Requirement 2: Initial Capital Logic & Daily Calculation
+                // Formula 5.14: Current Capital Calculation
                 if (currentDateStr === firstDayStr) {
                     // First day starts with initial capital
                     currentDayCapital = params.initialCapital;
-                    // If a same-day close happened, add its profit *to the first day's capital*
+                    // If a same-day close happened, add its profit to the first day's capital
                     if (tradeAction && (tradeAction.trade === 'Buy/Closed' || tradeAction.trade === 'Sell/Closed')) {
                         currentDayCapital += dailyProfit;
                     }
@@ -314,20 +387,21 @@ export default function WeeklyPortfolioPage() {
                 }
                 
                 const displayRecord: TradeHistoryItem = {
-                    ...(rawDayData), // Base O, H, L, C, V data
+                    // Start with raw data (includes Open, High, Low, Close, Volume)
+                    ...(rawDayData),
                     // Overwrite with trade action details if they exist for this day
                     date: currentDateStr,
-                    // Assign the correct trade string. Coloring MUST be handled in the display component (e.g., StockDetailView)
-                    // based on the content of this string.
-                    trade: tradeAction?.trade ?? '-', // Use the direct trade action string ('Buy', 'Sell', 'Closed', 'Buy/Closed', 'Sell/Closed', or '-')
+                    trade: tradeAction?.trade ?? '-', // Use the direct trade action string
                     suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
                     actualPrice: tradeAction?.actualPrice,
                     lotSize: tradeAction?.lotSize ?? 0,
                     stopPrice: tradeAction?.stopPrice,
-                    stop: tradeAction?.stop ?? '-',
-                    profit: tradeAction?.profit, // Show profit only on the day it occurred
+                    stop: tradeAction?.stop ?? '-', // Show 'Executed' only if stop triggered the close
+                    // IMPORTANT: Assign profit ONLY if it was calculated for this day's trade action
+                    profit: tradeAction?.profit, // Will be undefined if no trade closed today
                     exitPrice: tradeAction?.exitPrice,
                     capital: currentDayCapital, // Calculated capital for the end of this day
+                    // Ensure 'close' from rawData is preserved (it's already included via ...rawDayData)
                 };
                 completeHistoryWithCapital.push(displayRecord);
                 previousDayCapital = currentDayCapital; // Update capital for the next day's calculation
@@ -350,7 +424,7 @@ export default function WeeklyPortfolioPage() {
       setAnalysisParams(params);
       setProgress(0);
       setShowDetailView(false);
-      console.info('Running weekly analysis (v3.1 - Final) with params:', params);
+      console.info('Running weekly analysis (v4 - Sell Logic Corrected) with params:', params);
       setProgress(10);
       let dataTableName = params.dataTableName || await api.marketData.getDataTableName(params.country, params.stockMarket, params.assetClass);
       if (!dataTableName) throw new Error("Failed to identify data source");
@@ -433,7 +507,7 @@ export default function WeeklyPortfolioPage() {
       setProgress(95);
       setAnalysisResults(processedResults);
       setProgress(100);
-      toast({ title: "Weekly analysis completed", description: "Analysis was completed successfully (v3.1 logic)." });
+      toast({ title: "Weekly analysis completed", description: "Analysis was completed successfully (v4 logic)." });
     } catch (error) { console.error("Weekly analysis failed", error); toast({ variant: "destructive", title: "Analysis failed", description: error instanceof Error ? error.message : "Unknown error" }); setProgress(0); }
     finally { setTimeout(() => setIsLoading(false), 500); }
   };
@@ -519,7 +593,7 @@ export default function WeeklyPortfolioPage() {
      setAnalysisParams(updatedParams); 
      // Re-run the detail view logic with new params
      await viewDetails(selectedAsset); // Re-use viewDetails to fetch and process with updated params
-     toast({ title: "Analysis Updated", description: "Detailed view updated (v3.1 logic)." });
+     toast({ title: "Analysis Updated", description: "Detailed view updated (v4 logic)." });
   };
 
   // closeDetails function (kept from v2)
@@ -531,11 +605,7 @@ export default function WeeklyPortfolioPage() {
 
   // --- RETURN JSX --- 
   // IMPORTANT: The StockDetailView component needs to be modified to apply colors
-  // to the 'Trade' column based on its string content:
-  // - If text is 'Buy' or 'Sell', apply green color.
-  // - If text is 'Closed', apply red color.
-  // - If text is 'Buy/Closed' or 'Sell/Closed', apply green to 'Buy'/'Sell', default to '/', and red to 'Closed'.
-  // This typically involves conditional rendering or CSS classes within StockDetailView.
+  // to the 'Trade' column based on its string content.
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Weekly Portfolio</h1>
@@ -584,3 +654,4 @@ const addDays = (date: Date, days: number): Date => {
     result.setUTCDate(result.getUTCDate() + days);
     return result;
 };
+
