@@ -389,7 +389,7 @@ export function StockDetailsTable({
                             formattedValue = item.stopTrigger || "-";
                           } else if (column.id === "trade") {
                             formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                          } else if (column.id === "entryPrice" || column.id === "exitPrice") {
+                          } else if (column.id === "open" || column.id === "open") {
                             // Tratamento específico para Open e Close
                             formattedValue = value === 0 ? "-" : Number(value).toFixed(2);
                           } else if (typeof value === "number") {
