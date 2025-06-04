@@ -125,7 +125,7 @@ export function StockDetailsTable({
 
     if (trade.includes("/")) {
       // Exemplo: "Buy/Closed" ou "Sell/Closed"
-      const [firstPart, secondPart] = trade.split("/");
+      const [firstPart, secondPart] = trade.split(" / ");
       return (
         <>
           <span className={
