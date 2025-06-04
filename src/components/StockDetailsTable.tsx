@@ -24,7 +24,7 @@ export function StockDetailsTable({
   onUpdateParams,
   isLoading = false
 }: StockDetailsTableProps) {
-  // State
+  // State management
   const [sortField, setSortField] = useState<keyof TradeHistoryItem>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,14 +40,17 @@ export function StockDetailsTable({
   const [chartHeight, setChartHeight] = useState(400);
   const isMobile = useIsMobile();
 
+  // Update chart height to match setup panel
   useEffect(() => {
     const updateHeight = () => {
       if (setupPanelRef.current) {
         setChartHeight(setupPanelRef.current.clientHeight);
       }
     };
+
     const timer = setTimeout(updateHeight, 100);
     window.addEventListener('resize', updateHeight);
+    
     return () => {
       clearTimeout(timer);
       window.removeEventListener('resize', updateHeight);
@@ -57,14 +60,10 @@ export function StockDetailsTable({
   // Process and sort data
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
-    // Garante dados numéricos ou null
+    
+    // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
-      open: item.open !== undefined && item.open !== null && item.open !== '' ? Number(item.open) : null,
-      high: item.high !== undefined && item.high !== null && item.high !== '' ? Number(item.high) : null,
-      low: item.low !== undefined && item.low !== null && item.low !== '' ? Number(item.low) : null,
-      close: item.close !== undefined && item.close !== null && item.close !== '' ? Number(item.close) : null,
-      volume: item.volume !== undefined && item.volume !== null && item.volume !== '' ? Number(item.volume) : null,
       profitLoss: Number(item.profitLoss) || 0,
       currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
         ? Number(item.currentCapital) 
@@ -77,6 +76,7 @@ export function StockDetailsTable({
     return [...data].sort((a, b) => {
       const valA = a[sortField];
       const valB = b[sortField];
+
       if (sortField === "date") {
         const dateA = new Date(valA as string);
         const dateB = new Date(valB as string);
@@ -84,23 +84,84 @@ export function StockDetailsTable({
           ? dateA.getTime() - dateB.getTime() 
           : dateB.getTime() - dateA.getTime();
       }
+
+      // Numeric comparison for other fields
       const numA = Number(valA) || 0;
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
 
-  // Stop trigger auxiliary
-  function calculateStopTrigger(item: any, operation: string): string {
-    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) return "-";
+  // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
+  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+        return "-";
+    }
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
-    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) return "-";
+    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
+        return "-";
+    }
     const lowerCaseOperation = operation?.toLowerCase();
-    if (lowerCaseOperation === 'buy') return low < stopPrice ? "Executed" : "-";
-    else if (lowerCaseOperation === 'sell') return high > stopPrice ? "Executed" : "-";
-    else return "-";
+    if (lowerCaseOperation === 'buy') {
+        return low < stopPrice ? "Executed" : "-";
+    } else if (lowerCaseOperation === 'sell') {
+        return high > stopPrice ? "Executed" : "-";
+    } else {
+        return "-";
+    }
+  }
+
+  // Função para formatar o valor do trade com cores
+  function formatTradeValue(trade: string) {
+    if (typeof trade !== "string" || !trade) return <span>-</span>;
+
+    if (trade.includes("/")) {
+      // Exemplo: "Buy/Closed" ou "Sell/Closed"
+      const [firstPart, secondPart] = trade.split("/");
+      return (
+        <>
+          <span className={
+            firstPart === "Buy"
+              ? "text-green-600"
+              : firstPart === "Sell"
+              ? "text-red-600"
+              : ""
+          }>
+            {firstPart}
+          </span>
+          <span>/</span>
+          <span className={
+            secondPart === "Closed"
+              ? "text-yellow-600"
+              : ""
+          }>
+            {secondPart}
+          </span>
+        </>
+      );
+    } else {
+      return (
+        <span className={
+          trade === "Buy"
+            ? "text-green-600"
+            : trade === "Sell"
+            ? "text-red-600"
+            : trade === "Closed"
+            ? "text-yellow-600"
+            : ""
+        }>
+          {trade}
+        </span>
+      );
+    }
   }
 
   // Pagination
@@ -113,8 +174,9 @@ export function StockDetailsTable({
 
   // Handlers
   const handleSortChange = (field: keyof TradeHistoryItem) => {
-    if (sortField === field) setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    else {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
       setSortField(field);
       setSortDirection("desc");
     }
@@ -156,10 +218,12 @@ export function StockDetailsTable({
       const day = String(date.getUTCDate()).padStart(2, '0');
       const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const year = date.getUTCFullYear();
-      if (isNaN(date.getTime())) return dateString;
+      if (isNaN(date.getTime())) {
+          return dateString;
+      }
       return `${day}/${month}/${year}`;
     } catch {
-      return dateString;
+        return dateString;
     }
   };
 
@@ -170,13 +234,13 @@ export function StockDetailsTable({
       : <ChevronDown className="h-4 w-4 ml-1" />;
   };
 
-  // Columns configuration (fiel ao banco!)
+  // Columns configuration
   const columns = [
     { id: "date", label: "Date", width: "w-24" },
-    { id: "open", label: "Open", width: "w-20" },
+    { id: "entryPrice", label: "Open", width: "w-20" },
     { id: "high", label: "High", width: "w-20" },
     { id: "low", label: "Low", width: "w-20" },
-    { id: "close", label: "Close", width: "w-20" },
+    { id: "exitPrice", label: "Close", width: "w-20" },
     { id: "volume", label: "Volume", width: "w-24" },
     { id: "suggestedEntryPrice", label: "Suggested Entry", width: "w-28" },
     { id: "actualPrice", label: "Actual Price", width: "w-24" },
@@ -249,6 +313,7 @@ export function StockDetailsTable({
             </ResponsiveContainer>
           </div>
         </div>
+        
         {/* Setup Panel */}
         <div ref={setupPanelRef} className={`${isMobile ? 'order-1' : 'md:col-span-1'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Stock Setup</h3>
@@ -271,6 +336,7 @@ export function StockDetailsTable({
                 </SelectContent>
               </Select>
             </div>
+            
             <div>
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
@@ -294,6 +360,7 @@ export function StockDetailsTable({
                 <span className="ml-2">%</span>
               </div>
             </div>
+            
             <div>
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
@@ -317,6 +384,7 @@ export function StockDetailsTable({
                 <span className="ml-2">%</span>
               </div>
             </div>
+            
             <div>
               <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
               <Input 
@@ -327,6 +395,7 @@ export function StockDetailsTable({
                 placeholder="e.g. 10000.00"
               />
             </div>
+            
             <Button 
               onClick={handleUpdateResults} 
               className="w-full" 
@@ -337,6 +406,7 @@ export function StockDetailsTable({
           </div>
         </div>
       </div>
+      
       {/* Table */}
       <div className="bg-card rounded-lg border overflow-hidden">
         <div className="overflow-x-auto">
@@ -377,27 +447,26 @@ export function StockDetailsTable({
                   >
                     {columns.map((column) => {
                       const value = item[column.id as keyof TradeHistoryItem];
-                        let formattedValue = "-";
-                        if (value !== undefined && value !== null) {
-                          if (column.id === "date") {
-                            formattedValue = formatDate(value as string);
-                          } else if (column.id === "profitLoss" || column.id === "currentCapital") {
-                            formattedValue = formatCurrency(value as number);
-                          } else if (column.id === "volume" || column.id === "lotSize") {
-                            formattedValue = (value as number).toLocaleString();
-                          } else if (column.id === "stopTrigger") {
-                            formattedValue = item.stopTrigger || "-";
-                          } else if (column.id === "trade") {
-                            formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                          } else if (column.id === "entryPrice" || column.id === "exitPrice") {
-                            // Tratamento específico para Open e Close
-                            formattedValue = value === 0 ? "-" : Number(value).toFixed(2);
-                          } else if (typeof value === "number") {
-                            formattedValue = value.toFixed(2);
-                          } else {
-                            formattedValue = String(value);
-                          }
+                      let formattedValue = "-";
+                      
+                      if (value !== undefined && value !== null) {
+                        if (column.id === "date") {
+                          formattedValue = formatDate(value as string);
+                        } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                          formattedValue = formatCurrency(value as number);
+                        } else if (column.id === "volume" || column.id === "lotSize") {
+                          formattedValue = (value as number).toLocaleString();
+                        } else if (column.id === "stopTrigger") {
+                          formattedValue = item.stopTrigger || "-";
+                        } else if (column.id === "trade") {
+                          formattedValue = value as string;
+                        } else if (typeof value === "number") {
+                          formattedValue = value.toFixed(2);
+                        } else {
+                          formattedValue = String(value);
                         }
+                      }
+                      
                       return (
                         <TableCell 
                           key={column.id}
@@ -407,13 +476,9 @@ export function StockDetailsTable({
                             column.id === "profitLoss" ? 
                               (Number(item.profitLoss) > 0 ? "text-green-600" : 
                                Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
-                          } ${
-                            column.id === "trade" ?
-                              (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" : "") : ""
                           }`}
                         >
-                          {formattedValue}
+                          {column.id === "trade" ? formatTradeValue(formattedValue) : formattedValue}
                         </TableCell>
                       );
                     })}
@@ -423,6 +488,8 @@ export function StockDetailsTable({
             </TableBody>
           </Table>
         </div>
+        
+        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
             <div className="flex items-center gap-2 mb-4 sm:mb-0">
@@ -440,6 +507,7 @@ export function StockDetailsTable({
                 ))}
               </select>
             </div>
+            
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
@@ -448,6 +516,7 @@ export function StockDetailsTable({
                     disabled={currentPage === 1}
                   />
                 </PaginationItem>
+                
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const pageNum = currentPage <= 3
                     ? i + 1
@@ -465,6 +534,7 @@ export function StockDetailsTable({
                     </PaginationItem>
                   );
                 })}
+                
                 <PaginationItem>
                   <PaginationNext 
                     onClick={() => handlePageChange(currentPage + 1)}
@@ -480,8 +550,8 @@ export function StockDetailsTable({
   );
 }
 
-// Funções auxiliares para inputs decimais
-const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
+// Função auxiliar para lidar com a entrada de números decimais positivos
+function handleDecimalInputChange(value: string, onChange: (val: number | string | null) => void) {
   if (value === "") {
     onChange(null);
     return;
@@ -489,7 +559,7 @@ const handleDecimalInputChange = (value: string, onChange: (val: number | string
   const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
   if (regex.test(value)) {
     if (value === "." || value.endsWith(".")) {
-       onChange(value);
+      onChange(value);
     } else {
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && numValue >= 0) {
@@ -501,14 +571,15 @@ const handleDecimalInputChange = (value: string, onChange: (val: number | string
   } else {
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue >= 0) {
-       onChange(parseFloat(numValue.toFixed(2)));
+      onChange(parseFloat(numValue.toFixed(2)));
     } else if (value === "") {
-       onChange(null);
+      onChange(null);
     }
   }
-};
+}
 
-const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
+// Função auxiliar para formatar no blur
+function handleBlurFormatting(value: number | string | null | undefined, onChange: (val: number | null) => void) {
   let numValue = 0;
   if (typeof value === "string") {
     if (value === ".") {
@@ -523,4 +594,4 @@ const handleBlurFormatting = (value: number | string | null | undefined, onChang
     return;
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-};
+}
