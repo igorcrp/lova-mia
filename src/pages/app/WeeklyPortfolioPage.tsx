@@ -287,13 +287,15 @@ const processWeeklyTrades = (
         }
 
         const displayRecord: TradeHistoryItem = {
-      // Always include the raw day data first
-          open: currentDayData.open,
-          high: currentDayData.high,
-          low: currentDayData.low,
-          close: currentDayData.close,
-          volume: currentDayData.volume,
-      // Then add the trade-specific data
+          // Always include the raw day data first
+          ...(rawDayData || {
+            open: 0,
+            high: 0,
+            low: 0,
+            close: 0,
+            volume: 0
+          }),
+          // Then add the trade-specific data
           date: currentDateStr,
           trade: tradeAction?.trade ?? '-',
           suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
