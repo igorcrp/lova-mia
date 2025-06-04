@@ -80,22 +80,19 @@ export interface TradeHistoryItem {
   entryPrice: number;
   exitPrice: number;
   profit?: number;
-  profitLoss?: number;
+  profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-';
-  stop?: 'Executed' | 'Close' | '-';
-  volume?: number | null;
-  high?: number | null;
-  low?: number | null;
-  // Add these fields with proper typing
-  open?: number | null;
-  close?: number | null;
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
+  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  volume?: number;
+  high?: number;
+  low?: number;
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
   stopPrice?: number;
-  capital?: number;
-  currentCapital?: number;
+  capital?: number; // Current capital after this trade
+  currentCapital?: number; // Add currentCapital property
 }
 
 export interface CapitalPoint {

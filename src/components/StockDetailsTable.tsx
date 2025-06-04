@@ -55,50 +55,40 @@ export function StockDetailsTable({
   }, []);
 
   // Process and sort data
-      const processedData = useMemo(() => {
-          if (!result?.tradeHistory?.length) return [];
-          
-          const data = result.tradeHistory.map(item => ({
-            ...item,
-            // Mantenha os valores originais, sem transformação
-            high: item.high,
-            low: item.low,
-            open: item.open,
-            close: item.close,
-            volume: item.volume,
-            profitLoss: Number(item.profitLoss) || 0,
-            currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
-              ? Number(item.currentCapital) 
-              : undefined,
-            trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-            stopTrigger: calculateStopTrigger(item, params.operation)
-          }));
-      
-        // Update sorting to handle null values properly
-          return [...data].sort((a, b) => {
-          const valA = a[sortField];
-          const valB = b[sortField];
-          
-          if (sortField === "date") {
-            const dateA = new Date(valA as string);
-            const dateB = new Date(valB as string);
-            return sortDirection === "asc" 
-              ? dateA.getTime() - dateB.getTime() 
-              : dateB.getTime() - dateA.getTime();
-          }
-          
-          // Special handling for open, close, high, low fields
-          if (["open", "close", "high", "low"].includes(sortField)) {
-            const numA = valA === null || valA === "-" ? -Infinity : Number(valA);
-            const numB = valB === null || valB === "-" ? -Infinity : Number(valB);
-            return sortDirection === "asc" ? numA - numB : numB - numA;
-          }
-          
-          const numA = Number(valA) || 0;
-          const numB = Number(valB) || 0;
-          return sortDirection === "asc" ? numA - numB : numB - numA;
-        });
-      }, [result, sortField, sortDirection, params.operation]);
+  const processedData = useMemo(() => {
+    if (!result?.tradeHistory?.length) return [];
+    // Garante dados numéricos ou null
+    const data = result.tradeHistory.map(item => ({
+      ...item,
+      open: item.open !== undefined && item.open !== null && item.open !== '' ? Number(item.open) : null,
+      high: item.high !== undefined && item.high !== null && item.high !== '' ? Number(item.high) : null,
+      low: item.low !== undefined && item.low !== null && item.low !== '' ? Number(item.low) : null,
+      close: item.close !== undefined && item.close !== null && item.close !== '' ? Number(item.close) : null,
+      volume: item.volume !== undefined && item.volume !== null && item.volume !== '' ? Number(item.volume) : null,
+      profitLoss: Number(item.profitLoss) || 0,
+      currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
+        ? Number(item.currentCapital) 
+        : undefined,
+      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
+      stopTrigger: calculateStopTrigger(item, params.operation)
+    }));
+
+    // Sort data
+    return [...data].sort((a, b) => {
+      const valA = a[sortField];
+      const valB = b[sortField];
+      if (sortField === "date") {
+        const dateA = new Date(valA as string);
+        const dateB = new Date(valB as string);
+        return sortDirection === "asc" 
+          ? dateA.getTime() - dateB.getTime() 
+          : dateB.getTime() - dateA.getTime();
+      }
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
+      return sortDirection === "asc" ? numA - numB : numB - numA;
+    });
+  }, [result, sortField, sortDirection, params.operation]);
 
   // Stop trigger auxiliary
   function calculateStopTrigger(item: any, operation: string): string {
@@ -386,62 +376,47 @@ export function StockDetailsTable({
                     className={"hover:bg-muted/50"}
                   >
                     {columns.map((column) => {
-                        const value = item[column.id as keyof TradeHistoryItem];
-                          let formattedValue = "-";
-                          
-                          if (value !== undefined && value !== null) {
-                            if (column.id === "date") {
-                              formattedValue = formatDate(value as string);
-                            } else if (column.id === "profitLoss" || column.id === "currentCapital") {
-                              formattedValue = formatCurrency(value as number);
-                            } else if (column.id === "volume" || column.id === "lotSize") {
-                              formattedValue = (value as number).toLocaleString();
-                            } else if (column.id === "stopTrigger") {
-                              formattedValue = item.stopTrigger || "-";
-                            } else if (column.id === "trade") {
-                              formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                            } else if (
-                              column.id === "open" ||
-                              column.id === "high" ||
-                              column.id === "low" ||
-                              column.id === "close"
-                            ) {
-                              // Nova lógica de formatação para valores numéricos
-                              if (value === "-" || value === "" || value === null || value === undefined) {
-                                formattedValue = "-";
-                              } else if (typeof value === "number") {
-                                formattedValue = value.toFixed(2);
-                              } else if (typeof value === "string" && !isNaN(Number(value))) {
-                                formattedValue = Number(value).toFixed(2);
-                              } else {
-                                formattedValue = "-";
-                              }
-                            } else if (typeof value === "number") {
-                              formattedValue = value.toFixed(2);
-                            } else {
-                              formattedValue = String(value);
-                            }
+                      const value = item[column.id as keyof TradeHistoryItem];
+                        let formattedValue = "-";
+                        if (value !== undefined && value !== null) {
+                          if (column.id === "date") {
+                            formattedValue = formatDate(value as string);
+                          } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                            formattedValue = formatCurrency(value as number);
+                          } else if (column.id === "volume" || column.id === "lotSize") {
+                            formattedValue = (value as number).toLocaleString();
+                          } else if (column.id === "stopTrigger") {
+                            formattedValue = item.stopTrigger || "-";
+                          } else if (column.id === "trade") {
+                            formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
+                          } else if (column.id === "entryPrice" || column.id === "exitPrice") {
+                            // Tratamento específico para Open e Close
+                            formattedValue = value === 0 ? "-" : Number(value).toFixed(2);
+                          } else if (typeof value === "number") {
+                            formattedValue = value.toFixed(2);
+                          } else {
+                            formattedValue = String(value);
                           }
-                        
-                          return (
-                            <TableCell 
-                              key={column.id}
-                              className={`text-center px-2 py-2 text-sm ${
-                                column.id === "currentCapital" ? "font-medium" : ""
-                              } ${
-                                column.id === "profitLoss" ? 
-                                  (Number(item.profitLoss) > 0 ? "text-green-600" : 
-                                   Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
-                              } ${
-                                column.id === "trade" ?
-                                  (item.trade === "Buy" ? "text-green-600" :
-                                   item.trade === "Sell" ? "text-red-600" : "") : ""
-                              }`}
-                            >
-                              {formattedValue}
-                            </TableCell>
-                          );
-                        })}
+                        }
+                      return (
+                        <TableCell 
+                          key={column.id}
+                          className={`text-center px-2 py-2 text-sm ${
+                            column.id === "currentCapital" ? "font-medium" : ""
+                          } ${
+                            column.id === "profitLoss" ? 
+                              (Number(item.profitLoss) > 0 ? "text-green-600" : 
+                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                          } ${
+                            column.id === "trade" ?
+                              (item.trade === "Buy" ? "text-green-600" :
+                               item.trade === "Sell" ? "text-red-600" : "") : ""
+                          }`}
+                        >
+                          {formattedValue}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}
