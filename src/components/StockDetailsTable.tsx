@@ -57,14 +57,16 @@ export function StockDetailsTable({
   // Process and sort data
       const processedData = useMemo(() => {
         if (!result?.tradeHistory?.length) return [];
-        // Apenas converte número se for realmente numérico, senão mantém original para exibir igual do banco
+        
         const data = result.tradeHistory.map(item => ({
           ...item,
+          // Mantém os valores originais para high, low, open e close
           high: item.high ?? null,
           low: item.low ?? null,
-          open: item.open ?? null,
-          close: item.close ?? null,
+          open: item.open ?? null, // Preserva o valor original
+          close: item.close ?? null, // Preserva o valor original
           volume: item.volume ?? null,
+          // Converte apenas os campos que devem ser numéricos
           profitLoss: Number(item.profitLoss) || 0,
           currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
             ? Number(item.currentCapital) 
@@ -72,23 +74,29 @@ export function StockDetailsTable({
           trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
           stopTrigger: calculateStopTrigger(item, params.operation)
         }));
-
-    // Sort data
-    return [...data].sort((a, b) => {
-      const valA = a[sortField];
-      const valB = b[sortField];
-      if (sortField === "date") {
-        const dateA = new Date(valA as string);
-        const dateB = new Date(valB as string);
-        return sortDirection === "asc" 
-          ? dateA.getTime() - dateB.getTime() 
-          : dateB.getTime() - dateA.getTime();
-      }
-      const numA = Number(valA) || 0;
-      const numB = Number(valB) || 0;
-      return sortDirection === "asc" ? numA - numB : numB - numA;
-    });
-  }, [result, sortField, sortDirection, params.operation]);
+      
+        // Sort data
+        return [...data].sort((a, b) => {
+          const valA = a[sortField];
+          const valB = b[sortField];
+          if (sortField === "date") {
+            const dateA = new Date(valA as string);
+            const dateB = new Date(valB as string);
+            return sortDirection === "asc" 
+              ? dateA.getTime() - dateB.getTime() 
+              : dateB.getTime() - dateA.getTime();
+          }
+          // Para campos numéricos, trata os valores null ou "-" como 0
+          if (["high", "low", "open", "close", "volume"].includes(sortField)) {
+            const numA = valA === "-" || valA === null ? 0 : Number(valA);
+            const numB = valB === "-" || valB === null ? 0 : Number(valB);
+            return sortDirection === "asc" ? numA - numB : numB - numA;
+          }
+          const numA = Number(valA) || 0;
+          const numB = Number(valB) || 0;
+          return sortDirection === "asc" ? numA - numB : numB - numA;
+        });
+      }, [result, sortField, sortDirection, params.operation]);
 
   // Stop trigger auxiliary
   function calculateStopTrigger(item: any, operation: string): string {
