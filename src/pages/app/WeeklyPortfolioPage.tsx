@@ -304,7 +304,7 @@ const processWeeklyTrades = (
           stopPrice: tradeAction?.stopPrice,
           stop: tradeAction?.stop ?? '-',
           profit: tradeAction?.profit,
-          exitPrice: tradeAction?.exitPrice,
+          exitPrice: rawDayData?.close ?? 0,
           capital: currentDayCapital,
         };
 
