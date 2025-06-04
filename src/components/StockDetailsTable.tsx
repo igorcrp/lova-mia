@@ -450,8 +450,7 @@ export function StockDetailsTable({
                           } ${
                             column.id === "trade" ?
                               (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" : "") :
-                               item.trade === "Closed" ? "text-yellow-600" : "") : ""
+                               item.trade === "Sell" ? "text-red-600" : "") : ""
                           }`}
                         >
                           {formattedValue}
