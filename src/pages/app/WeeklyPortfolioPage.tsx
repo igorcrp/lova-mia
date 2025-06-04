@@ -104,7 +104,7 @@ const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage
   return (totalReturnPercentage / 100 - riskFreeRate) / downsideDeviation;
 };
 
-// ---- CORRIGIDA: inclui todos os dias úteis no histórico, mesmo sem operação ----
+// ---- FIEL AOS DADOS DO BANCO: cada linha do histórico = cada linha do banco ----
 const processWeeklyTrades = (
   fullHistory: TradeHistoryItem[],
   params: StockAnalysisParams
@@ -252,66 +252,54 @@ const processWeeklyTrades = (
     }
   });
 
-  // Geração do histórico completo (agora inclui todos os dias úteis)
+  // HISTÓRICO FIEL: cada linha é igual ao banco, sem filtro
   const completeHistoryWithCapital: TradeHistoryItem[] = [];
   const tradeExecutionMap = new Map(tradeExecutionHistory.map(item => [item.date, item]));
   let previousDayCapital = params.initialCapital;
 
-  if (sortedHistory.length > 0) {
-    const firstDayStr = sortedHistory[0].date;
-    const lastDayStr = sortedHistory[sortedHistory.length - 1].date;
-    let currentDate = new Date(firstDayStr + 'T00:00:00Z');
-    const lastDate = new Date(lastDayStr + 'T00:00:00Z');
-    const rawDataMap = new Map(sortedHistory.map(item => [item.date, item]));
+  // Cada linha do banco é uma linha do histórico, sem ignorar nada
+  sortedHistory.forEach((rawDayData, idx) => {
+    const tradeAction = tradeExecutionMap.get(rawDayData.date);
+    const dailyProfit = tradeAction?.profit ?? 0;
 
-    while (currentDate <= lastDate) {
-      const currentDateStr = formatDateISO(currentDate);
-
-      // Só mostra dias úteis (segunda a sexta)
-      if (currentDate.getUTCDay() !== 0 && currentDate.getUTCDay() !== 6) {
-        const rawDayData = rawDataMap.get(currentDateStr);
-        const tradeAction = tradeExecutionMap.get(currentDateStr);
-        const dailyProfit = tradeAction?.profit ?? 0;
-
-        let currentDayCapital: number;
-        if (currentDateStr === firstDayStr) {
-          currentDayCapital = params.initialCapital;
-          if (tradeAction && (tradeAction.trade === 'Buy/Closed' || tradeAction.trade === 'Sell/Closed')) {
-            currentDayCapital += dailyProfit;
-          }
-        } else {
-          currentDayCapital = previousDayCapital;
-          if (tradeAction && (tradeAction.trade === 'Buy/Closed' || tradeAction.trade === 'Sell/Closed' || tradeAction.trade === 'Closed')) {
-            currentDayCapital += dailyProfit;
-          }
-        }
-
-        const displayRecord: TradeHistoryItem = {
-          ...(rawDayData || {
-            open: 0,
-            high: 0,
-            low: 0,
-            close: 0,
-            volume: 0
-          }),
-          date: currentDateStr,
-          trade: tradeAction?.trade ?? '-',
-          suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
-          actualPrice: tradeAction?.actualPrice,
-          lotSize: tradeAction?.lotSize ?? 0,
-          stopPrice: tradeAction?.stopPrice,
-          stop: tradeAction?.stop ?? '-',
-          profit: tradeAction?.profit,
-          exitPrice: tradeAction?.exitPrice,
-          capital: currentDayCapital,
-        };
-
-        completeHistoryWithCapital.push(displayRecord);
-        previousDayCapital = currentDayCapital;
+    let currentDayCapital: number;
+    if (idx === 0) {
+      currentDayCapital = params.initialCapital;
+      if (tradeAction && (tradeAction.trade === 'Buy/Closed' || tradeAction.trade === 'Sell/Closed')) {
+        currentDayCapital += dailyProfit;
       }
-      currentDate = addDays(currentDate, 1);
+    } else {
+      currentDayCapital = previousDayCapital;
+      if (tradeAction && (tradeAction.trade === 'Buy/Closed' || tradeAction.trade === 'Sell/Closed' || tradeAction.trade === 'Closed')) {
+        currentDayCapital += dailyProfit;
+      }
     }
-  }
+
+    // Garante que a coluna 'close' SEMPRE reflete o valor fiel do banco
+    const displayRecord: TradeHistoryItem = {
+      ...rawDayData,
+      date: rawDayData.date,
+      trade: tradeAction?.trade ?? '-',
+      suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
+      actualPrice: tradeAction?.actualPrice,
+      lotSize: tradeAction?.lotSize ?? 0,
+      stopPrice: tradeAction?.stopPrice,
+      stop: tradeAction?.stop ?? '-',
+      profit: tradeAction?.profit,
+      exitPrice: tradeAction?.exitPrice,
+      capital: currentDayCapital,
+      // As linhas abaixo garantem que o valor do banco seja exibido sempre,
+      // mesmo em dias sem operação.
+      open: rawDayData.open,
+      high: rawDayData.high,
+      low: rawDayData.low,
+      close: rawDayData.close,
+      volume: rawDayData.volume,
+    };
+
+    completeHistoryWithCapital.push(displayRecord);
+    previousDayCapital = currentDayCapital;
+  });
 
   return {
     processedHistory: completeHistoryWithCapital,
