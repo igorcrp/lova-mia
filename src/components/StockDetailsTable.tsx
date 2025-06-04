@@ -69,7 +69,6 @@ export function StockDetailsTable({
         ? Number(item.currentCapital) 
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-      // Calculate stop trigger here for consistency
       stopTrigger: calculateStopTrigger(item, params.operation)
     }));
 
@@ -95,44 +94,75 @@ export function StockDetailsTable({
 
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
-    // trade: string; // Removido, pois não é mais necessário para a lógica do Stop Trigger
     stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
-}
+  }
 
   function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
-    // Verifica se os dados necessários existem e são válidos
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
-        return "-"; // Retorna "-" se faltar Stop Price, Low ou High
+        return "-";
     }
-
-    // Converte os valores para número, tratando possíveis strings
     const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
-
-    // Verifica se as conversões foram bem sucedidas e se stopPrice é válido (> 0)
-    // Considera 0 como inválido para Stop Price, pois geralmente é usado como placeholder
     if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
-        return "-"; // Retorna "-" se a conversão falhar ou stopPrice for inválido
-    }
-
-    // Aplica a lógica de stop trigger baseada na operação (case-insensitive)
-    const lowerCaseOperation = operation?.toLowerCase(); // Garante que a comparação não seja sensível a maiúsculas/minúsculas
-
-    if (lowerCaseOperation === 'buy') {
-        // Para Buy: Low < Stop Price
-        return low < stopPrice ? "Executed" : "-";
-    } else if (lowerCaseOperation === 'sell') {
-        // Para Sell: High > Stop Price
-        return high > stopPrice ? "Executed" : "-";
-    } else {
-        // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
-        // console.warn(`calculateStopTrigger: Operação desconhecida ou inválida: ${operation}`); // Adiciona um aviso para depuração (opcional)
         return "-";
     }
-}
+    const lowerCaseOperation = operation?.toLowerCase();
+    if (lowerCaseOperation === 'buy') {
+        return low < stopPrice ? "Executed" : "-";
+    } else if (lowerCaseOperation === 'sell') {
+        return high > stopPrice ? "Executed" : "-";
+    } else {
+        return "-";
+    }
+  }
+
+  // Função para formatar o valor do trade com cores
+  function formatTradeValue(trade: string) {
+    if (typeof trade !== "string" || !trade) return <span>-</span>;
+
+    if (trade.includes("/")) {
+      // Exemplo: "Buy/Closed" ou "Sell/Closed"
+      const [firstPart, secondPart] = trade.split("/");
+      return (
+        <>
+          <span className={
+            firstPart === "Buy"
+              ? "text-green-600"
+              : firstPart === "Sell"
+              ? "text-red-600"
+              : ""
+          }>
+            {firstPart}
+          </span>
+          <span>/</span>
+          <span className={
+            secondPart === "Closed"
+              ? "text-yellow-600"
+              : ""
+          }>
+            {secondPart}
+          </span>
+        </>
+      );
+    } else {
+      return (
+        <span className={
+          trade === "Buy"
+            ? "text-green-600"
+            : trade === "Sell"
+            ? "text-red-600"
+            : trade === "Closed"
+            ? "text-yellow-600"
+            : ""
+        }>
+          {trade}
+        </span>
+      );
+    }
+  }
 
   // Pagination
   const totalItems = processedData.length;
@@ -245,14 +275,14 @@ export function StockDetailsTable({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={result.capitalEvolution || []}
-                margin={{ top: 0, right: 0, left: 0, bottom: 0 }} // Remove margins
+                margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <Tooltip 
-                  cursor={false} // Remove vertical line on hover
+                  cursor={false}
                   content={({ active, payload }) => (
                     active && payload?.length ? (
-                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm"> {/* Reduced padding and font size */}
-                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p> {/* Added small bottom margin */}
+                      <div className="bg-background border rounded-md p-2 shadow-lg text-sm">
+                        <p className="font-medium mb-0.5">{formatDate(payload[0].payload.date)}</p>
                         <p className="text-primary">Capital: {formatCurrency(payload[0].payload.capital)}</p>
                       </div>
                     ) : null
@@ -270,11 +300,11 @@ export function StockDetailsTable({
                 <Line
                   type="monotone"
                   dataKey="capital"
-                  stroke="#00ffff" // Neon cyan color
+                  stroke="#00ffff"
                   strokeWidth={2}
-                  dot={false} // No dots by default, maybe add activeDot styling
-                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
-                  filter="url(#glow)" // Apply glow effect
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }}
+                  filter="url(#glow)"
                   isAnimationActive={true}
                   animationDuration={2000}
                   animationEasing="ease-in-out"
@@ -311,11 +341,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Entry Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isEntryPriceFocused 
                          ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
-                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
                   onFocus={() => setIsEntryPriceFocused(true)}
                   onBlur={() => {
@@ -324,8 +354,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 1.50"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -335,11 +365,11 @@ export function StockDetailsTable({
               <label className="block text-sm font-medium mb-1">Stop Price (%)</label>
               <div className="flex items-center">
                 <Input 
-                  type="text" // Changed from number
-                  inputMode="decimal" // Added for mobile
+                  type="text"
+                  inputMode="decimal"
                   value={isStopPriceFocused 
                          ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
-                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
+                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')}
                   onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
                   onFocus={() => setIsStopPriceFocused(true)}
                   onBlur={() => {
@@ -348,8 +378,8 @@ export function StockDetailsTable({
                   }}
                   disabled={isLoading}
                   placeholder="e.g. 2.00"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Added to hide spinners
-                  min="0" // Added for semantics
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  min="0"
                 />
                 <span className="ml-2">%</span>
               </div>
@@ -429,9 +459,8 @@ export function StockDetailsTable({
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
-                          // Conditionally display 'Executed' for daytrade interval
-                          formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                        }else if (typeof value === "number") {
+                          formattedValue = value as string;
+                        } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
                           formattedValue = String(value);
@@ -447,15 +476,9 @@ export function StockDetailsTable({
                             column.id === "profitLoss" ? 
                               (Number(item.profitLoss) > 0 ? "text-green-600" : 
                                Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
-                          } ${
-                            column.id === "trade" ?
-                              (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" :
-                               item.trade === "Closed" ? "text-yellow-600"
-                               item.trade === "Buy/Closed" ? "Buy" === "text-green-600", "Closed" === "text-yellow-600" : "") : ""
                           }`}
                         >
-                          {formattedValue}
+                          {column.id === "trade" ? formatTradeValue(formattedValue) : formattedValue}
                         </TableCell>
                       );
                     })}
@@ -527,56 +550,48 @@ export function StockDetailsTable({
   );
 }
 
-
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-    if (value === "") {
-      onChange(null); // Permite campo vazio temporariamente
-      return;
-    }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com "." ou "0."
-    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
-      if (value === "." || value.endsWith(".")) {
-         onChange(value); // Mantém como string temporariamente para permitir digitação
-      } else {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue >= 0) {
-          onChange(numValue);
-        }
-      }
-    } else if (value === "-") { // Impede digitar negativo
-      // Não faz nada se tentar digitar "-" 
+// Função auxiliar para lidar com a entrada de números decimais positivos
+function handleDecimalInputChange(value: string, onChange: (val: number | string | null) => void) {
+  if (value === "") {
+    onChange(null);
+    return;
+  }
+  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+  if (regex.test(value)) {
+    if (value === "." || value.endsWith(".")) {
+      onChange(value);
     } else {
-      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && numValue >= 0) {
-         // Formata para 2 casas decimais se for um número válido colado
-         onChange(parseFloat(numValue.toFixed(2)));
-      } else if (value === "") {
-         onChange(null);
+        onChange(numValue);
       }
     }
-  };
+  } else if (value === "-") {
+    // Não faz nada se tentar digitar "-"
+  } else {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+      onChange(parseFloat(numValue.toFixed(2)));
+    } else if (value === "") {
+      onChange(null);
+    }
+  }
+}
 
-  // Função auxiliar para formatar no blur
-  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-    let numValue = 0;
-    if (typeof value === "string") {
-      // Se for só um ponto, trata como 0
-      if (value === ".") {
-        numValue = 0;
-      } else {
-        numValue = parseFloat(value) || 0;
-      }
-    } else if (typeof value === "number") {
-      numValue = value;
-    } else if (value === null || value === undefined) {
-      onChange(null); // Mantém nulo se estava vazio
-      return;
+// Função auxiliar para formatar no blur
+function handleBlurFormatting(value: number | string | null | undefined, onChange: (val: number | null) => void) {
+  let numValue = 0;
+  if (typeof value === "string") {
+    if (value === ".") {
+      numValue = 0;
+    } else {
+      numValue = parseFloat(value) || 0;
     }
-    // Garante que seja positivo e formata
-    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-  };
+  } else if (typeof value === "number") {
+    numValue = value;
+  } else if (value === null || value === undefined) {
+    onChange(null);
+    return;
+  }
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+}
