@@ -55,23 +55,23 @@ export function StockDetailsTable({
   }, []);
 
   // Process and sort data
-  const processedData = useMemo(() => {
-    if (!result?.tradeHistory?.length) return [];
-    // Garante dados numéricos ou null
-    const data = result.tradeHistory.map(item => ({
-      ...item,
-      open: item.open !== undefined && item.open !== null && item.open !== '' ? Number(item.open) : null,
-      high: item.high !== undefined && item.high !== null && item.high !== '' ? Number(item.high) : null,
-      low: item.low !== undefined && item.low !== null && item.low !== '' ? Number(item.low) : null,
-      close: item.close !== undefined && item.close !== null && item.close !== '' ? Number(item.close) : null,
-      volume: item.volume !== undefined && item.volume !== null && item.volume !== '' ? Number(item.volume) : null,
-      profitLoss: Number(item.profitLoss) || 0,
-      currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
-        ? Number(item.currentCapital) 
-        : undefined,
-      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-      stopTrigger: calculateStopTrigger(item, params.operation)
-    }));
+      const processedData = useMemo(() => {
+        if (!result?.tradeHistory?.length) return [];
+        // Apenas converte número se for realmente numérico, senão mantém original para exibir igual do banco
+        const data = result.tradeHistory.map(item => ({
+          ...item,
+          high: item.high ?? null,
+          low: item.low ?? null,
+          open: item.open ?? null,
+          close: item.close ?? null,
+          volume: item.volume ?? null,
+          profitLoss: Number(item.profitLoss) || 0,
+          currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
+            ? Number(item.currentCapital) 
+            : undefined,
+          trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
+          stopTrigger: calculateStopTrigger(item, params.operation)
+        }));
 
     // Sort data
     return [...data].sort((a, b) => {
