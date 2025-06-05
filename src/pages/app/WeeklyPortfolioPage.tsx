@@ -366,3 +366,178 @@ export default function WeeklyPortfolioPage() {
       const validResults = results.filter((r): r is AnalysisResult => r !== null);
       setAnalysisResults(validResults);
       setProgress(100);
+      toast({
+        title: "Weekly analysis completed",
+        description: "Analysis was completed successfully."
+      });
+    } catch (error) {
+      console.error("Weekly analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "Unknown error"
+      });
+    } finally {
+      setTimeout(() => setIsLoading(false), 500);
+    }
+  };
+
+  const viewDetails = async (assetCode: string) => {
+    if (!analysisParams) return;
+    try {
+      setIsLoadingDetails(true);
+      setSelectedAsset(assetCode);
+
+      const paramsWithTable = analysisParams.dataTableName
+        ? analysisParams
+        : {
+            ...analysisParams,
+            dataTableName: await api.marketData.getDataTableName(
+              analysisParams.country,
+              analysisParams.stockMarket,
+              analysisParams.assetClass
+            )
+          };
+
+      if (!paramsWithTable.dataTableName) {
+        throw new Error("Could not determine data table name");
+      }
+
+      const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
+      if (detailedData && detailedData.tradeHistory) {
+        const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
+        
+        detailedData.tradeHistory = processedHistory;
+        detailedData.tradingDays = processedHistory.length;
+        
+        const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
+        
+        if (tradePairsFiltered.length > 0) {
+          let currentCapital = paramsWithTable.initialCapital;
+          detailedData.capitalEvolution = tradePairsFiltered.map(pair => {
+            currentCapital += pair.close.profit;
+            return { date: pair.close.date, capital: currentCapital };
+          });
+          
+          detailedData.capitalEvolution.unshift({
+            date: tradePairsFiltered[0]?.open.date || processedHistory[0]?.date || '',
+            capital: paramsWithTable.initialCapital
+          });
+
+          const finalCapital = currentCapital;
+          const totalProfit = finalCapital - paramsWithTable.initialCapital;
+          const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
+
+          detailedData.maxDrawdown = calculateMaxDrawdown(tradePairsFiltered.map(pair => pair.close), paramsWithTable.initialCapital);
+          
+          const returns = tradePairs.map(pair => pair.close.profit / paramsWithTable.initialCapital);
+          detailedData.sharpeRatio = calculateSharpeRatio(returns);
+          detailedData.sortinoRatio = calculateSortinoRatio(returns);
+          detailedData.recoveryFactor = detailedData.maxDrawdown !== 0 
+            ? Math.abs(totalProfit / (detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital)) 
+            : (totalProfit > 0 ? Infinity : 0);
+        } else {
+          detailedData.capitalEvolution = [{
+            date: processedHistory[0]?.date || '',
+            capital: paramsWithTable.initialCapital
+          }];
+          detailedData.maxDrawdown = 0;
+          detailedData.sharpeRatio = 0;
+          detailedData.sortinoRatio = 0;
+          detailedData.recoveryFactor = 0;
+        }
+      }
+
+      setDetailedResult(detailedData);
+      setShowDetailView(true);
+    } catch (error) {
+      console.error("Failed to fetch detailed analysis:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch details",
+        description: error instanceof Error ? error.message : "An unknown error occurred"
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
+    if (!selectedAsset) return;
+    try {
+      setIsLoadingDetails(true);
+      const paramsWithTable = updatedParams.dataTableName 
+        ? updatedParams 
+        : {
+            ...updatedParams,
+            dataTableName: await api.marketData.getDataTableName(
+              updatedParams.country,
+              updatedParams.stockMarket,
+              updatedParams.assetClass
+            )
+          };
+
+      if (!paramsWithTable.dataTableName) {
+        throw new Error("Could not determine data table name for update");
+      }
+
+      await viewDetails(selectedAsset);
+      setAnalysisParams(paramsWithTable);
+      
+      toast({
+        title: "Analysis Updated",
+        description: "Detailed view has been updated with new parameters."
+      });
+    } catch (error) {
+      console.error("Failed to update analysis:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred"
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
+  const closeDetails = () => {
+    setShowDetailView(false);
+    setDetailedResult(null);
+    setSelectedAsset(null);
+  };
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Weekly Portfolio</h1>
+      {!showDetailView ? (
+        <div className="bg-card p-6 rounded-lg border">
+          <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
+          {isLoading && (
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Processing weekly analysis...</span>
+                <span>{progress.toFixed(0)}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
+          {analysisResults.length > 0 && !isLoading && (
+            <ResultsTable results={analysisResults} onViewDetails={viewDetails} />
+          )}
+        </div>
+      ) : (
+        detailedResult && analysisParams && (
+          <div className="bg-card p-6 rounded-lg border">
+            <StockDetailView
+              result={detailedResult}
+              params={analysisParams}
+              onClose={closeDetails}
+              onUpdateParams={updateAnalysis}
+              isLoading={isLoadingDetails}
+            />
+          </div>
+        )
+      )}
+    </div>
+  );
+}
