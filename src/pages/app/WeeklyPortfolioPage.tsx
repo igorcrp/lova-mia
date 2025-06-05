@@ -143,15 +143,9 @@ export default function WeeklyPortfolioPage() {
       for (let i = 0; i < weekTrades.length; i++) {
         const currentDayData = weekTrades[i];
         const currentDay = { ...currentDayData, trade: '-' as TradeHistoryItem['trade'], profit: undefined, capital: undefined, stop: '-' as TradeHistoryItem['stop'] }; // Default state
-        
-        // Definir o capital inicial para o dia mais antigo do período selecionado
-        if (i === 0 && weekTrades[0] === sortedHistory[0]) {
+        if (i === 0) { // Check if it's the first day of the week
           currentDay.capital = params.initialCapital;
-        } else if (i === 0) {
-          // Para o primeiro dia de outras semanas, manter o capital atual
-          currentDay.capital = currentCapital;
         }
-        
         const currentDate = new Date(currentDay.date);
 
         // Try to open trade on Monday
@@ -176,25 +170,6 @@ export default function WeeklyPortfolioPage() {
               currentDay.suggestedEntryPrice = activeTrade.suggestedEntryPrice;
               currentDay.stopPrice = activeTrade.stopPrice;
               entryDayFound = true; // Mark entry day found for this week
-              
-              // Verificar se o Stop Price foi atingido no mesmo dia da operação
-              const stopHitSameDay = checkStopLoss(currentDay, stopPriceCalculated, params.operation);
-              if (stopHitSameDay) {
-                // Se o Stop Price foi atingido no mesmo dia, marcar como Buy/Closed ou Sell/Closed
-                currentDay.trade = `${currentDay.trade}/Closed` as TradeHistoryItem['trade'];
-                currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
-                const exitPrice = stopPriceCalculated;
-                currentDay.profit = calculateProfit(entryPrice, exitPrice, params.operation, currentDay.volume);
-                currentCapital += currentDay.profit;
-                currentDay.capital = currentCapital;
-                tradePairs.push({ open: activeTrade, close: { ...currentDay, exitPrice: exitPrice } });
-                activeTrade = null; // Close trade
-                stopPriceCalculated = null;
-              } else {
-                // Se o Stop Price não foi atingido no mesmo dia, zerar o Profit/Loss
-                currentDay.profit = 0;
-                currentDay.capital = currentCapital; // Manter o capital atual
-              }
             } else {
               activeTrade = null; // No entry signal
             }
@@ -207,7 +182,7 @@ export default function WeeklyPortfolioPage() {
           const stopHit = checkStopLoss(currentDay, stopPriceCalculated, params.operation);
           if (stopHit) {
             const exitPrice = stopPriceCalculated;
-            currentDay.trade = 'Closed' as TradeHistoryItem['trade'];
+            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
             currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
             currentCapital += currentDay.profit;
@@ -218,26 +193,20 @@ export default function WeeklyPortfolioPage() {
           } else if (isFridayOrLastBusinessDay(currentDate)) {
             // Check End of Week
             const exitPrice = currentDay.exitPrice;
-            currentDay.trade = 'Closed' as TradeHistoryItem['trade'];
-            currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
+            currentDay.trade = 'Close' as TradeHistoryItem['trade'];
+            currentDay.profit = 0; // Profit/Loss is 0 if Stop Price is not hit
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
             tradePairs.push({ open: activeTrade, close: { ...currentDay } });
             activeTrade = null; // Close trade
             stopPriceCalculated = null;
-          } else {
-            // Operação ainda ativa, mas não encerrada - manter capital do dia anterior
-            currentDay.profit = 0;
-            currentDay.capital = currentCapital;
           }
         }
         
-        // Se não for o primeiro dia e não tiver capital definido, usar o capital atual
-        if (currentDay.capital === undefined) {
-          currentDay.capital = currentCapital;
-        }
-        
         // Add current day to processed history
+        if (currentDay.trade !== 'Close') {
+           currentDay.capital = activeTrade ? undefined : currentCapital; // Show capital only after close or if no trade active
+        }
         processedHistory.push(currentDay);
       }
     });
@@ -322,207 +291,140 @@ export default function WeeklyPortfolioPage() {
         throw new Error("Could not determine data table name");
       }
       
-      const detailedData = await api.analysis.getDetailedAnalysis(
-        assetCode,
-        paramsWithTable
-      );
+      const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
       
-      if (!detailedData) {
-        throw new Error("Failed to fetch detailed data");
-      }
-      
-      // Process the trade history with the updated Weekly logic
-      const { processedHistory, tradePairs } = processWeeklyTrades(
-        detailedData.tradeHistory,
-        {
-          ...paramsWithTable,
-          interval: 'weekly' // Adiciona o parâmetro interval para identificar que é Weekly
+      // Processa as operações semanais (using v2 refined logic)
+      if (detailedData && detailedData.tradeHistory) {
+        // *** Use REFINED v2 processWeeklyTrades function ***
+        const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
+        detailedData.tradeHistory = processedHistory;
+        detailedData.tradingDays = processedHistory.length;
+        
+        const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
+        
+        // Recalcula a evolução do capital (using v2 logic)
+        if (tradePairsFiltered.length > 0) {
+          let currentCapital = paramsWithTable.initialCapital;
+          detailedData.capitalEvolution = tradePairsFiltered.map(pair => {
+            currentCapital += pair.close.profit;
+            return { date: pair.close.date, capital: currentCapital };
+          });
+          detailedData.capitalEvolution.unshift({ date: tradePairsFiltered[0]?.open.date || processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital });
+          
+          const finalCapital = currentCapital;
+          const totalProfit = finalCapital - paramsWithTable.initialCapital;
+          const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
+          detailedData.maxDrawdown = calculateMaxDrawdown(tradePairsFiltered.map(pair => pair.close), paramsWithTable.initialCapital);
+          detailedData.sharpeRatio = calculateSharpeRatio(tradePairsFiltered.map(pair => pair.close), profitPercentageTotal);
+          detailedData.sortinoRatio = calculateSortinoRatio(tradePairsFiltered.map(pair => pair.close), profitPercentageTotal);
+          detailedData.recoveryFactor = detailedData.maxDrawdown !== 0 ? Math.abs(totalProfit / (detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital)) : (totalProfit > 0 ? Infinity : 0);
+        } else {
+           detailedData.capitalEvolution = [{ date: processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital }];
+           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
         }
-      );
-      
-      // Calculate additional metrics
-      const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
-      const trades = tradePairsFiltered.length;
-      
-      if (trades === 0) {
-        setDetailedResult({
-          ...detailedData,
-          assetCode,
-          tradeHistory: processedHistory,
-          tradingDays: processedHistory.length,
-          trades: 0,
-          profits: 0,
-          losses: 0,
-          stops: 0,
-          finalCapital: paramsWithTable.initialCapital,
-          profit: 0,
-          successRate: 0,
-          profitPercentage: 0,
-          lossPercentage: 0,
-          tradePercentage: 0,
-          stopPercentage: 0,
-          averageGain: 0,
-          averageLoss: 0,
-          maxDrawdown: 0,
-          sharpeRatio: 0,
-          sortinoRatio: 0,
-          recoveryFactor: 0,
-          capitalEvolution: processedHistory.map(day => ({
-            date: day.date,
-            capital: day.capital !== undefined ? day.capital : paramsWithTable.initialCapital
-          }))
-        });
-      } else {
-        const profitsCount = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
-        const lossesCount = trades - profitsCount;
-        const stopsCount = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
-        
-        let finalCapital = paramsWithTable.initialCapital;
-        tradePairsFiltered.forEach(pair => {
-          finalCapital += pair.close.profit;
-        });
-        
-        const totalProfit = finalCapital - paramsWithTable.initialCapital;
-        const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
-        
-        const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
-        const lossTrades = tradePairsFiltered.filter(pair => pair.close.profit < 0);
-        
-        const averageGain = gainTrades.length > 0
-          ? gainTrades.reduce((sum, pair) => sum + pair.close.profit, 0) / gainTrades.length
-          : 0;
-          
-        const averageLoss = lossTrades.length > 0
-          ? lossTrades.reduce((sum, pair) => sum + Math.abs(pair.close.profit), 0) / lossTrades.length
-          : 0;
-          
-        const maxDrawdown = calculateMaxDrawdown(
-          tradePairsFiltered.map(pair => pair.close),
-          paramsWithTable.initialCapital
-        );
-        
-        const sharpeRatio = calculateSharpeRatio(
-          tradePairsFiltered.map(pair => pair.close),
-          profitPercentageTotal
-        );
-        
-        const sortinoRatio = calculateSortinoRatio(
-          tradePairsFiltered.map(pair => pair.close),
-          profitPercentageTotal
-        );
-        
-        const recoveryFactor = maxDrawdown !== 0
-          ? Math.abs(totalProfit / (maxDrawdown / 100 * paramsWithTable.initialCapital))
-          : (totalProfit > 0 ? Infinity : 0);
-          
-        // Prepare capital evolution data
-        const capitalEvolution = processedHistory.map(day => ({
-          date: day.date,
-          capital: day.capital !== undefined ? day.capital : paramsWithTable.initialCapital
-        }));
-        
-        // Calculate percentages
-        const profitPercentage = trades > 0 ? (profitsCount / trades) * 100 : 0;
-        const lossPercentage = trades > 0 ? (lossesCount / trades) * 100 : 0;
-        const tradePercentage = processedHistory.length > 0 ? (trades / processedHistory.length) * 100 : 0;
-        const stopPercentage = trades > 0 ? (stopsCount / trades) * 100 : 0;
-        
-        // Add profit percentage to each trade for chart
-        const tradeHistoryWithPercentages = processedHistory.map(day => {
-          const profitPercentage = day.profit !== undefined && day.profit !== 0 && day.capital !== undefined
-            ? (day.profit / (day.capital - day.profit)) * 100
-            : 0;
-            
-          return {
-            ...day,
-            profitPercentage
-          };
-        });
-        
-        setDetailedResult({
-          ...detailedData,
-          assetCode,
-          tradeHistory: tradeHistoryWithPercentages,
-          tradingDays: processedHistory.length,
-          trades,
-          profits: profitsCount,
-          losses: lossesCount,
-          stops: stopsCount,
-          finalCapital,
-          profit: totalProfit,
-          successRate: profitPercentage,
-          profitPercentage,
-          lossPercentage,
-          tradePercentage,
-          stopPercentage,
-          averageGain,
-          averageLoss,
-          maxDrawdown,
-          sharpeRatio,
-          sortinoRatio,
-          recoveryFactor,
-          capitalEvolution
-        });
       }
       
-      setShowDetailView(true);
+      // *** Logic from v1 ***
+      setDetailedResult(detailedData);
+      setShowDetailView(true); 
+      // *** End of Logic from v1 ***
+
     } catch (error) {
-      console.error("Failed to load details:", error);
+      console.error("Failed to fetch weekly detailed analysis", error);
       toast({
         variant: "destructive",
-        title: "Failed to load details",
-        description: error instanceof Error ? error.message : "Unknown error"
+        title: "Failed to fetch details",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
       });
     } finally {
       setIsLoadingDetails(false);
     }
   };
 
+  // updateAnalysis function (kept from v2 - uses refined processWeeklyTrades)
+  const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
+     if (!selectedAsset) return;
+     try {
+       setIsLoadingDetails(true);
+       const paramsWithTable = updatedParams.dataTableName ? updatedParams : { ...updatedParams, dataTableName: await api.marketData.getDataTableName(updatedParams.country, updatedParams.stockMarket, updatedParams.assetClass) };
+       if (!paramsWithTable.dataTableName) throw new Error("Could not determine data table name for update");
+       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
+       if (detailedData && detailedData.tradeHistory) {
+         // *** Use REFINED v2 processWeeklyTrades function ***
+         const { processedHistory, tradePairs } = processWeeklyTrades(detailedData.tradeHistory, paramsWithTable);
+         detailedData.tradeHistory = processedHistory;
+         detailedData.tradingDays = processedHistory.length;
+         const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
+         if (tradePairsFiltered.length > 0) {
+           let currentCapital = paramsWithTable.initialCapital;
+           detailedData.capitalEvolution = tradePairsFiltered.map(pair => { currentCapital += pair.close.profit; return { date: pair.close.date, capital: currentCapital }; });
+           detailedData.capitalEvolution.unshift({ date: tradePairsFiltered[0]?.open.date || processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital });
+           const finalCapital = currentCapital;
+           const totalProfit = finalCapital - paramsWithTable.initialCapital;
+           const profitPercentageTotal = (totalProfit / paramsWithTable.initialCapital) * 100;
+           detailedData.maxDrawdown = calculateMaxDrawdown(tradePairsFiltered.map(pair => pair.close), paramsWithTable.initialCapital);
+           detailedData.sharpeRatio = calculateSharpeRatio(tradePairsFiltered.map(pair => pair.close), profitPercentageTotal);
+           detailedData.sortinoRatio = calculateSortinoRatio(tradePairsFiltered.map(pair => pair.close), profitPercentageTotal);
+           detailedData.recoveryFactor = detailedData.maxDrawdown !== 0 ? Math.abs(totalProfit / (detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital)) : (totalProfit > 0 ? Infinity : 0);
+         } else {
+           detailedData.capitalEvolution = [{ date: processedHistory[0]?.date || '', capital: paramsWithTable.initialCapital }];
+           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
+         }
+       }
+       setDetailedResult(detailedData); // Update result
+       setAnalysisParams(paramsWithTable); // Update params
+       toast({ title: "Analysis Updated", description: "Detailed view updated (v4 logic)." });
+     } catch (error) { console.error("Failed to update detailed analysis", error); toast({ variant: "destructive", title: "Update Failed", description: error instanceof Error ? error.message : "Unknown error" }); }
+     finally { setIsLoadingDetails(false); }
+  };
+
+  // closeDetails function (kept from v2)
+  const closeDetails = () => {
+    setShowDetailView(false);
+    setDetailedResult(null);
+    setSelectedAsset(null);
+  };
+
+  // --- RETURN JSX - RESTORED from v1 (WeeklyPortfolioPage_corrected.tsx) --- 
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-bold">Weekly Portfolio Analysis</h1>
-        <p className="text-muted-foreground">
-          Analyze stocks with a weekly trading strategy. Trades open on the first business day of the week
-          and close on the last business day or when stop loss is triggered.
-        </p>
-      </div>
-
-      {isLoading && (
-        <div className="w-full mt-4">
-          <Progress value={progress} className="h-2" />
-          <p className="text-sm text-muted-foreground mt-2">
-            {progress < 100 ? "Processing..." : "Completed"}
-          </p>
-        </div>
-      )}
-
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Weekly Portfolio</h1>
+      
+      {/* Conditional rendering based on showDetailView */} 
       {!showDetailView ? (
-        <>
+        // Main View: Setup Form and Results Table
+        <div className="bg-card p-6 rounded-lg border">
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
-          
-          {analysisResults.length > 0 && (
-            <ResultsTable 
-              results={analysisResults} 
-              onViewDetails={viewDetails}
-              isLoading={isLoadingDetails}
-            />
+          {isLoading && (
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Processing weekly analysis...</span>
+                <span>{progress.toFixed(0)}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+            </div>
           )}
-        </>
+          {analysisResults.length > 0 && !isLoading && (
+            <ResultsTable results={analysisResults} onViewDetails={viewDetails} />
+          )}
+        </div>
       ) : (
-        detailedResult && (
-          <StockDetailView 
-            result={detailedResult}
-            params={{
-              ...analysisParams!,
-              interval: 'weekly' // Adiciona o parâmetro interval para identificar que é Weekly
-            }}
-            onClose={() => setShowDetailView(false)}
-            onUpdateParams={runAnalysis}
-            isLoading={isLoadingDetails}
-          />
+        // Detail View: Render ONLY if detailedResult and analysisParams exist
+        detailedResult && analysisParams && (
+          <div className="bg-card p-6 rounded-lg border">
+            <StockDetailView
+              result={detailedResult} // Pass the validated result
+              params={analysisParams}
+              onClose={closeDetails}
+              onUpdateParams={updateAnalysis}
+              isLoading={isLoadingDetails} // Pass loading state
+            />
+          </div>
         )
+        // If detailedResult is null or analysisParams is null, this block won't render,
+        // effectively showing nothing or the previous view until data is ready.
       )}
     </div>
   );
 }
+
