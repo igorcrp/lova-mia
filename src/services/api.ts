@@ -298,6 +298,13 @@ export const auth = {
  */
 const users = {
   /**
+   * Get all users (alias for compatibility)
+   */
+  async getAll(): Promise<User[]> {
+    return this.getUsers();
+  },
+
+  /**
    * Get all users
    */
   async getUsers(): Promise<User[]> {
@@ -332,6 +339,81 @@ const users = {
   },
 
   /**
+   * Get user statistics for dashboard
+   */
+  async getUserStats(): Promise<any> {
+    try {
+      const users = await this.getUsers();
+      
+      const stats = {
+        total: users.length,
+        active: users.filter(u => u.status === 'active').length,
+        pending: users.filter(u => u.status === 'pending').length,
+        inactive: users.filter(u => u.status === 'inactive').length,
+        premium: users.filter(u => u.account_type === 'premium').length,
+        new: users.filter(u => {
+          const createdDate = new Date(u.created_at);
+          const lastWeek = new Date();
+          lastWeek.setDate(lastWeek.getDate() - 7);
+          return createdDate > lastWeek;
+        }).length
+      };
+
+      return stats;
+    } catch (error) {
+      console.error("Failed to get user stats:", error);
+      return {
+        total: 0,
+        active: 0,
+        pending: 0,
+        inactive: 0,
+        premium: 0,
+        new: 0
+      };
+    }
+  },
+
+  /**
+   * Create new user (alias for compatibility)
+   */
+  async create(userData: any): Promise<User> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          email: userData.email,
+          name: userData.full_name,
+          level_id: userData.level_id,
+          status_users: userData.status,
+          email_verified: userData.email_verified
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Create user error:", error);
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        email: data.email,
+        full_name: data.name || '',
+        avatar_url: '',
+        level_id: data.level_id || 1,
+        status: data.status_users === 'active' ? 'active' : data.status_users === 'inactive' ? 'inactive' : 'pending',
+        email_verified: data.email_verified || false,
+        account_type: userData.account_type || 'free',
+        created_at: data.created_at,
+        last_login: data.updated_at
+      } as User;
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Update user status
    */
   async updateUserStatus(userId: string, status: string): Promise<void> {
@@ -356,6 +438,13 @@ const users = {
  * Assets API service for admin functionality
  */
 const assets = {
+  /**
+   * Get all assets (alias for compatibility)
+   */
+  async getAll(): Promise<Asset[]> {
+    return this.getAssets();
+  },
+
   /**
    * Get all assets
    */
@@ -385,6 +474,26 @@ const assets = {
       console.error("Failed to get assets:", error);
       return [];
     }
+  },
+
+  /**
+   * Get total asset count for dashboard
+   */
+  async getTotalCount(): Promise<number> {
+    try {
+      const assets = await this.getAssets();
+      return assets.length;
+    } catch (error) {
+      console.error("Failed to get asset count:", error);
+      return 0;
+    }
+  },
+
+  /**
+   * Create new asset (alias for compatibility)
+   */
+  async create(asset: Partial<Asset>): Promise<Asset> {
+    return this.createAsset(asset);
   },
 
   /**
@@ -957,8 +1066,8 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
-    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+    const tradeHistory: TradeHistoryItem[] = [];
     let capital = params.initialCapital;
     
     // Ensure data is sorted by date in ascending order
@@ -975,7 +1084,7 @@ const analysis = {
       
       // Get previous day capital (or initial capital if first day)
       const previousCapital = i > 0 
-        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital) // Use currentCapital from previous entry
+        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital)
         : params.initialCapital;
       
       // Calculate suggested entry price based on previous day's reference price
@@ -1007,13 +1116,13 @@ const analysis = {
         : 0;
       
       // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
@@ -1022,21 +1131,21 @@ const analysis = {
         : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: string = '-'; // Type corrected
-      if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
+      let stop: string = '-';
+      if (trade !== "-" && stopPrice !== '-') {
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = currentData.low <= Number(stopPrice) ? "Executed" : "-";
+          stop = currentData.low <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = currentData.high >= Number(stopPrice) ? "Executed" : "-";
+          stop = currentData.high >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
       // Calculate profit/loss
       let profitLoss = 0;
-      if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
-        if (stopTrigger === "Executed" && stopPrice !== '-') {
+      if (trade !== "-" && actualPrice !== '-') {
+        if (stop === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
             ? (Number(stopPrice) - Number(actualPrice)) * lotSize
@@ -1050,14 +1159,13 @@ const analysis = {
       }
       
       // Update capital: Previous day's capital + current day's profit/loss
-      // Ensure capital doesn't go below zero (optional, based on requirements)
       capital = Math.max(0, previousCapital + profitLoss);
       
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: currentData.open, // Using open as entryPrice for consistency?
-        exitPrice: currentData.close, // Using close as exitPrice
+        entryPrice: Number(actualPrice !== '-' ? actualPrice : 0),
+        exitPrice: currentData.close,
         high: currentData.high,
         low: currentData.low,
         close: currentData.close,
@@ -1067,10 +1175,11 @@ const analysis = {
         trade,
         lotSize,
         stopPrice,
-        stopTrigger, // Changed from 'stop'
-        profitLoss, // Changed from 'profit'
-        currentCapital: capital // Changed from 'capital'
-        });
+        stop,
+        profitLoss,
+        profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
+        currentCapital: capital
+      });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
@@ -1080,7 +1189,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -1088,7 +1197,6 @@ const analysis = {
     const capitalEvolution: { date: string; capital: number }[] = [];
     
     // Add initial capital point if the first trade isn't the very first day possible
-    // This might need adjustment based on how the date range is handled
     capitalEvolution.push({ date: tradeHistory[0].date, capital: initialCapital }); 
 
     for (const trade of tradeHistory) {
@@ -1125,10 +1233,10 @@ const analysis = {
     const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
     const trades = executedTrades.length;
     
-    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
+    // Count profits, losses, and stops based on the profitLoss and stop fields
     const profits = executedTrades.filter(trade => Number(trade.profitLoss) > 0).length;
-    const losses = executedTrades.filter(trade => Number(trade.profitLoss) < 0 && trade.stopTrigger !== 'Executed').length;
-    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
+    const losses = executedTrades.filter(trade => Number(trade.profitLoss) < 0 && trade.stop !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stop === 'Executed').length;
     
     // Sum the profit/loss values
     let totalProfit = 0;
@@ -1146,10 +1254,9 @@ const analysis = {
       
     // Calculate percentages with safety checks to avoid division by zero
     const tradePercentage = tradingDays > 0 ? (trades / tradingDays) * 100 : 0;
-    // Note: Profit/Loss/Stop percentages are based on the number of TRADES, not trading days
-    const profitRate = trades > 0 ? (profits / trades) * 100 : 0; // Renamed from profitPercentage
-    const lossRate = trades > 0 ? (losses / trades) * 100 : 0; // Renamed from lossPercentage
-    const stopRate = trades > 0 ? (stops / trades) * 100 : 0; // Renamed from stopPercentage
+    const profitRate = trades > 0 ? (profits / trades) * 100 : 0;
+    const lossRate = trades > 0 ? (losses / trades) * 100 : 0;
+    const stopRate = trades > 0 ? (stops / trades) * 100 : 0;
     
     // Calculate final capital and profit from capital evolution
     const finalCapital = capitalEvolution.length > 0 
@@ -1165,7 +1272,7 @@ const analysis = {
       : 0;
       
     // Use absolute value for average loss calculation
-    const averageLoss = (losses + stops) > 0 // Consider stops as losses for avg loss calculation
+    const averageLoss = (losses + stops) > 0
       ? Math.abs(executedTrades.filter(t => Number(t.profitLoss) < 0).reduce((sum, t) => sum + Number(t.profitLoss), 0)) / (losses + stops) 
       : 0;
     
@@ -1176,7 +1283,7 @@ const analysis = {
     for (const point of capitalEvolution) {
       // Ensure capital is treated as a number
       const currentCapitalPoint = Number(point.capital);
-      if (isNaN(currentCapitalPoint)) continue; // Skip if capital is not a number
+      if (isNaN(currentCapitalPoint)) continue;
 
       if (currentCapitalPoint > peak) {
         peak = currentCapitalPoint;
@@ -1192,10 +1299,9 @@ const analysis = {
     maxDrawdown = maxDrawdown * 100; // Express as percentage
       
     // --- Ratios Calculation (Simplified Example) ---
-    // Proper calculation requires more details (e.g., risk-free rate, time period)
     const sharpeRatio = 0; // Placeholder
     const sortinoRatio = 0; // Placeholder
-    const recoveryFactor = maxDrawdown > 0 ? Math.abs(profit / (maxDrawdown / 100 * params.initialCapital)) : 0; // Profit / Max Drawdown Value
+    const recoveryFactor = maxDrawdown > 0 ? Math.abs(profit / (maxDrawdown / 100 * params.initialCapital)) : 0;
     
     // Calculate success rate (Profits / Total Trades)
     const successRate = trades > 0 ? (profits / trades) * 100 : 0;
@@ -1205,18 +1311,18 @@ const analysis = {
       trades,
       tradePercentage,
       profits,
-      profitPercentage: profitRate, // Use the calculated rate
+      profitPercentage: profitRate,
       losses,
-      lossPercentage: lossRate, // Use the calculated rate
+      lossPercentage: lossRate,
       stops,
-      stopPercentage: stopRate, // Use the calculated rate
+      stopPercentage: stopRate,
       finalCapital,
       profit,
       averageGain,
       averageLoss,
       maxDrawdown,
-      sharpeRatio, // Placeholder
-      sortinoRatio, // Placeholder
+      sharpeRatio,
+      sortinoRatio,
       recoveryFactor,
       successRate
     };
@@ -1248,11 +1354,10 @@ const analysis = {
       const stockData = await this.getStockData(
         params.dataTableName, 
         stockCode,
-        params.period // Pass the period parameter to filter by date
+        params.period
       );
       
       if (!stockData || stockData.length === 0) {
-        // Return a default structure instead of throwing error to allow UI to handle it
         console.warn(`No data found for stock ${stockCode} in table ${params.dataTableName} for the selected period`);
         return {
           assetCode: stockCode,
@@ -1294,14 +1399,13 @@ const analysis = {
       // Return detailed result
       return {
         assetCode: stockCode,
-        assetName: stockCode, // Use code as name if name is not available
+        assetName: stockCode,
         tradeHistory,
         capitalEvolution,
         ...metrics
       };
     } catch (error) {
       console.error(`Failed to get detailed analysis for ${stockCode}:`, error);
-      // Re-throw the error to be caught by the calling function
       throw error; 
     }
   }
