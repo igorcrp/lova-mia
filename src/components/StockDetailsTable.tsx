@@ -50,11 +50,11 @@ export function StockDetailsTable({
     };
 
     const timer = setTimeout(updateHeight, 100);
-    window.addEventListener(\'resize\', updateHeight);
+    window.addEventListener('resize', updateHeight);
     
     return () => {
       clearTimeout(timer);
-      window.removeEventListener(\'resize\', updateHeight);
+      window.removeEventListener('resize', updateHeight);
     };
   }, []);
 
@@ -65,11 +65,12 @@ export function StockDetailsTable({
     // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
+      // Corrigido: Usar item.profit para profitLoss e item.capital para currentCapital
       profitLoss: Number(item.profit) || 0,
       currentCapital: item.capital !== undefined && item.capital !== null 
         ? Number(item.capital) 
         : undefined,
-      trade: typeof item.trade === \'string\' ? item.trade.trim() || "-" : "-",
+      trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
       // Calculate stop trigger here for consistency
       stopTrigger: calculateStopTrigger(item, params.operation)
     }));
@@ -97,7 +98,7 @@ export function StockDetailsTable({
   // Function to calculate stop trigger
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     // Verifica se os dados necessários existem e são válidos
-    if (!item || item.stopPrice === \'-\' || item.stopPrice === null || item.low === null || item.high === null) {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-"; // Retorna "-" se faltar Stop Price, Low ou High
     }
 
@@ -115,14 +116,14 @@ export function StockDetailsTable({
     // Aplica a lógica de stop trigger baseada na operação (case-insensitive)
     const lowerCaseOperation = operation?.toLowerCase(); // Garante que a comparação não seja sensível a maiúsculas/minúsculas
 
-    if (lowerCaseOperation === \'buy\') {
+    if (lowerCaseOperation === 'buy') {
         // Para Buy: Low < Stop Price
         return low < stopPrice ? "Executed" : "-";
-    } else if (lowerCaseOperation === \'sell\') {
+    } else if (lowerCaseOperation === 'sell') {
         // Para Sell: High > Stop Price
         return high > stopPrice ? "Executed" : "-";
     } else {
-        // Se a operação não for \'buy\' nem \'sell\', ou se \'operation\' for undefined/null, retorna "-"
+        // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
         return "-";
     }
   }
@@ -137,7 +138,7 @@ export function StockDetailsTable({
     }
     
     // 2. For Weekly interval, check if trade started and stop was hit on same day
-    if (params.interval === \'weekly\') {
+    if (params.interval === 'weekly') {
       const stopTrigger = item.stopTrigger || calculateStopTrigger(item, params.operation);
       
       // If a Buy or Sell trade AND stop was executed on same day
@@ -190,17 +191,17 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === \'number\' ? Number(entryPercentage.toFixed(2)) : 0,
-      stopPercentage: typeof stopPercentage === \'number\' ? Number(stopPercentage.toFixed(2)) : 0,
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : 0,
       initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
   };
 
-  // Função para lidar com a entrada de valores decimais
+  // Função para lidar com a entrada de valores decimais (mantida a original)
   const handleDecimalInputChange = (value: string, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
     // Permite valores vazios, números e um único ponto decimal
-    if (value === \'\' || value === \'.\') {
+    if (value === '' || value === '.') {
       setter(value);
       return;
     }
@@ -218,14 +219,14 @@ export function StockDetailsTable({
     }
   };
 
-  // Função para formatar valores ao perder o foco
+  // Função para formatar valores ao perder o foco (mantida a original)
   const handleBlurFormatting = (value: number | string | null, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
-    if (value === \'\' || value === \'.\' || value === null) {
+    if (value === '' || value === '.' || value === null) {
       setter(0);
       return;
     }
     
-    if (typeof value === \'string\') {
+    if (typeof value === 'string') {
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
         setter(numValue);
@@ -238,9 +239,9 @@ export function StockDetailsTable({
   // Formatting functions
   const formatCurrency = (amount: number | undefined | null): string => {
     if (amount === undefined || amount === null) return "-";
-    return new Intl.NumberFormat(\'en-US\', {
-      style: \'currency\',
-      currency: \'USD\',
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount);
@@ -250,8 +251,8 @@ export function StockDetailsTable({
     if (!dateString) return "-";
     try {
       const date = new Date(`${dateString}T00:00:00Z`);
-      const day = String(date.getUTCDate()).padStart(2, \'0\');
-      const month = String(date.getUTCMonth() + 1).padStart(2, \'0\');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
       const year = date.getUTCFullYear();
       if (isNaN(date.getTime())) {
           return dateString;
@@ -302,9 +303,9 @@ export function StockDetailsTable({
   return (
     <div className="w-full flex flex-col gap-6">
       {/* Chart and Setup Panel */}
-      <div className={`grid grid-cols-1 ${isMobile ? \'gap-6\' : \'md:grid-cols-4 gap-4\'}`}>
+      <div className={`grid grid-cols-1 ${isMobile ? 'gap-6' : 'md:grid-cols-4 gap-4'}`}>
         {/* Chart */}
-        <div className={`${isMobile ? \'order-2\' : \'md:col-span-3\'} bg-card rounded-lg border p-4`}>
+        <div className={`${isMobile ? 'order-2' : 'md:col-span-3'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Capital Evolution</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -338,7 +339,7 @@ export function StockDetailsTable({
                   stroke="#00ffff" // Neon cyan color
                   strokeWidth={2}
                   dot={false} // No dots by default, maybe add activeDot styling
-                  activeDot={{ r: 5, strokeWidth: 1, fill: \'#ffffff\', stroke: \'#00ffff\' }} // White dot with cyan border on hover
+                  activeDot={{ r: 5, strokeWidth: 1, fill: '#ffffff', stroke: '#00ffff' }} // White dot with cyan border on hover
                   filter="url(#glow)" // Apply glow effect
                   isAnimationActive={true}
                   animationDuration={2000}
@@ -350,7 +351,7 @@ export function StockDetailsTable({
         </div>
         
         {/* Setup Panel */}
-        <div ref={setupPanelRef} className={`${isMobile ? \'order-1\' : \'md:col-span-1\'} bg-card rounded-lg border p-4`}>
+        <div ref={setupPanelRef} className={`${isMobile ? 'order-1' : 'md:col-span-1'} bg-card rounded-lg border p-4`}>
           <h3 className="text-lg font-medium mb-4">Stock Setup</h3>
           <div className="space-y-4">
             <div>
@@ -379,8 +380,8 @@ export function StockDetailsTable({
                   type="text" // Changed from number
                   inputMode="decimal" // Added for mobile
                   value={isEntryPriceFocused 
-                         ? (entryPercentage === null || entryPercentage === undefined ? \'\' : String(entryPercentage)) 
-                         : (typeof entryPercentage === \'number\' ? entryPercentage.toFixed(2) : \'\')} // Conditional formatting
+                         ? (entryPercentage === null || entryPercentage === undefined ? '' : String(entryPercentage)) 
+                         : (typeof entryPercentage === 'number' ? entryPercentage.toFixed(2) : '')} // Conditional formatting
                   onChange={(e) => handleDecimalInputChange(e.target.value, setEntryPercentage)}
                   onFocus={() => setIsEntryPriceFocused(true)}
                   onBlur={() => {
@@ -403,8 +404,8 @@ export function StockDetailsTable({
                   type="text" // Changed from number
                   inputMode="decimal" // Added for mobile
                   value={isStopPriceFocused 
-                         ? (stopPercentage === null || stopPercentage === undefined ? \'\' : String(stopPercentage)) 
-                         : (typeof stopPercentage === \'number\' ? stopPercentage.toFixed(2) : \'\')} // Conditional formatting
+                         ? (stopPercentage === null || stopPercentage === undefined ? '' : String(stopPercentage)) 
+                         : (typeof stopPercentage === 'number' ? stopPercentage.toFixed(2) : '')} // Conditional formatting
                   onChange={(e) => handleDecimalInputChange(e.target.value, setStopPercentage)}
                   onFocus={() => setIsStopPriceFocused(true)}
                   onBlur={() => {
@@ -426,10 +427,10 @@ export function StockDetailsTable({
                 <span className="mr-2">$</span>
                 <Input 
                   type="number"
-                  value={initialCapital !== null ? initialCapital : \'\'}
+                  value={initialCapital !== null ? initialCapital : ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === \'\') {
+                    if (value === '') {
                       setInitialCapital(null);
                     } else {
                       const numValue = parseFloat(value);
@@ -493,11 +494,13 @@ export function StockDetailsTable({
                     {formatTradeDisplay(item)}
                   </TableCell>
                   <TableCell>{item.lotSize !== undefined ? item.lotSize : "-"}</TableCell>
-                  <TableCell>{item.stopPrice !== undefined && item.stopPrice !== \'-\' ? item.stopPrice : "-"}</TableCell>
+                  <TableCell>{item.stopPrice !== undefined && item.stopPrice !== '-' ? item.stopPrice : "-"}</TableCell>
                   <TableCell>{item.stopTrigger}</TableCell>
+                  {/* Corrigido: Usar item.profit para a coluna Profit/Loss */}
                   <TableCell className={item.profit > 0 ? "text-green-600" : item.profit < 0 ? "text-red-600" : ""}>
                     {item.profit !== undefined && item.profit !== 0 ? formatCurrency(item.profit) : "$0.00"}
                   </TableCell>
+                  {/* Corrigido: Usar item.capital para a coluna Current Capital */}
                   <TableCell>{item.capital !== undefined ? formatCurrency(item.capital) : "-"}</TableCell>
                 </TableRow>
               ))}
@@ -580,3 +583,4 @@ export function StockDetailsTable({
     </div>
   );
 }
+
