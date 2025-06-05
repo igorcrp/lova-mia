@@ -143,6 +143,9 @@ export default function WeeklyPortfolioPage() {
       for (let i = 0; i < weekTrades.length; i++) {
         const currentDayData = weekTrades[i];
         const currentDay = { ...currentDayData, trade: '-' as TradeHistoryItem['trade'], profit: undefined, capital: undefined, stop: '-' as TradeHistoryItem['stop'] }; // Default state
+        if (i === 0) { // Check if it's the first day of the week
+          currentDay.capital = params.initialCapital;
+        }
         const currentDate = new Date(currentDay.date);
 
         // Try to open trade on Monday
@@ -191,7 +194,7 @@ export default function WeeklyPortfolioPage() {
             // Check End of Week
             const exitPrice = currentDay.exitPrice;
             currentDay.trade = 'Close' as TradeHistoryItem['trade'];
-            currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
+            currentDay.profit = 0; // Profit/Loss is 0 if Stop Price is not hit
             currentCapital += currentDay.profit;
             currentDay.capital = currentCapital;
             tradePairs.push({ open: activeTrade, close: { ...currentDay } });
