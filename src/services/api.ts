@@ -1125,31 +1125,31 @@ const analysis = {
         trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
-      // Calculate stop price
+      // Calculate stop price - ensure it's a number
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
         ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
-        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : 0;
       
       // Determine if stop is triggered based on the CURRENT day's low/high
       let stop: string = '-';
-      if (trade !== "-" && stopPrice !== '-') {
+      if (trade !== "-" && stopPrice > 0) {
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stop = currentData.low <= Number(stopPrice) ? "Executed" : "-";
+          stop = currentData.low <= stopPrice ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stop = currentData.high >= Number(stopPrice) ? "Executed" : "-";
+          stop = currentData.high >= stopPrice ? "Executed" : "-";
         }
       }
       
       // Calculate profit/loss
       let profitLoss = 0;
       if (trade !== "-" && actualPrice !== '-') {
-        if (stop === "Executed" && stopPrice !== '-') {
+        if (stop === "Executed" && stopPrice > 0) {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
+            ? (stopPrice - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - stopPrice) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
@@ -1164,7 +1164,7 @@ const analysis = {
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: Number(actualPrice !== '-' ? actualPrice : 0),
+        entryPrice: actualPrice !== '-' ? Number(actualPrice) : 0,
         exitPrice: currentData.close,
         high: currentData.high,
         low: currentData.low,
@@ -1174,7 +1174,7 @@ const analysis = {
         actualPrice,
         trade,
         lotSize,
-        stopPrice,
+        stopPrice: stopPrice > 0 ? stopPrice : '-',
         stop,
         profitLoss,
         profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
