@@ -313,6 +313,7 @@ const displayRecord: TradeHistoryItem = {
     capital: currentDayCapital,
     // stopTrigger será calculado depois pela tabela, se necessário
 };
+        console.log('WeeklyPage - Display Record:', JSON.stringify(displayRecord));
         completeHistoryWithCapital.push(displayRecord);
         previousDayCapital = currentDayCapital;
       }
