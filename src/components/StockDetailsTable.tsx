@@ -95,7 +95,6 @@ export function StockDetailsTable({
 
   // Function to calculate stop trigger
   interface TradeItemForStopTrigger {
-    // trade: string; // Removido, pois não é mais necessário para a lógica do Stop Trigger
     stopPrice: string | number | null;
     low: number | string | null;
     high: number | string | null;
@@ -129,10 +128,43 @@ export function StockDetailsTable({
         return high > stopPrice ? "Executed" : "-";
     } else {
         // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
-        // console.warn(`calculateStopTrigger: Operação desconhecida ou inválida: ${operation}`); // Adiciona um aviso para depuração (opcional)
         return "-";
     }
 }
+
+  // Function to format trade display with new logic
+  const formatTradeDisplay = (item: any): string => {
+    let tradeValue = item.trade;
+    
+    // 1. Replace all "Close" with "Closed"
+    if (tradeValue === "Close") {
+      tradeValue = "Closed";
+    }
+    
+    // 2. For Weekly interval, check if trade started and stop was hit on same day
+    if (params.interval === 'weekly') {
+      const stopTrigger = item.stopTrigger || calculateStopTrigger(item, params.operation);
+      
+      // If a Buy or Sell trade AND stop was executed on same day
+      if ((tradeValue === "Buy" || tradeValue === "Sell") && stopTrigger === "Executed") {
+        return `${tradeValue}/Closed`;
+      }
+    }
+    
+    return tradeValue || "-";
+  };
+
+  // Function to get trade text color
+  const getTradeTextColor = (tradeDisplay: string): string => {
+    if (tradeDisplay.includes("Buy")) {
+      return "text-green-600";
+    } else if (tradeDisplay.includes("Sell")) {
+      return "text-red-600";
+    } else if (tradeDisplay.includes("Closed")) {
+      return "text-yellow-600";
+    }
+    return "";
+  };
 
   // Pagination
   const totalItems = processedData.length;
@@ -429,9 +461,9 @@ export function StockDetailsTable({
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
-                          // Conditionally display 'Executed' for daytrade interval
-                          formattedValue = params.interval === 'daytrade' && (value === 'Buy' || value === 'Sell') ? 'Executed' : String(value);
-                        }else if (typeof value === "number") {
+                          // Apply the new trade formatting logic
+                          formattedValue = formatTradeDisplay(item);
+                        } else if (typeof value === "number") {
                           formattedValue = value.toFixed(2);
                         } else {
                           formattedValue = String(value);
@@ -448,9 +480,7 @@ export function StockDetailsTable({
                               (Number(item.profitLoss) > 0 ? "text-green-600" : 
                                Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
                           } ${
-                            column.id === "trade" ?
-                              (item.trade === "Buy" ? "text-green-600" :
-                               item.trade === "Sell" ? "text-red-600" : "") : ""
+                            column.id === "trade" ? getTradeTextColor(formattedValue) : ""
                           }`}
                         >
                           {formattedValue}
@@ -525,56 +555,55 @@ export function StockDetailsTable({
   );
 }
 
-
-  // Função auxiliar para lidar com a entrada de números decimais positivos
-  const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-    if (value === "") {
-      onChange(null); // Permite campo vazio temporariamente
-      return;
-    }
-    // Regex para permitir números positivos com até 2 casas decimais
-    // Permite iniciar com "." ou "0."
-    const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
-      if (value === "." || value.endsWith(".")) {
-         onChange(value); // Mantém como string temporariamente para permitir digitação
-      } else {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue >= 0) {
-          onChange(numValue);
-        }
-      }
-    } else if (value === "-") { // Impede digitar negativo
-      // Não faz nada se tentar digitar "-" 
+// Função auxiliar para lidar com a entrada de números decimais positivos
+const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
+  if (value === "") {
+    onChange(null); // Permite campo vazio temporariamente
+    return;
+  }
+  // Regex para permitir números positivos com até 2 casas decimais
+  // Permite iniciar com "." ou "0."
+  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+  if (regex.test(value)) {
+    // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
+    if (value === "." || value.endsWith(".")) {
+       onChange(value); // Mantém como string temporariamente para permitir digitação
     } else {
-      // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
       const numValue = parseFloat(value);
       if (!isNaN(numValue) && numValue >= 0) {
-         // Formata para 2 casas decimais se for um número válido colado
-         onChange(parseFloat(numValue.toFixed(2)));
-      } else if (value === "") {
-         onChange(null);
+        onChange(numValue);
       }
     }
-  };
+  } else if (value === "-") { // Impede digitar negativo
+    // Não faz nada se tentar digitar "-" 
+  } else {
+    // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+       // Formata para 2 casas decimais se for um número válido colado
+       onChange(parseFloat(numValue.toFixed(2)));
+    } else if (value === "") {
+       onChange(null);
+    }
+  }
+};
 
-  // Função auxiliar para formatar no blur
-  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-    let numValue = 0;
-    if (typeof value === "string") {
-      // Se for só um ponto, trata como 0
-      if (value === ".") {
-        numValue = 0;
-      } else {
-        numValue = parseFloat(value) || 0;
-      }
-    } else if (typeof value === "number") {
-      numValue = value;
-    } else if (value === null || value === undefined) {
-      onChange(null); // Mantém nulo se estava vazio
-      return;
+// Função auxiliar para formatar no blur
+const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
+  let numValue = 0;
+  if (typeof value === "string") {
+    // Se for só um ponto, trata como 0
+    if (value === ".") {
+      numValue = 0;
+    } else {
+      numValue = parseFloat(value) || 0;
     }
-    // Garante que seja positivo e formata
-    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-  };
+  } else if (typeof value === "number") {
+    numValue = value;
+  } else if (value === null || value === undefined) {
+    onChange(null); // Mantém nulo se estava vazio
+    return;
+  }
+  // Garante que seja positivo e formata
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+};
