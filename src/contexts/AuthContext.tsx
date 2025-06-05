@@ -1,6 +1,9 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/services/api';
+import { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -10,6 +13,9 @@ interface AuthContextType {
   register: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (data: any) => Promise<void>;
+  googleLogin: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,15 +30,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: { session } } = await supabase.auth.getSession();
 
       setSession(session);
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        // Fetch user data from our custom users table
+        try {
+          const { data } = await supabase.rpc('check_user_by_email', {
+            p_email: session.user.email
+          });
+          
+          if (data && data.length > 0) {
+            const userData = data[0];
+            setUser({
+              id: userData.id,
+              email: userData.email,
+              full_name: userData.name || '',
+              level_id: userData.level_id || 1,
+              status: userData.status_users || 'pending',
+              email_verified: userData.email_verified || false,
+              account_type: 'free',
+              created_at: new Date().toISOString(),
+              last_login: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        setUser(null);
+      }
       setIsLoading(false);
     };
 
     loadSession();
 
-    supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+    supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session ?? null);
+      
+      if (session?.user) {
+        try {
+          const { data } = await supabase.rpc('check_user_by_email', {
+            p_email: session.user.email
+          });
+          
+          if (data && data.length > 0) {
+            const userData = data[0];
+            setUser({
+              id: userData.id,
+              email: userData.email,
+              full_name: userData.name || '',
+              level_id: userData.level_id || 1,
+              status: userData.status_users || 'pending',
+              email_verified: userData.email_verified || false,
+              account_type: 'free',
+              created_at: new Date().toISOString(),
+              last_login: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        setUser(null);
+      }
       setIsLoading(false);
     });
   }, []);
@@ -41,9 +99,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await api.auth.login(email, password);
       
-      // Handle successful login
       if (response.user && response.session) {
-        setUser(response.user);
+        setUser({
+          id: response.user.id,
+          email: response.user.email || '',
+          full_name: response.user.user_metadata?.full_name || '',
+          level_id: 1,
+          status: 'active',
+          email_verified: !!response.user.email_confirmed_at,
+          account_type: 'free',
+          created_at: response.user.created_at,
+          last_login: new Date().toISOString()
+        });
         setSession(response.session);
         setIsLoading(false);
         return { success: true };
@@ -61,9 +128,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await api.auth.register(email, password, fullName);
       
-      // Handle successful registration
       if (response.user) {
-        setUser(response.user);
+        setUser({
+          id: response.user.id,
+          email: response.user.email || '',
+          full_name: fullName,
+          level_id: 1,
+          status: 'pending',
+          email_verified: false,
+          account_type: 'free',
+          created_at: response.user.created_at,
+          last_login: new Date().toISOString()
+        });
         setSession(response.session);
         setIsLoading(false);
         return { success: true };
@@ -97,6 +173,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const googleLogin = async () => {
+    try {
+      await api.auth.googleLogin();
+    } catch (error: any) {
+      console.error('Google login error:', error.message);
+      throw error;
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await api.auth.resetPassword(email);
+    } catch (error: any) {
+      console.error('Reset password error:', error.message);
+      throw error;
+    }
+  };
+
+  const resendConfirmationEmail = async (email: string) => {
+    try {
+      await api.auth.resendConfirmationEmail(email);
+    } catch (error: any) {
+      console.error('Resend confirmation error:', error.message);
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     session,
@@ -105,6 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     register,
     logout,
     updateUser,
+    googleLogin,
+    resetPassword,
+    resendConfirmationEmail,
   };
 
   return (

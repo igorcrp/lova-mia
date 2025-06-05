@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import {
   Table,
@@ -43,7 +44,7 @@ export default function AdminAssetsPage() {
         market: assetData.market || ''
       };
       
-      const createdAsset = await api.assets.createAsset(requiredAsset);
+      const createdAsset = await api.assets.create(requiredAsset);
       if (createdAsset) {
         setAssets(prev => [...prev, {
           id: Date.now().toString(), // Temporary ID
@@ -75,7 +76,7 @@ export default function AdminAssetsPage() {
           <h1 className="text-3xl font-bold">Assets</h1>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="primary">Create Asset</Button>
+              <Button variant="default">Create Asset</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
