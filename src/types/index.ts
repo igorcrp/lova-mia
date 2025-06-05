@@ -69,6 +69,7 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
+  detailedHistory?: TradeHistoryItem[]; // Add detailedHistory property
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -88,6 +89,7 @@ export interface TradeHistoryItem {
   volume?: number;
   high?: number;
   low?: number;
+  close?: number; // Add close property
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;

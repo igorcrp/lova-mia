@@ -167,19 +167,20 @@ export default function MonthlyPortfolioPage() {
             const shouldEnter = (params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold);
 
             if (shouldEnter) {
+              const calculatedStopPrice = calculateStopPrice(potentialEntryPrice, params);
               const entryDayRecord: TradeHistoryItem = {
                 ...currentDayData,
-                trade: (params.operation === 'buy' ? 'Buy' : 'Sell'),
+                trade: (params.operation === 'buy' ? 'Buy' : 'Sell') as 'Buy' | 'Sell',
                 suggestedEntryPrice: potentialEntryPrice,
                 actualPrice: potentialEntryPrice,
-                stopPrice: calculateStopPrice(potentialEntryPrice, params),
+                stopPrice: calculatedStopPrice,
                 lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
                 stop: '-',
                 profit: undefined, // Profit undefined on entry
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value
               };
               activeTradeEntry = entryDayRecord;
-              stopPriceCalculated = entryDayRecord.stopPrice;
+              stopPriceCalculated = calculatedStopPrice;
               finalProcessedHistory.push(entryDayRecord);
             }
           }
@@ -212,7 +213,7 @@ export default function MonthlyPortfolioPage() {
             capitalBeforeCurrentTrade += profit; // Update tracker for next potential trade
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
-            exitPrice = typeof currentDayData.close === 'number' ? currentDayData.close : undefined;
+            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
             if (exitPrice !== undefined) {
               profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
               closeRecord = {
@@ -390,7 +391,7 @@ export default function MonthlyPortfolioPage() {
            
            // Add initial capital point logic
            // Need original full history for the very first date point
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || []; // Fallback
+           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.tradeHistory || detailedData.tradeHistory || []; // Fixed reference
            const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
               new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
            );
@@ -412,7 +413,7 @@ export default function MonthlyPortfolioPage() {
 
         } else {
            // Handle case with no processed trades
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || [];
+           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.tradeHistory || detailedData.tradeHistory || [];
            const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
            detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsForDetails.initialCapital }];
            detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
@@ -427,7 +428,7 @@ export default function MonthlyPortfolioPage() {
       } else {
         // Handle case where no detailed data/history is found
         console.warn(`[v6] No detailed data or trade history found for ${assetCode}.`);
-        toast({ variant: "warning", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
+        toast({ variant: "default", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
         setDetailedResult(null);
         setShowDetailView(false); // Ensure view is hidden
         setSelectedAsset(null); // Deselect asset
@@ -481,7 +482,7 @@ export default function MonthlyPortfolioPage() {
               .map(trade => ({ date: trade.date, capital: trade.capital as number }));
               
             // Add initial capital point logic (needs original history)
-            const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
+            const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.tradeHistory || detailedData.tradeHistory || [];
             const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
                new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
             );
@@ -502,7 +503,7 @@ export default function MonthlyPortfolioPage() {
             detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
             
          } else {
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
+           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.tradeHistory || detailedData.tradeHistory || [];
            const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
            detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsWithTable.initialCapital }];
            detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
@@ -516,7 +517,7 @@ export default function MonthlyPortfolioPage() {
          
        } else {
          console.warn(`[v6] No detailed data or trade history found during update for ${selectedAsset}.`);
-         toast({ variant: "warning", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
+         toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
        }
      } catch (error) { 
        console.error(`[v6] Failed to update detailed analysis for ${selectedAsset}`, error); 
@@ -580,4 +581,3 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
-
