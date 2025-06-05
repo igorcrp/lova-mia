@@ -286,7 +286,7 @@ const processWeeklyTrades = (
           }
         }
 
-   '''// Garante um objeto base seguro, mesmo se rawDayData for nulo
+// Garante um objeto base seguro, mesmo se rawDayData for nulo
 const safeRawData = rawDayData || {
     date: currentDateStr,
     open: undefined, high: undefined, low: undefined, close: undefined, volume: undefined,
@@ -312,7 +312,7 @@ const displayRecord: TradeHistoryItem = {
     profit: tradeAction?.profit,
     capital: currentDayCapital,
     // stopTrigger será calculado depois pela tabela, se necessário
-};'''
+};
         completeHistoryWithCapital.push(displayRecord);
         previousDayCapital = currentDayCapital;
       }
