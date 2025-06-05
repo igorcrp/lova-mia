@@ -286,28 +286,33 @@ const processWeeklyTrades = (
           }
         }
 
-        const displayRecord: TradeHistoryItem = {
-          // Always include the raw day data first
-          ...(rawDayData || {
-            open: 0,
-            high: 0,
-            low: 0,
-            close: 0,
-            volume: 0
-          }),
-          // Then add the trade-specific data
-          date: currentDateStr,
-          trade: tradeAction?.trade ?? '-',
-          suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
-          actualPrice: tradeAction?.actualPrice,
-          lotSize: tradeAction?.lotSize ?? 0,
-          stopPrice: tradeAction?.stopPrice,
-          stop: tradeAction?.stop ?? '-',
-          profit: tradeAction?.profit,
-          exitPrice: typeof rawDayData?.close === 'number' ? rawDayData.close : undefined,
-          capital: currentDayCapital,
-        };
+   '''// Garante um objeto base seguro, mesmo se rawDayData for nulo
+const safeRawData = rawDayData || {
+    date: currentDateStr,
+    open: undefined, high: undefined, low: undefined, close: undefined, volume: undefined,
+    entryPrice: undefined, exitPrice: undefined // Inclui para segurança
+};
 
+const displayRecord: TradeHistoryItem = {
+    // Começa com todos os dados brutos disponíveis
+    ...safeRawData,
+
+    // *** GARANTE OS VALORES BRUTOS NOS CAMPOS QUE A TABELA USA ***
+    entryPrice: safeRawData.open, // Usa o valor bruto de 'open' para 'entryPrice'
+    exitPrice: safeRawData.close,  // Usa o valor bruto de 'close' para 'exitPrice'
+
+    // Adiciona/sobrescreve com dados calculados de trade (se houver)
+    date: currentDateStr, // Garante a data correta
+    trade: tradeAction?.trade ?? '-',
+    suggestedEntryPrice: tradeAction?.suggestedEntryPrice,
+    actualPrice: tradeAction?.actualPrice,
+    lotSize: tradeAction?.lotSize ?? 0,
+    stopPrice: tradeAction?.stopPrice,
+    stop: tradeAction?.stop ?? '-',
+    profit: tradeAction?.profit,
+    capital: currentDayCapital,
+    // stopTrigger será calculado depois pela tabela, se necessário
+};'''
         completeHistoryWithCapital.push(displayRecord);
         previousDayCapital = currentDayCapital;
       }
