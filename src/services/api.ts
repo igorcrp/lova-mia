@@ -232,8 +232,12 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use the secure function to get user data
-      const { data, error } = await supabase.rpc('get_current_user');
+      // Use direct query instead of RPC function that doesn't exist
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error("Get user data error:", error);
@@ -241,7 +245,24 @@ export const auth = {
       }
 
       console.log("User data retrieved:", data);
-      return data as User;
+      
+      // Transform the data to match User interface
+      if (data) {
+        return {
+          id: data.id,
+          email: data.email,
+          full_name: data.name || '',
+          avatar_url: '',
+          level_id: data.level_id || 1,
+          status: data.status_users === 'active' ? 'active' : data.status_users === 'inactive' ? 'inactive' : 'pending',
+          email_verified: data.email_verified || false,
+          account_type: 'free',
+          created_at: data.created_at,
+          last_login: data.updated_at
+        } as User;
+      }
+      
+      return null;
     } catch (error) {
       console.error("Get user data failed:", error);
       return null;
@@ -267,6 +288,137 @@ export const auth = {
       console.log("Email confirmed successfully");
     } catch (error) {
       console.error("Email confirmation failed:", error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Users API service for admin functionality
+ */
+const users = {
+  /**
+   * Get all users
+   */
+  async getUsers(): Promise<User[]> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Get users error:", error);
+        throw error;
+      }
+
+      // Transform the data to match User interface
+      return (data || []).map(user => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.name || '',
+        avatar_url: '',
+        level_id: user.level_id || 1,
+        status: user.status_users === 'active' ? 'active' : user.status_users === 'inactive' ? 'inactive' : 'pending',
+        email_verified: user.email_verified || false,
+        account_type: 'free',
+        created_at: user.created_at,
+        last_login: user.updated_at
+      })) as User[];
+    } catch (error) {
+      console.error("Failed to get users:", error);
+      return [];
+    }
+  },
+
+  /**
+   * Update user status
+   */
+  async updateUserStatus(userId: string, status: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ status_users: status })
+        .eq('id', userId);
+
+      if (error) {
+        console.error("Update user status error:", error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("Failed to update user status:", error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Assets API service for admin functionality
+ */
+const assets = {
+  /**
+   * Get all assets
+   */
+  async getAssets(): Promise<Asset[]> {
+    try {
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('*')
+        .order('country');
+
+      if (error) {
+        console.error("Get assets error:", error);
+        throw error;
+      }
+
+      // Transform market data sources to assets
+      return (data || []).map(source => ({
+        id: source.id.toString(),
+        code: source.stock_table,
+        name: `${source.country} - ${source.stock_market}`,
+        country: source.country,
+        stock_market: source.stock_market,
+        asset_class: source.asset_class,
+        status: 'active'
+      })) as Asset[];
+    } catch (error) {
+      console.error("Failed to get assets:", error);
+      return [];
+    }
+  },
+
+  /**
+   * Create new asset
+   */
+  async createAsset(asset: Partial<Asset>): Promise<Asset> {
+    try {
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .insert([{
+          country: asset.country,
+          stock_market: asset.stock_market,
+          asset_class: asset.asset_class,
+          stock_table: asset.code
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Create asset error:", error);
+        throw error;
+      }
+
+      return {
+        id: data.id.toString(),
+        code: data.stock_table,
+        name: `${data.country} - ${data.stock_market}`,
+        country: data.country,
+        stock_market: data.stock_market,
+        asset_class: data.asset_class,
+        status: 'active'
+      } as Asset;
+    } catch (error) {
+      console.error("Failed to create asset:", error);
       throw error;
     }
   }
@@ -556,8 +708,7 @@ const analysis = {
       
       // Use fromDynamic to handle the dynamic table name
       const { data, error } = await fromDynamic(tableName)
-        .select('stock_code') // Corrected based on user feedback
-        .groupBy('stock_code') // Corrected based on user feedback
+        .select('stock_code')
         .order('stock_code');
       
       if (error) {
@@ -572,11 +723,13 @@ const analysis = {
       }
       
       // Extract stock codes with proper type safety
-      const stocks: StockInfo[] = (data as any[])
-        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .map(item => ({
-          code: String(item.stock_code),
-          name: String(item.stock_code) // Use stock_code as name since 'name' column doesn't exist
+      const uniqueCodes = [...new Set(data.map((item: any) => item.stock_code))];
+      
+      const stocks: StockInfo[] = uniqueCodes
+        .filter(code => code)
+        .map(code => ({
+          code: String(code),
+          name: String(code)
         }));
       
       console.log(`Direct query found ${stocks.length} stock codes`);
@@ -683,8 +836,6 @@ const analysis = {
       return [];
     }
   },
-
-  // --- Start: Functions copied from api-18.ts ---
 
   /**
    * Run stock analysis with given parameters
@@ -851,34 +1002,34 @@ const analysis = {
       }
       
       // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
-        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
         : 0;
       
       // Determine if trade is executed
       let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
       }
       
       // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
-        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: TradeHistoryItem['stopTrigger'] = '-'; // Type corrected
+      let stopTrigger: string = '-'; // Type corrected
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = currentData.low <= stopPrice ? "Executed" : "-";
+          stopTrigger = currentData.low <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = currentData.high >= stopPrice ? "Executed" : "-";
+          stopTrigger = currentData.high >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
@@ -888,13 +1039,13 @@ const analysis = {
         if (stopTrigger === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (currentData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - currentData.close) * lotSize;
+            ? (currentData.close - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - currentData.close) * lotSize;
         }
       }
       
@@ -909,6 +1060,7 @@ const analysis = {
         exitPrice: currentData.close, // Using close as exitPrice
         high: currentData.high,
         low: currentData.low,
+        close: currentData.close,
         volume: currentData.volume,
         suggestedEntryPrice,
         actualPrice,
@@ -974,8 +1126,8 @@ const analysis = {
     const trades = executedTrades.length;
     
     // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
-    const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
-    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
+    const profits = executedTrades.filter(trade => Number(trade.profitLoss) > 0).length;
+    const losses = executedTrades.filter(trade => Number(trade.profitLoss) < 0 && trade.stopTrigger !== 'Executed').length;
     const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
     
     // Sum the profit/loss values
@@ -984,11 +1136,11 @@ const analysis = {
     
     // Calculate total profits and losses from executed trades
     for (const trade of executedTrades) {
-      if (trade.profitLoss > 0) {
-        totalProfit += trade.profitLoss;
-      } else if (trade.profitLoss < 0) {
+      if (Number(trade.profitLoss) > 0) {
+        totalProfit += Number(trade.profitLoss);
+      } else if (Number(trade.profitLoss) < 0) {
         // Accumulate all negative P/L as total loss
-        totalLoss += trade.profitLoss; 
+        totalLoss += Number(trade.profitLoss); 
       }
     }
       
@@ -1014,7 +1166,7 @@ const analysis = {
       
     // Use absolute value for average loss calculation
     const averageLoss = (losses + stops) > 0 // Consider stops as losses for avg loss calculation
-      ? Math.abs(executedTrades.filter(t => t.profitLoss < 0).reduce((sum, t) => sum + t.profitLoss, 0)) / (losses + stops) 
+      ? Math.abs(executedTrades.filter(t => Number(t.profitLoss) < 0).reduce((sum, t) => sum + Number(t.profitLoss), 0)) / (losses + stops) 
       : 0;
     
     // Calculate max drawdown from capital evolution
@@ -1152,16 +1304,14 @@ const analysis = {
       // Re-throw the error to be caught by the calling function
       throw error; 
     }
-  },
-
-  // --- End: Functions copied from api-18.ts ---
-
+  }
 };
 
 // Export the API services
 export const api = {
   auth,
+  users,
+  assets,
   marketData,
   analysis
 };
-
