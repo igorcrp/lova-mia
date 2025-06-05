@@ -286,7 +286,7 @@ const processWeeklyTrades = (
           }
         }
 
-   '''// Garante um objeto base seguro, mesmo se rawDayData for nulo
+   // Garante um objeto base seguro, mesmo se rawDayData for nulo
 const safeRawData = rawDayData || {
     date: currentDateStr,
     open: undefined, high: undefined, low: undefined, close: undefined, volume: undefined,
@@ -294,12 +294,13 @@ const safeRawData = rawDayData || {
 };
 
 const displayRecord: TradeHistoryItem = {
-    // Começa com todos os dados brutos disponíveis
-    ...safeRawData,
-
-    // *** GARANTE OS VALORES BRUTOS NOS CAMPOS QUE A TABELA USA ***
-    entryPrice: safeRawData.open, // Usa o valor bruto de 'open' para 'entryPrice'
-    exitPrice: safeRawData.close,  // Usa o valor bruto de 'close' para 'exitPrice'
+    date: currentDateStr,
+    // --- Dados OHLCV Brutos Mapeados --- 
+    entryPrice: safeRawData.open,  // Mapeia 'open' bruto para 'entryPrice' (esperado pela tabela)
+    high: safeRawData.high,
+    low: safeRawData.low,
+    exitPrice: safeRawData.close, // Mapeia 'close' bruto para 'exitPrice' (esperado pela tabela)
+    volume: safeRawData.volume,
 
     // Adiciona/sobrescreve com dados calculados de trade (se houver)
     date: currentDateStr, // Garante a data correta
@@ -312,7 +313,7 @@ const displayRecord: TradeHistoryItem = {
     profit: tradeAction?.profit,
     capital: currentDayCapital,
     // stopTrigger será calculado depois pela tabela, se necessário
-};'''
+};
         completeHistoryWithCapital.push(displayRecord);
         previousDayCapital = currentDayCapital;
       }
