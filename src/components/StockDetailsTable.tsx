@@ -466,7 +466,7 @@ export function StockDetailsTable({
                           formattedValue = String(value);
                         }
                       }
-                      
+                      console.log('StockTable - Rendering Item for Cell:', column.id, JSON.stringify(item));
                       return (
                         <TableCell 
                           key={column.id}
