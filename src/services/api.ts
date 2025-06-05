@@ -1066,125 +1066,125 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
-    const tradeHistory: TradeHistoryItem[] = [];
-    let capital = params.initialCapital;
+    async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+      const tradeHistory: TradeHistoryItem[] = [];
+      let capital = params.initialCapital;
+      
+      // Ensure data is sorted by date in ascending order
+      const sortedData = [...stockData].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
     
-    // Ensure data is sorted by date in ascending order
-    const sortedData = [...stockData].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-
-    console.info(`Generating trade history for ${sortedData.length} days of stock data`);
-    
-    for (let i = 0; i < sortedData.length; i++) {
-      const currentData = sortedData[i];
-      // Use previous day's data for calculations when available
-      const previousData = i > 0 ? sortedData[i - 1] : null;
+      console.info(`Generating trade history for ${sortedData.length} days of stock data`);
       
-      // Get previous day capital (or initial capital if first day)
-      const previousCapital = i > 0 
-        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital)
-        : params.initialCapital;
-      
-      // Calculate suggested entry price based on previous day's reference price
-      // Use current day's reference price if previous day is not available
-      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
-      let suggestedEntryPrice: number;
-      
-      if (params.operation === 'buy') {
-        // Buy: Previous day's reference price - (Previous day's reference price * entry percentage)
-        suggestedEntryPrice = referencePrice - (referencePrice * params.entryPercentage / 100);
-      } else {
-        // Sell: Previous day's reference price + (Previous day's reference price * entry percentage)
-        suggestedEntryPrice = referencePrice + (referencePrice * params.entryPercentage / 100);
-      }
-      
-      // Determine actual price based on conditional logic:
-      let actualPrice: number | string;
-      if (currentData.open <= suggestedEntryPrice) {
-        actualPrice = currentData.open;
-      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
-        actualPrice = suggestedEntryPrice;
-      } else {
-        actualPrice = '-';
-      }
-      
-      // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
-        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
-        : 0;
-      
-      // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-";
-      if (params.operation === 'buy') {
-        // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-";
-      } else {
-        // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
-      }
-      
-      // Calculate stop price - ensure it's a number
-      const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
-        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : 0;
-      
-      // Determine if stop is triggered based on the CURRENT day's low/high
-      let stop: string = '-';
-      if (trade !== "-" && stopPrice > 0) {
+      for (let i = 0; i < sortedData.length; i++) {
+        const currentData = sortedData[i];
+        // Use previous day's data for calculations when available
+        const previousData = i > 0 ? sortedData[i - 1] : null;
+        
+        // Get previous day capital (or initial capital if first day)
+        const previousCapital = i > 0 
+          ? (tradeHistory[i-1].currentCapital ?? params.initialCapital)
+          : params.initialCapital;
+        
+        // Calculate suggested entry price based on previous day's reference price
+        // Use current day's reference price if previous day is not available
+        const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+        let suggestedEntryPrice: number;
+        
         if (params.operation === 'buy') {
-          // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stop = currentData.low <= stopPrice ? "Executed" : "-";
+          // Buy: Previous day's reference price - (Previous day's reference price * entry percentage)
+          suggestedEntryPrice = referencePrice - (referencePrice * params.entryPercentage / 100);
         } else {
-          // Sell: If CURRENT High >= Stop Price → "Executed"
-          stop = currentData.high >= stopPrice ? "Executed" : "-";
+          // Sell: Previous day's reference price + (Previous day's reference price * entry percentage)
+          suggestedEntryPrice = referencePrice + (referencePrice * params.entryPercentage / 100);
         }
+        
+        // Determine actual price based on conditional logic:
+        let actualPrice: number | string;
+        if (currentData.open <= suggestedEntryPrice) {
+          actualPrice = currentData.open;
+        } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+          actualPrice = suggestedEntryPrice;
+        } else {
+          actualPrice = '-';
+        }
+        
+        // Calculate lot size from previous day's capital and actual price
+        const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+          ? Math.floor(previousCapital / Number(actualPrice) / 10 * 10 
+          : 0;
+        
+        // Determine if trade is executed
+        let trade: TradeHistoryItem['trade'] = "-";
+        if (params.operation === 'buy') {
+          // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
+          trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-";
+        } else {
+          // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
+          trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
+        }
+        
+        // Calculate stop price - ensure it's a number
+        const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
+          ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+          : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : 0;
+        
+        // Determine if stop is triggered based on the CURRENT day's low/high
+        let stop: "Executed" | "-" = '-';
+        if (trade !== "-" && stopPrice > 0) {
+          if (params.operation === 'buy') {
+            // Buy: If CURRENT Low <= Stop Price → "Executed"
+            stop = currentData.low <= stopPrice ? "Executed" : "-";
+          } else {
+            // Sell: If CURRENT High >= Stop Price → "Executed"
+            stop = currentData.high >= stopPrice ? "Executed" : "-";
+          }
+        }
+        
+        // Calculate profit/loss
+        let profitLoss = 0;
+        if (trade !== "-" && actualPrice !== '-') {
+          if (stop === "Executed" && stopPrice > 0) {
+            // If stop is triggered on the SAME day, use stop price
+            profitLoss = params.operation === 'buy'
+              ? (stopPrice - Number(actualPrice)) * lotSize
+              : (Number(actualPrice) - stopPrice) * lotSize;
+          } else {
+            // Otherwise, use the close price of the CURRENT day
+            profitLoss = params.operation === 'buy'
+              ? (currentData.close - Number(actualPrice)) * lotSize
+              : (Number(actualPrice) - currentData.close) * lotSize;
+          }
+        }
+        
+        // Update capital: Previous day's capital + current day's profit/loss
+        capital = Math.max(0, previousCapital + profitLoss);
+        
+        // Create trade history item
+        tradeHistory.push({
+          date: currentData.date,
+          entryPrice: actualPrice !== '-' ? Number(actualPrice) : 0, // Corrigido para sempre number
+          exitPrice: currentData.close,
+          high: currentData.high,
+          low: currentData.low,
+          close: currentData.close,
+          volume: currentData.volume,
+          suggestedEntryPrice,
+          actualPrice,
+          trade,
+          lotSize,
+          stopPrice: stopPrice > 0 ? stopPrice : '-',
+          stop, // Já está tipado corretamente como "Executed" | "-"
+          profitLoss,
+          profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
+          currentCapital: capital
+        });
       }
       
-      // Calculate profit/loss
-      let profitLoss = 0;
-      if (trade !== "-" && actualPrice !== '-') {
-        if (stop === "Executed" && stopPrice > 0) {
-          // If stop is triggered on the SAME day, use stop price
-          profitLoss = params.operation === 'buy'
-            ? (stopPrice - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - stopPrice) * lotSize;
-        } else {
-          // Otherwise, use the close price of the CURRENT day
-          profitLoss = params.operation === 'buy'
-            ? (currentData.close - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - currentData.close) * lotSize;
-        }
-      }
-      
-      // Update capital: Previous day's capital + current day's profit/loss
-      capital = Math.max(0, previousCapital + profitLoss);
-      
-      // Create trade history item
-      tradeHistory.push({
-        date: currentData.date,
-        entryPrice: actualPrice !== '-' ? Number(actualPrice) : 0,
-        exitPrice: currentData.close,
-        high: currentData.high,
-        low: currentData.low,
-        close: currentData.close,
-        volume: currentData.volume,
-        suggestedEntryPrice,
-        actualPrice,
-        trade,
-        lotSize,
-        stopPrice: stopPrice > 0 ? stopPrice : '-',
-        stop,
-        profitLoss,
-        profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
-        currentCapital: capital
-      });
-    }
-    
-    console.info(`Generated ${tradeHistory.length} trade history entries`);
-    return tradeHistory;
-  },
+      console.info(`Generated ${tradeHistory.length} trade history entries`);
+      return tradeHistory;
+    },
   
   /**
    * Calculate capital evolution based on trade history
