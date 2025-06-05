@@ -111,7 +111,7 @@ export default function WeeklyPortfolioPage() {
   const [showDetailView, setShowDetailView] = useState(false);
 
   // Função para processar operações semanais
-    const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
+  c  const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
 
     const processedHistory: TradeHistoryItem[] = [];
