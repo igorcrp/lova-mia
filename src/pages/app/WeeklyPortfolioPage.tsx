@@ -111,16 +111,16 @@ export default function WeeklyPortfolioPage() {
   const [showDetailView, setShowDetailView] = useState(false);
 
   // Função para processar operações semanais
-  const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
+  c  const processWeeklyTrades = (fullHistory: TradeHistoryItem[], params: StockAnalysisParams): { processedHistory: TradeHistoryItem[], tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] } => {
     if (!fullHistory || fullHistory.length === 0) return { processedHistory: [], tradePairs: [] };
-    
+
     const processedHistory: TradeHistoryItem[] = [];
     const tradePairs: { open: TradeHistoryItem, close: TradeHistoryItem }[] = [];
-    const sortedHistory = [...fullHistory].sort((a, b) => 
+    const sortedHistory = [...fullHistory].sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-    let currentCapital = params.initialCapital;
-    
+    let currentCapital = params.initialCapital; // This is the running capital
+
     // Group trades by week
     const tradesByWeek: { [weekKey: string]: TradeHistoryItem[] } = {};
     for (let i = 0; i < sortedHistory.length; i++) {
@@ -132,7 +132,9 @@ export default function WeeklyPortfolioPage() {
       }
       tradesByWeek[weekKey].push(trade);
     }
-    
+
+    let firstDayOfHistory = sortedHistory[0].date; // Get the date of the very first day in the entire history
+
     // Process each week - ensuring only one trade per week
     Object.keys(tradesByWeek).forEach(weekKey => {
       const weekTrades = tradesByWeek[weekKey];
@@ -142,10 +144,28 @@ export default function WeeklyPortfolioPage() {
 
       for (let i = 0; i < weekTrades.length; i++) {
         const currentDayData = weekTrades[i];
-        const currentDay = { ...currentDayData, trade: '-' as TradeHistoryItem['trade'], profit: undefined, capital: undefined, stop: '-' as TradeHistoryItem['stop'] }; // Default state
-        if (i === 0) { // Check if it's the first day of the week
-          currentDay.capital = params.initialCapital;
+        // Initialize profit to 0 for all days unless a trade is closed with stop hit
+        const currentDay: TradeHistoryItem = {
+          ...currentDayData,
+          trade: '-' as TradeHistoryItem['trade'],
+          profit: 0, // Default profit to 0
+          capital: undefined, // Will be set later
+          stop: '-' as TradeHistoryItem['stop']
+        };
+
+        // Handle the very first day of the entire history
+        if (currentDay.date === firstDayOfHistory) { // Use sortedHistory[0].date for the absolute first day
+          currentDay.profit = 0;
+          // If there's a trade on the first day, mark it
+          if (currentDayData.trade === 'Buy' || currentDayData.trade === 'Sell') {
+            currentDay.trade = currentDayData.trade;
+          }
+          currentCapital = params.initialCapital; // Set initial capital for the first day
+        } else {
+          // For subsequent days, profit is 0 by default, and capital is inherited
+          currentDay.profit = 0; // Ensure profit is 0 unless stop is hit
         }
+
         const currentDate = new Date(currentDay.date);
 
         // Try to open trade on Monday
@@ -154,21 +174,21 @@ export default function WeeklyPortfolioPage() {
           if (previousDay && previousDay.exitPrice !== undefined) {
             const entryPrice = previousDay.exitPrice;
             activeTrade = { ...currentDay }; // Store entry details
-            
-            // Determine entry signal based on price movement
+
             const referencePrice = getReferencePrice(previousDay, params.referencePrice);
             const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
-            
+
             if ((params.operation === 'buy' && entryPrice >= entryThreshold) ||
                 (params.operation === 'sell' && entryPrice <= entryThreshold)) {
               activeTrade.suggestedEntryPrice = entryPrice;
               activeTrade.trade = (params.operation === 'buy' ? 'Buy' : 'Sell') as TradeHistoryItem['trade'];
               stopPriceCalculated = calculateStopPrice(entryPrice, params);
               activeTrade.stopPrice = stopPriceCalculated;
-              
-              currentDay.trade = activeTrade.trade;
+
+              currentDay.trade = activeTrade.trade; // Mark trade for this day
               currentDay.suggestedEntryPrice = activeTrade.suggestedEntryPrice;
               currentDay.stopPrice = activeTrade.stopPrice;
+              currentDay.profit = 0; // Profit is 0 when trade is opened
               entryDayFound = true; // Mark entry day found for this week
             } else {
               activeTrade = null; // No entry signal
@@ -185,32 +205,34 @@ export default function WeeklyPortfolioPage() {
             currentDay.trade = 'Close' as TradeHistoryItem['trade'];
             currentDay.stop = 'Executed' as TradeHistoryItem['stop'];
             currentDay.profit = calculateProfit(activeTrade.suggestedEntryPrice, exitPrice, params.operation, activeTrade.volume);
-            currentCapital += currentDay.profit;
-            currentDay.capital = currentCapital;
             tradePairs.push({ open: activeTrade, close: { ...currentDay, exitPrice: exitPrice } });
             activeTrade = null; // Close trade
             stopPriceCalculated = null;
           } else if (isFridayOrLastBusinessDay(currentDate)) {
-            // Check End of Week
-            const exitPrice = currentDay.exitPrice;
+            // Check End of Week - if stop not hit, profit is 0
             currentDay.trade = 'Close' as TradeHistoryItem['trade'];
             currentDay.profit = 0; // Profit/Loss is 0 if Stop Price is not hit
-            currentCapital += currentDay.profit;
-            currentDay.capital = currentCapital;
             tradePairs.push({ open: activeTrade, close: { ...currentDay } });
             activeTrade = null; // Close trade
             stopPriceCalculated = null;
           }
         }
-        
-        // Add current day to processed history
-        if (currentDay.trade !== 'Close') {
-           currentDay.capital = activeTrade ? undefined : currentCapital; // Show capital only after close or if no trade active
-        }
+
+        // Update currentCapital and currentDay.capital after processing profit for the day
+        currentCapital += currentDay.profit;
+        currentDay.capital = currentCapital;
+
         processedHistory.push(currentDay);
       }
     });
-    
+
+    return { processedHistory, tradePairs };
+  };  currentDay.capital = currentCapital;
+
+        processedHistory.push(currentDay);
+      }
+    });
+
     return { processedHistory, tradePairs };
   };
 
