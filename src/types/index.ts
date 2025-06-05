@@ -43,6 +43,7 @@ export interface StockAnalysisParams {
   dataTableName?: string;
   period: string; // Period parameter (now required)
   comparisonStocks?: string[]; // Added comparisonStocks parameter
+  interval?: string; // Added interval parameter for weekly analysis
 }
 
 export interface AnalysisResult {
@@ -82,17 +83,18 @@ export interface TradeHistoryItem {
   profit?: number;
   profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
-  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | 'Closed' | '-'; // Added 'Closed' to the union
+  stop?: 'Executed' | 'Close' | 'Closed' | '-'; // Updated to include 'Closed'
   volume?: number;
   high?: number;
   low?: number;
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
-  stopPrice?: number;
+  stopPrice?: number | string; // Allow both number and string
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
+  stopTrigger?: string; // Add stopTrigger property
 }
 
 export interface CapitalPoint {
@@ -112,4 +114,3 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
-

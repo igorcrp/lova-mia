@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -94,13 +95,7 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-}
-
-  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     // Verifica se os dados necessários existem e são válidos
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-"; // Retorna "-" se faltar Stop Price, Low ou High
@@ -130,7 +125,7 @@ export function StockDetailsTable({
         // Se a operação não for 'buy' nem 'sell', ou se 'operation' for undefined/null, retorna "-"
         return "-";
     }
-}
+  }
 
   // Function to format trade display with new logic
   const formatTradeDisplay = (item: any): string => {
@@ -195,8 +190,8 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : 0,
       initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
