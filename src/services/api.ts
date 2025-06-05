@@ -1112,7 +1112,7 @@ const analysis = {
         
         // Calculate lot size from previous day's capital and actual price
         const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
-          ? Math.floor(previousCapital / Number(actualPrice) / 10 * 10 
+          ? Math.floor(previousCapital / Number(actualPrice)) / 10 * 10 
           : 0;
         
         // Determine if trade is executed
@@ -1161,10 +1161,10 @@ const analysis = {
         // Update capital: Previous day's capital + current day's profit/loss
         capital = Math.max(0, previousCapital + profitLoss);
         
-        // Create trade history item
+        // Create trade history item with proper type conversions
         tradeHistory.push({
           date: currentData.date,
-          entryPrice: actualPrice !== '-' ? Number(actualPrice) : 0, // Corrigido para sempre number
+          entryPrice: actualPrice !== '-' ? Number(actualPrice) : 0, // Fix: Convert to number or use 0
           exitPrice: currentData.close,
           high: currentData.high,
           low: currentData.low,
@@ -1175,7 +1175,7 @@ const analysis = {
           trade,
           lotSize,
           stopPrice: stopPrice > 0 ? stopPrice : '-',
-          stop, // Já está tipado corretamente como "Executed" | "-"
+          stop, // Fix: Already properly typed as "Executed" | "-"
           profitLoss,
           profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
           currentCapital: capital
