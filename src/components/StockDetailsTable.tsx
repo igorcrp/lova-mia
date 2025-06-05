@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -65,9 +64,9 @@ export function StockDetailsTable({
     // Create a safe copy of the data
     const data = result.tradeHistory.map(item => ({
       ...item,
-      profitLoss: Number(item.profitLoss) || 0,
-      currentCapital: item.currentCapital !== undefined && item.currentCapital !== null 
-        ? Number(item.currentCapital) 
+      profitLoss: Number(item.profit) || 0,
+      currentCapital: item.capital !== undefined && item.capital !== null 
+        ? Number(item.capital) 
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
       // Calculate stop trigger here for consistency
@@ -195,6 +194,44 @@ export function StockDetailsTable({
       initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
+  };
+
+  // Função para lidar com a entrada de valores decimais
+  const handleDecimalInputChange = (value: string, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
+    // Permite valores vazios, números e um único ponto decimal
+    if (value === '' || value === '.') {
+      setter(value);
+      return;
+    }
+    
+    // Verifica se é um número válido com até 2 casas decimais
+    const regex = /^-?\d*\.?\d{0,2}$/;
+    if (regex.test(value)) {
+      // Se for um número válido, converte para número se possível
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        setter(numValue);
+      } else {
+        setter(value);
+      }
+    }
+  };
+
+  // Função para formatar valores ao perder o foco
+  const handleBlurFormatting = (value: number | string | null, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
+    if (value === '' || value === '.' || value === null) {
+      setter(0);
+      return;
+    }
+    
+    if (typeof value === 'string') {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        setter(numValue);
+      } else {
+        setter(0);
+      }
+    }
   };
 
   // Formatting functions
@@ -383,151 +420,121 @@ export function StockDetailsTable({
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Initial Capital ($)</label>
-              <Input 
-                type="number"
-                value={initialCapital ?? ""}
-                onChange={(e) => setInitialCapital(Number(e.target.value) || null)}
-                disabled={isLoading}
-                placeholder="e.g. 10000.00"
-              />
+              <label className="block text-sm font-medium mb-1">Initial Capital</label>
+              <div className="flex items-center">
+                <span className="mr-2">$</span>
+                <Input 
+                  type="number"
+                  value={initialCapital !== null ? initialCapital : ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setInitialCapital(null);
+                    } else {
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue)) {
+                        setInitialCapital(numValue);
+                      }
+                    }
+                  }}
+                  disabled={isLoading}
+                  placeholder="e.g. 10000"
+                  min="0"
+                />
+              </div>
             </div>
             
             <Button 
               onClick={handleUpdateResults} 
-              className="w-full" 
               disabled={isLoading}
+              className="w-full"
             >
-              {isLoading ? 'Updating...' : 'Update Results'}
+              Update Results
             </Button>
           </div>
         </div>
       </div>
       
-      {/* Table */}
-      <div className="bg-card rounded-lg border overflow-hidden">
+      {/* Data Table */}
+      <div className="bg-card rounded-lg border p-4">
+        <h3 className="text-lg font-medium mb-4">Trade History</h3>
+        
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((column) => (
+                {columns.map((col) => (
                   <TableHead 
-                    key={column.id}
-                    className={`text-center px-2 py-2 text-sm cursor-pointer ${column.width}`}
-                    onClick={() => handleSortChange(column.id as keyof TradeHistoryItem)}
+                    key={col.id} 
+                    className={`${col.width} cursor-pointer`}
+                    onClick={() => handleSortChange(col.id as keyof TradeHistoryItem)}
                   >
-                    <div className="flex items-center justify-center">
-                      {column.label} {getSortIcon(column.id as keyof TradeHistoryItem)}
+                    <div className="flex items-center">
+                      {col.label}
+                      {getSortIcon(col.id as keyof TradeHistoryItem)}
                     </div>
                   </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center py-6">
-                    Loading data...
+              {currentData.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{formatDate(item.date)}</TableCell>
+                  <TableCell>{item.entryPrice !== undefined ? item.entryPrice : "-"}</TableCell>
+                  <TableCell>{item.high !== undefined ? item.high : "-"}</TableCell>
+                  <TableCell>{item.low !== undefined ? item.low : "-"}</TableCell>
+                  <TableCell>{item.exitPrice !== undefined ? item.exitPrice : "-"}</TableCell>
+                  <TableCell>{item.volume !== undefined ? item.volume.toLocaleString() : "-"}</TableCell>
+                  <TableCell>{item.suggestedEntryPrice !== undefined ? item.suggestedEntryPrice : "-"}</TableCell>
+                  <TableCell>{item.actualPrice !== undefined ? item.actualPrice : "-"}</TableCell>
+                  <TableCell className={getTradeTextColor(formatTradeDisplay(item))}>
+                    {formatTradeDisplay(item)}
                   </TableCell>
-                </TableRow>
-              ) : currentData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="text-center py-6">
-                    No data to display
+                  <TableCell>{item.lotSize !== undefined ? item.lotSize : "-"}</TableCell>
+                  <TableCell>{item.stopPrice !== undefined && item.stopPrice !== '-' ? item.stopPrice : "-"}</TableCell>
+                  <TableCell>{item.stopTrigger}</TableCell>
+                  <TableCell className={item.profitLoss > 0 ? "text-green-600" : item.profitLoss < 0 ? "text-red-600" : ""}>
+                    {item.profitLoss !== undefined && item.profitLoss !== 0 ? formatCurrency(item.profitLoss) : "$0.00"}
                   </TableCell>
+                  <TableCell>{item.currentCapital !== undefined ? formatCurrency(item.currentCapital) : "-"}</TableCell>
                 </TableRow>
-              ) : (
-                currentData.map((item) => (
-                  <TableRow 
-                    key={`${item.date}-${item.profitLoss}`}
-                    className={"hover:bg-muted/50"}
-                  >
-                    {columns.map((column) => {
-                      const value = item[column.id as keyof TradeHistoryItem];
-                      let formattedValue = "-";
-                      
-                      if (value !== undefined && value !== null) {
-                        if (column.id === "date") {
-                          formattedValue = formatDate(value as string);
-                        } else if (column.id === "profitLoss" || column.id === "currentCapital") {
-                          formattedValue = formatCurrency(value as number);
-                        } else if (column.id === "volume" || column.id === "lotSize") {
-                          formattedValue = (value as number).toLocaleString();
-                        } else if (column.id === "stopTrigger") {
-                          formattedValue = item.stopTrigger || "-";
-                        } else if (column.id === "trade") {
-                          // Apply the new trade formatting logic
-                          formattedValue = formatTradeDisplay(item);
-                        } else if (typeof value === "number") {
-                          formattedValue = value.toFixed(2);
-                        } else {
-                          formattedValue = String(value);
-                        }
-                      }
-                      
-                      return (
-                        <TableCell 
-                          key={column.id}
-                          className={`text-center px-2 py-2 text-sm ${
-                            column.id === "currentCapital" ? "font-medium" : ""
-                          } ${
-                            column.id === "profitLoss" ? 
-                              (Number(item.profitLoss) > 0 ? "text-green-600" : 
-                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
-                          } ${
-                            column.id === "trade" ? getTradeTextColor(formattedValue) : ""
-                          }`}
-                        >
-                          {formattedValue}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </div>
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
-            <div className="flex items-center gap-2 mb-4 sm:mb-0">
-              <span className="text-sm text-muted-foreground">Rows per page:</span>
-              <select
-                className="bg-card border rounded px-2 py-1 text-sm"
-                value={itemsPerPage}
-                onChange={(e) => {
-                  setItemsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-              >
-                {[10, 50, 100, 500].map((size) => (
-                  <option key={size} value={size}>{size}</option>
-                ))}
-              </select>
-            </div>
-            
+          <div className="mt-4">
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious 
                     onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
                 
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = currentPage <= 3
-                    ? i + 1
-                    : currentPage >= totalPages - 2
-                      ? totalPages - 4 + i
-                      : currentPage - 2 + i;
+                  // Logic to show pages around current page
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
                   return (
-                    <PaginationItem key={pageNum}>
+                    <PaginationItem key={i}>
                       <PaginationLink
-                        isActive={currentPage === pageNum}
                         onClick={() => handlePageChange(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
                       >
                         {pageNum}
                       </PaginationLink>
@@ -538,67 +545,37 @@ export function StockDetailsTable({
                 <PaginationItem>
                   <PaginationNext 
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
           </div>
         )}
+        
+        {/* Items per page selector */}
+        <div className="mt-4 flex items-center justify-end">
+          <span className="text-sm mr-2">Rows per page:</span>
+          <Select 
+            value={String(itemsPerPage)} 
+            onValueChange={(v) => {
+              setItemsPerPage(Number(v));
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[80px]">
+              <SelectValue placeholder={itemsPerPage} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );
 }
-
-// Função auxiliar para lidar com a entrada de números decimais positivos
-const handleDecimalInputChange = (value: string, onChange: (val: number | string | null) => void) => {
-  if (value === "") {
-    onChange(null); // Permite campo vazio temporariamente
-    return;
-  }
-  // Regex para permitir números positivos com até 2 casas decimais
-  // Permite iniciar com "." ou "0."
-  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
-  if (regex.test(value)) {
-    // Se o valor for apenas ".", ou terminar com ".", não converte para float ainda
-    if (value === "." || value.endsWith(".")) {
-       onChange(value); // Mantém como string temporariamente para permitir digitação
-    } else {
-      const numValue = parseFloat(value);
-      if (!isNaN(numValue) && numValue >= 0) {
-        onChange(numValue);
-      }
-    }
-  } else if (value === "-") { // Impede digitar negativo
-    // Não faz nada se tentar digitar "-" 
-  } else {
-    // Se o regex falhar mas for um número válido (ex: colado), tenta parsear
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 0) {
-       // Formata para 2 casas decimais se for um número válido colado
-       onChange(parseFloat(numValue.toFixed(2)));
-    } else if (value === "") {
-       onChange(null);
-    }
-  }
-};
-
-// Função auxiliar para formatar no blur
-const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number | null) => void) => {
-  let numValue = 0;
-  if (typeof value === "string") {
-    // Se for só um ponto, trata como 0
-    if (value === ".") {
-      numValue = 0;
-    } else {
-      numValue = parseFloat(value) || 0;
-    }
-  } else if (typeof value === "number") {
-    numValue = value;
-  } else if (value === null || value === undefined) {
-    onChange(null); // Mantém nulo se estava vazio
-    return;
-  }
-  // Garante que seja positivo e formata
-  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
-};
