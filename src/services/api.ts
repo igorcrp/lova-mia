@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { StockAnalysisParams, AnalysisResult, DetailedResult, TradeHistoryItem } from "@/types";
 
@@ -107,6 +108,22 @@ export const api = {
         .eq('id', userId);
       if (error) throw error;
       return data;
+    },
+
+    async resendConfirmationEmail(email: string) {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+      if (error) throw error;
+    },
+
+    async googleLogin() {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google'
+      });
+      if (error) throw error;
+      return data;
     }
   },
 
@@ -117,13 +134,57 @@ export const api = {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as User[];
+      return data.map(user => ({
+        ...user,
+        full_name: user.name || '' // Map name to full_name
+      })) as User[];
+    },
+
+    async getAll() {
+      return this.getUsers();
+    },
+
+    async getUserStats() {
+      const { data, error } = await supabase
+        .from('users')
+        .select('status_users, level_id')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      
+      const stats = {
+        total: data.length,
+        active: data.filter(u => u.status_users === 'active').length,
+        pending: data.filter(u => u.status_users === 'pending').length,
+        admin: data.filter(u => u.level_id === 2).length,
+        investor: data.filter(u => u.level_id === 1).length
+      };
+      return stats;
+    },
+
+    async create(userData: Partial<User>) {
+      const { data, error } = await supabase
+        .from('users')
+        .insert({
+          email: userData.email,
+          name: userData.full_name,
+          level_id: userData.level_id || 1,
+          status_users: userData.status_users || 'active',
+          email_verified: userData.email_verified || false
+        });
+      if (error) throw error;
+      return data;
     },
 
     async updateUser(userId: string, updates: Partial<User>) {
       const { data, error } = await supabase
         .from('users')
-        .update(updates)
+        .update({
+          email: updates.email,
+          name: updates.full_name,
+          level_id: updates.level_id,
+          status_users: updates.status_users,
+          email_verified: updates.email_verified
+        })
         .eq('id', userId);
       if (error) throw error;
       return data;
@@ -157,7 +218,19 @@ export const api = {
       })) as Asset[];
     },
 
-    async createAsset(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) {
+    async getAll() {
+      return this.getAssets();
+    },
+
+    async getTotalCount() {
+      const { count, error } = await supabase
+        .from('market_data_sources')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+
+    async create(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) {
       // For now, we'll add to market_data_sources
       const { data, error } = await supabase
         .from('market_data_sources')
@@ -169,6 +242,10 @@ export const api = {
         });
       if (error) throw error;
       return data;
+    },
+
+    async createAsset(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>) {
+      return this.create(asset);
     },
 
     async updateAsset(assetId: string, updates: Partial<Asset>) {
@@ -279,6 +356,24 @@ export const api = {
       return data.stock_table;
     },
 
+    async checkTableExists(tableName: string): Promise<boolean> {
+      try {
+        const { data, error } = await supabase.rpc('table_exists', {
+          p_table_name: tableName
+        });
+        
+        if (error) {
+          console.error("Error checking table existence:", error);
+          return false;
+        }
+        
+        return data || false;
+      } catch (error) {
+        console.error("Error checking table existence:", error);
+        return false;
+      }
+    },
+
     async getAvailableStocks(dataTableName: string) {
       const { data, error } = await supabase.rpc('get_unique_stock_codes', {
         p_table_name: dataTableName
@@ -290,7 +385,11 @@ export const api = {
       }
       
       console.info(`Found ${data.length} unique stock codes`);
-      return data.map(item => item.stock_code);
+      return data.map(item => ({
+        code: item.stock_code,
+        name: item.stock_code,
+        fullName: item.stock_code
+      }));
     },
 
     async getStockData(dataTableName: string, stockCode: string, startDate?: string, endDate?: string) {
@@ -311,23 +410,26 @@ export const api = {
   },
 
   analysis: {
+    async getAvailableStocks(dataTableName: string) {
+      return api.marketData.getAvailableStocks(dataTableName);
+    },
+
     async runAnalysis(params: StockAnalysisParams, onProgress?: (progress: number) => void): Promise<AnalysisResult[]> {
       try {
         console.info('Starting analysis with params:', params);
         
-        const availableStocks = await api.marketData.getAvailableStocks(params.dataTableName!);
+        const availableStocks = await this.getAvailableStocks(params.dataTableName!);
         const totalStocks = availableStocks.length;
         const results: AnalysisResult[] = [];
         
         for (let i = 0; i < Math.min(totalStocks, 50); i++) {
-          const stockCode = availableStocks[i];
+          const stockInfo = availableStocks[i];
+          const stockCode = stockInfo.code;
           
           try {
             const stockData = await api.marketData.getStockData(
               params.dataTableName!,
-              stockCode,
-              params.startDate,
-              params.endDate
+              stockCode
             );
             
             if (stockData && stockData.length > 0) {
@@ -355,9 +457,7 @@ export const api = {
       try {
         const stockData = await api.marketData.getStockData(
           params.dataTableName!,
-          assetCode,
-          params.startDate,
-          params.endDate
+          assetCode
         );
         
         if (!stockData || stockData.length === 0) {
@@ -399,6 +499,7 @@ function generateTradeHistory(stockData: any[], params: StockAnalysisParams): Tr
       stopPrice: '-',
       stop: '-',
       profitLoss: 0,
+      profitPercentage: 0,
       currentCapital: undefined
     };
 
@@ -420,7 +521,7 @@ function generateTradeHistory(stockData: any[], params: StockAnalysisParams): Tr
         // Calculate stop price
         const stopPercent = params.stopPercentage || 0;
         const stopPrice = currentPrice * (1 + (params.operation === 'buy' ? -1 : 1) * (stopPercent / 100));
-        tradeItem.stopPrice = stopPrice.toString();
+        tradeItem.stopPrice = stopPrice;
         
         // Check if stop is hit
         const low = Number(item.low) || 0;
@@ -431,6 +532,7 @@ function generateTradeHistory(stockData: any[], params: StockAnalysisParams): Tr
           tradeItem.stop = 'Executed';
           const exitPrice = stopPrice;
           tradeItem.profitLoss = (params.operation === 'buy' ? exitPrice - currentPrice : currentPrice - exitPrice) * (tradeItem.lotSize || 0);
+          tradeItem.profitPercentage = tradeItem.profitLoss / params.initialCapital * 100;
         }
       }
     }
@@ -450,11 +552,16 @@ function calculateAnalysisMetrics(tradeHistory: TradeHistoryItem[], params: Stoc
   
   return {
     assetCode,
+    assetName: assetCode,
     tradingDays: tradeHistory.length,
     trades: trades.length,
+    tradePercentage: tradeHistory.length > 0 ? (trades.length / tradeHistory.length) * 100 : 0,
     profits,
+    profitPercentage: trades.length > 0 ? (profits / trades.length) * 100 : 0,
     losses,
+    lossPercentage: trades.length > 0 ? (losses / trades.length) * 100 : 0,
     stops,
+    stopPercentage: trades.length > 0 ? (stops / trades.length) * 100 : 0,
     finalCapital,
     profit: totalProfit,
     successRate: trades.length > 0 ? (profits / trades.length) * 100 : 0,
