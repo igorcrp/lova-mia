@@ -4,7 +4,266 @@ import { formatDateToYYYYMMDD, getDateRangeForPeriod } from '@/utils/dateUtils';
 
 // Serviço de autenticação (inalterado)
 export const auth = {
-  // ... mantenha igual ...
+  // Login with email and password
+  async login(email: string, password: string): Promise<any> {
+    try {
+      console.log(`Attempting to login with email: ${email}`);
+      
+      // REMOVIDO: Bloco que chamava RPC inexistente 'check_user_by_email'
+      // A verificação de status agora é feita no AuthContext após o login do Supabase Auth
+
+      // Autentica com Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error("Login error:", error);
+        // Verifica se o erro é por email não confirmado
+        if (error.message.includes("Email not confirmed")) {
+          throw new Error("PENDING_CONFIRMATION"); // Lança erro específico para tratamento no AuthContext
+        }
+        throw error; // Lança outros erros de autenticação
+      }
+
+      // REMOVIDO: Bloco que verificava status 'pending' após login bem-sucedido
+      // Essa lógica agora está no AuthContext
+
+      console.log("Supabase Auth Login successful:", data);
+      return {
+        user: data.user,
+        session: data.session,
+      };
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Register a new user
+   */
+  async register(email: string, password: string, fullName: string): Promise<any> {
+    try {
+      console.log(`Attempting to register user with email: ${email}`);
+      
+      // Register user with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
+          data: {
+            full_name: fullName,
+          }
+        }
+      });
+
+      if (authError) {
+        console.error("Registration auth error:", authError);
+        throw authError;
+      }
+
+      console.log("Auth registration successful:", authData);
+
+      // Insert user data into public.users table with level_id=1 and status_user='pending'
+      if (authData.user) {
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: authData.user.id,
+              email: email,
+              name: fullName,
+              level_id: 1,
+              status_users: 'pending',
+              created_at: new Date().toISOString(),
+            }
+          ]);
+
+        if (userError) {
+          console.error("User data insertion error:", userError);
+          // Don't throw here, as the auth user is already created
+          // Just log the error and continue
+          console.warn("User created in auth but not in public.users table");
+        } else {
+          console.log("User registration successful in public.users table");
+        }
+      }
+
+      return {
+        user: authData.user,
+        session: authData.session,
+        success: true
+      };
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Send password reset email
+   */
+  async resetPassword(email: string): Promise<void> {
+    try {
+      console.log(`Sending password reset email to: ${email}`);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login?reset=true`,
+      });
+
+      if (error) {
+        console.error("Password reset error:", error);
+        throw error;
+      }
+
+      console.log("Password reset email sent successfully");
+    } catch (error) {
+      console.error("Password reset failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update user password
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    try {
+      console.log("Updating user password");
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        console.error("Password update error:", error);
+        throw error;
+      }
+
+      console.log("Password updated successfully");
+    } catch (error) {
+      console.error("Password update failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Resend confirmation email
+   */
+  async resendConfirmationEmail(email: string): Promise<void> {
+    try {
+      console.log(`Resending confirmation email to: ${email}`);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
+        }
+      });
+
+      if (error) {
+        console.error("Resend confirmation email error:", error);
+        throw error;
+      }
+
+      console.log("Confirmation email resent successfully");
+    } catch (error) {
+      console.error("Resend confirmation email failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Login with Google
+   */
+  async googleLogin(): Promise<any> {
+    try {
+      console.log("Attempting to login with Google");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/login?provider=google`
+        }
+      });
+
+      if (error) {
+        console.error("Google login error:", error);
+        throw error;
+      }
+
+      console.log("Google login initiated:", data);
+      return data;
+    } catch (error) {
+      console.error("Google login failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Logout current user
+   */
+  async logout(): Promise<void> {
+    try {
+      console.log("Attempting to logout");
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Logout error:", error);
+        throw error;
+      }
+
+      console.log("Logout successful");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get current user data from public.users table
+   */
+  async getUserData(userId: string): Promise<User | null> {
+    try {
+      console.log(`Getting user data for ID: ${userId}`);
+      
+      // Use the secure function to get user data
+      const { data, error } = await supabase.rpc('get_current_user');
+
+      if (error) {
+        console.error("Get user data error:", error);
+        throw error;
+      }
+
+      console.log("User data retrieved:", data);
+      return data as User;
+    } catch (error) {
+      console.error("Get user data failed:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Update user status to active after email confirmation
+   */
+  async confirmUserEmail(userId: string): Promise<void> {
+    try {
+      console.log(`Confirming email for user ID: ${userId}`);
+      const { error } = await supabase
+        .from('users')
+        .update({ status_users: 'active' })
+        .eq('id', userId);
+
+      if (error) {
+        console.error("Email confirmation error:", error);
+        throw error;
+      }
+
+      console.log("Email confirmed successfully");
+    } catch (error) {
+      console.error("Email confirmation failed:", error);
+      throw error;
+    }
+  }
 };
 
 /**
