@@ -1174,7 +1174,7 @@ const analysis = {
           actualPrice,
           trade,
           lotSize,
-          stopPrice: stopPrice > 0 ? stopPrice : '-',
+          stopPrice: stopPrice > 0 ? stopPrice : '-', // Fix: Ensure proper type assignment
           stop, // Fix: Already properly typed as "Executed" | "-"
           profitLoss,
           profitPercentage: previousCapital > 0 ? (profitLoss / previousCapital) * 100 : 0,
