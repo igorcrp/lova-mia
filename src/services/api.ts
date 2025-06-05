@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { StockAnalysisParams, AnalysisResult, DetailedResult, TradeHistoryItem } from "@/types";
 
