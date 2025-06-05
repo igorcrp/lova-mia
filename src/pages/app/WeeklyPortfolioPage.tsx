@@ -526,4 +526,3 @@ export default function WeeklyPortfolioPage() {
     </div>
   );
 }
-
