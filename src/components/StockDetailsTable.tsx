@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -93,9 +92,15 @@ export function StockDetailsTable({
     });
   }, [result, sortField, sortDirection, params.operation]);
 
-  // Function to calculate stop trigger - made more flexible for optional properties
-  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
-    if (!item || !item.stopPrice || item.stopPrice === '-' || item.low === null || item.high === null) {
+  // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
+  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
     }
     const stopPrice = Number(item.stopPrice);
@@ -188,9 +193,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage) || 0,
-      stopPercentage: Number(stopPercentage) || 0,
-      initialCapital: Number(initialCapital) || 0
+      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
+      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
+      initialCapital: Number(initialCapital?.toFixed(2)) || 0
     };
     onUpdateParams(cleanParams);
   };
@@ -452,7 +457,7 @@ export function StockDetailsTable({
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
-                          formattedValue = (item as any).stopTrigger || "-";
+                          formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
                           formattedValue = value as string;
                         } else if (typeof value === "number") {

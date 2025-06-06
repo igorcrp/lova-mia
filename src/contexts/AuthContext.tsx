@@ -1,234 +1,355 @@
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Session, User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { User } from '@/types';
-import { api } from '@/services/api';
+import { api } from "@/services/api";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@/types";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<{ success: boolean }>;
-  logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   googleLogin: () => Promise<void>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string, fullName: string) => Promise<any>;
+  resetPassword: (email: string) => Promise<void>;
   resendConfirmationEmail: (email: string) => Promise<void>;
+}
+
+// Define types for API responses to fix TypeScript errors
+interface AuthResponse {
+  user?: Partial<User>;
+  session?: {
+    access_token?: string;
+    token?: string;
+  } | string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.info('Initial session:', session?.user?.email);
-      setSession(session);
-      if (session?.user) {
-        loadUserData(session.user);
-      } else {
-        setIsLoading(false);
+    // Check if user is already logged in
+    const storedUser = localStorage.getItem("alphaquant-user");
+    const storedToken = localStorage.getItem("alphaquant-token");
+    
+    if (storedUser && storedToken) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Failed to parse stored user", error);
+        localStorage.removeItem("alphaquant-user");
+        localStorage.removeItem("alphaquant-token");
       }
-    });
+    }
+    
+    // Check for URL parameters that indicate email confirmation or password reset
+    const params = new URLSearchParams(location.search);
+    const confirmation = params.get('confirmation');
+    const reset = params.get('reset');
+    
+    if (confirmation === 'true') {
+      toast.success("Email confirmado com sucesso! Você já pode fazer login.");
+    }
+    
+    if (reset === 'true') {
+      toast.info("Você pode definir uma nova senha agora.");
+    }
+    
+    setIsLoading(false);
+  }, [location]);
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.info('Auth state changed:', event, session?.user?.email);
-      setSession(session);
-      
-      if (session?.user) {
-        await loadUserData(session.user);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const loadUserData = async (authUser: SupabaseUser) => {
+  // Function to check user status in Supabase and handle redirection
+  const checkUserStatusAndRedirect = async (userEmail: string) => {
     try {
-      console.info('Loading user data for:', authUser.email);
+      console.log("Checking status for user:", userEmail);
       
-      // Get user data from our API
-      const userData = await api.auth.getCurrentUser();
-      
+      // CORRIGIDO: Consulta direta à tabela public.users
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('status_users, level_id')
+        .eq('email', userEmail)
+        .maybeSingle(); // Use maybeSingle() para obter um único objeto ou null
+
+      if (error) {
+        console.error("Error checking user status:", error);
+        toast.error("Erro ao verificar status do usuário.");
+        throw error;
+      }
+
+      console.log("User data from Supabase:", userData);
+
+      // CORRIGIDO: Verifica se userData não é null (resultado de maybeSingle())
       if (userData) {
-        console.info('User data loaded successfully:', userData.email);
-        setUser(userData);
+        const userInfo = userData; // userData já é o objeto do usuário
+        // User exists in the database
+        if (userInfo.status_users === 'active') {
+          // User is active, check level and redirect accordingly
+          if (userInfo.level_id === 2) {
+            navigate("/admin");
+            return { isActive: true, level: 2 };
+          } else {
+            navigate("/app");
+            return { isActive: true, level: 1 };
+          }
+        } else {
+          // User exists but is not active
+          toast.warning("Por favor, confirme seu cadastro clicando no link enviado para seu email.");
+          // Automatically resend confirmation email
+          await api.auth.resendConfirmationEmail(userEmail);
+          toast.info("Um novo email de confirmação foi enviado para você.");
+          navigate("/login");
+          return { isActive: false, level: userInfo.level_id };
+        }
       } else {
-        // Create minimal user object from auth data
-        const minimalUser: User = {
-          id: authUser.id,
-          email: authUser.email!,
-          full_name: authUser.user_metadata?.full_name || authUser.email!,
-          level_id: 1,
-          status: 'active',
-          email_verified: !!authUser.email_confirmed_at,
-          account_type: 'free',
-          created_at: authUser.created_at,
-          last_login: authUser.last_sign_in_at
-        };
-        console.info('Created minimal user object:', minimalUser.email);
-        setUser(minimalUser);
+        // User doesn't exist in the database
+        toast.info("Cadastro não encontrado. Por favor, registre-se primeiro.");
+        navigate("/login");
+        return { isActive: false, level: null };
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
-      // Create fallback user object
-      const fallbackUser: User = {
-        id: authUser.id,
-        email: authUser.email!,
-        full_name: authUser.user_metadata?.full_name || authUser.email!,
-        level_id: 1,
-        status: 'active',
-        email_verified: !!authUser.email_confirmed_at,
-        account_type: 'free',
-        created_at: authUser.created_at,
-        last_login: authUser.last_sign_in_at,
-        avatar_url: authUser.user_metadata?.avatar_url
-      };
-      console.info('Created fallback user object:', fallbackUser.email);
-      setUser(fallbackUser);
+      console.error("Error checking user status:", error);
+      toast.error("Erro ao verificar status do usuário.");
+      return { isActive: false, level: null };
+    }
+  };
+  
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      console.log("Attempting login for:", email);
+      const response = await api.auth.login(email, password) as AuthResponse;
+      console.log("Login response:", response);
+      
+      if (!response || !response.session) {
+        throw new Error("Invalid login response from API");
+      }
+      
+      // Check user status in Supabase and handle redirection
+      const userStatus = await checkUserStatusAndRedirect(email);
+      console.log("User status after check:", userStatus);
+      
+      // Only create user object if user is active
+      if (userStatus.isActive) {
+        // Safely extract user data with default values
+        const userResponse = response.user || {};
+        
+        // Create a user object with all required properties from the User type
+        const fullUser: User = {
+          id: userResponse.id || '',
+          email: userResponse.email || email,
+          full_name: userResponse.full_name || '',
+          level_id: userStatus.level,
+          status: 'active',
+          email_verified: true,
+          account_type: (userResponse.account_type as 'free' | 'premium') || 'free',
+          created_at: userResponse.created_at || new Date().toISOString(),
+          last_login: userResponse.last_login || new Date().toISOString(),
+          avatar_url: userResponse.avatar_url
+        };
+        
+        // Extract token safely
+        let sessionToken = '';
+        const session = response.session || {};
+        
+        if (typeof session === 'string') {
+          sessionToken = session;
+        } else if (session && typeof session === 'object') {
+          sessionToken = session.access_token || session.token || '';
+        }
+        
+        // Store user and token
+        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+        localStorage.setItem("alphaquant-token", sessionToken);
+        
+        setUser(fullUser);
+        toast.success("Login realizado com sucesso!");
+      }
+    } catch (error) {
+      console.error("Login failed", error);
+      throw error; // Let the component handle the error
     } finally {
       setIsLoading(false);
     }
   };
-
-  const login = async (email: string, password: string) => {
+  
+  const googleLogin = async () => {
     try {
       setIsLoading(true);
-      console.info('Attempting login for:', email);
+      console.log("Attempting Google login");
+      const response = await api.auth.googleLogin() as AuthResponse;
+      console.log("Google login response:", response);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('Login error:', error);
-        throw error;
+      if (!response.user?.email) {
+        throw new Error('Failed to get user email from Google login');
       }
-
-      if (data?.user) {
-        console.info('Login successful, loading user data');
-        await loadUserData(data.user);
+      
+      // Check user status in Supabase and handle redirection
+      const userEmail = response.user.email;
+      const userStatus = await checkUserStatusAndRedirect(userEmail);
+      console.log("User status after check:", userStatus);
+      
+      // Only create user object if user is active
+      if (userStatus.isActive) {
+        // Create a user object with all required properties from the User type
+        const fullUser: User = {
+          id: response.user.id || '',
+          email: userEmail,
+          full_name: response.user.full_name || '',
+          level_id: userStatus.level,
+          status: 'active',
+          email_verified: true,
+          account_type: (response.user.account_type as 'free' | 'premium') || 'free',
+          created_at: response.user.created_at || new Date().toISOString(),
+          last_login: response.user.last_login || new Date().toISOString(),
+          avatar_url: response.user.avatar_url
+        };
+        
+        // Extract token safely
+        let sessionToken = '';
+        const session = response.session || {};
+        
+        if (typeof session === 'string') {
+          sessionToken = session;
+        } else if (session && typeof session === 'object') {
+          sessionToken = session.access_token || session.token || '';
+        }
+        
+        // Store user and token
+        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+        localStorage.setItem("alphaquant-token", sessionToken);
+        
+        setUser(fullUser);
+        toast.success("Login realizado com sucesso!");
       }
-    } catch (error: any) {
-      console.error('Login error:', error);
+    } catch (error) {
+      console.error("Google login failed", error);
+      toast.error("Falha no login com Google.");
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
-
-  const register = async (email: string, password: string, fullName: string): Promise<{ success: boolean }> => {
+  
+  const register = async (email: string, password: string, fullName: string) => {
     try {
       setIsLoading(true);
-      const result = await api.auth.register(email, password, fullName);
+      console.log("Attempting to register user:", email);
       
-      if (result?.user) {
-        const newUser: User = {
-          id: result.user.id,
-          email: result.user.email!,
-          full_name: fullName,
-          level_id: 1,
-          status: 'pending',
-          email_verified: !!result.user.email_confirmed_at,
-          account_type: 'free',
-          created_at: result.user.created_at,
-          last_login: result.user.last_sign_in_at
-        };
-        setUser(newUser);
-        return { success: true };
-      }
-      return { success: false };
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      // Return success even if there was an error with the database insertion
-      // This is because the auth user might have been created successfully
-      return { success: true };
+    // Call the API function
+    const result = await api.auth.register(email, password, fullName);
+
+    // Check if the API call was successful (adapt if needed)
+    if (result && !result.error) {
+      console.log("Registration successful, navigating to login...");
+      // Try navigating FIRST
+      navigate("/login");
+      // Then show messages
+      toast.success("Cadastro realizado com sucesso!");
+      toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
+    } else {
+      // Handle API error case
+      console.error("Registration API call failed or returned error:", result);
+      toast.error("Ocorreu um erro durante o registro. Tente novamente.");
+      // Optionally re-throw or handle specific errors from 'result' if available
+      throw new Error(result?.error?.message || "Erro desconhecido no registro");
+    }
+
+    return result; // Return result for potential further use
+
+  } catch (error: any) { // Catch errors from await or thrown errors
+    console.error("Registration failed in AuthContext:", error);
+    // Display a generic error or a specific one if available
+    toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
+    throw error; // Re-throw the error so the calling component knows about it
+  } finally {
+    setIsLoading(false);
+  }
+  };
+  
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      console.log("Attempting to reset password for:", email);
+      
+      await api.auth.resetPassword(email);
+      
+      toast.success("Email de redefinição de senha enviado com sucesso!");
+      toast.info("Por favor, verifique sua caixa de entrada e siga as instruções para redefinir sua senha.");
+    } catch (error) {
+      console.error("Password reset failed", error);
+      toast.error("Falha ao enviar email de redefinição de senha. Tente novamente mais tarde.");
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
-
+  
+  const resendConfirmationEmail = async (email: string) => {
+    try {
+      setIsLoading(true);
+      console.log("Attempting to resend confirmation email for:", email);
+      
+      await api.auth.resendConfirmationEmail(email);
+      
+      toast.success("Email de confirmação reenviado com sucesso!");
+      toast.info("Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
+    } catch (error) {
+      console.error("Resend confirmation email failed", error);
+      toast.error("Falha ao reenviar email de confirmação. Tente novamente mais tarde.");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   const logout = async () => {
     try {
       setIsLoading(true);
       await api.auth.logout();
-      setUser(null);
-      setSession(null);
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetPassword = async (email: string) => {
-    try {
-      await api.auth.resetPassword(email);
-    } catch (error: any) {
-      console.error('Reset password error:', error);
-      throw error;
-    }
-  };
-
-  const googleLogin = async () => {
-    try {
-      setIsLoading(true);
-      const result = await api.auth.googleLogin();
       
-      if (result?.url) {
-        window.location.href = result.url;
-      }
-    } catch (error: any) {
-      console.error('Google login error:', error);
+      // Clear storage
+      localStorage.removeItem("alphaquant-user");
+      localStorage.removeItem("alphaquant-token");
+      
+      setUser(null);
+      navigate("/login");
+      
+      toast.success("Logout realizado com sucesso!");
+    } catch (error) {
+      console.error("Logout failed", error);
+      toast.error("Falha ao realizar logout.");
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
-
-  const resendConfirmationEmail = async (email: string) => {
-    try {
-      await api.auth.resendConfirmationEmail(email);
-    } catch (error: any) {
-      console.error('Resend confirmation error:', error);
-      throw error;
-    }
-  };
-
+  
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      isLoading,
-      login,
-      register,
-      logout,
-      resetPassword,
-      googleLogin,
-      resendConfirmationEmail
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      login, 
+      googleLogin, 
+      logout, 
+      register, 
+      resetPassword, 
+      resendConfirmationEmail 
     }}>
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}
+};

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -40,8 +39,20 @@ export default function AdminUsersPage() {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
-        const data = await api.users.getAllUsers();
-        setUsers(data);
+        const data = await api.users.getAll();
+        
+        // Ensure users have the correct status type
+        const typedUsers: User[] = data.map(user => ({
+          ...user,
+          status: (user.status === 'active' || user.status === 'pending' || user.status === 'inactive') 
+            ? user.status 
+            : 'active' as 'active' | 'pending' | 'inactive',
+          account_type: (user.account_type === 'free' || user.account_type === 'premium') 
+            ? user.account_type 
+            : 'free' as 'free' | 'premium'
+        }));
+        
+        setUsers(typedUsers);
       } catch (error) {
         console.error("Failed to fetch users", error);
         toast.error("Failed to fetch users");
@@ -62,24 +73,7 @@ export default function AdminUsersPage() {
     try {
       setIsLoading(true);
       const createdUser = await api.users.create(newUser);
-      
-      // Map the database response to the User type
-      const mappedUser: User = {
-        id: createdUser.id,
-        email: createdUser.email,
-        full_name: createdUser.name || createdUser.email,
-        level_id: createdUser.level_id || 1,
-        status: createdUser.status_users === 'active' ? 'active' : 
-                createdUser.status_users === 'inactive' ? 'inactive' : 
-                createdUser.status_users === 'pending' ? 'pending' : 
-                'active' as 'active' | 'pending' | 'inactive',
-        email_verified: createdUser.email_verified || false,
-        account_type: 'free',
-        created_at: createdUser.created_at,
-        last_login: createdUser.updated_at
-      };
-      
-      setUsers([mappedUser, ...users]);
+      setUsers([createdUser, ...users]);
       setShowNewUserDialog(false);
       toast.success("User added successfully");
       

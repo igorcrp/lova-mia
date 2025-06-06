@@ -140,33 +140,42 @@ export type Database = {
       }
       users: {
         Row: {
+          auth_id: string | null
+          auth_user_id: string | null
           created_at: string | null
           email: string
           email_verified: boolean | null
           id: string
           level_id: number | null
+          metadata: Json | null
           name: string | null
           role: string | null
           status_users: string | null
           updated_at: string | null
         }
         Insert: {
+          auth_id?: string | null
+          auth_user_id?: string | null
           created_at?: string | null
           email: string
           email_verified?: boolean | null
           id?: string
           level_id?: number | null
+          metadata?: Json | null
           name?: string | null
           role?: string | null
           status_users?: string | null
           updated_at?: string | null
         }
         Update: {
+          auth_id?: string | null
+          auth_user_id?: string | null
           created_at?: string | null
           email?: string
           email_verified?: boolean | null
           id?: string
           level_id?: number | null
+          metadata?: Json | null
           name?: string | null
           role?: string | null
           status_users?: string | null
@@ -179,40 +188,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_user_by_email: {
-        Args: { p_email: string }
-        Returns: {
-          user_exists: boolean
-          id: string
-          email: string
-          name: string
-          status_users: string
-          level_id: number
-          email_verified: boolean
-        }[]
-      }
       get_stock_data: {
         Args: {
-          table_name: string
-          stock_code_param: string
-          start_date?: string
-          end_date?: string
+          p_table_name: string
+          p_stock_code_param: string
+          p_limit_rows?: number
         }
-        Returns: {
-          date: string
-          open: number
-          high: number
-          low: number
-          close: number
-          volume: number
-          stock_code: string
-        }[]
+        Returns: Json
       }
       get_unique_stock_codes: {
         Args: { p_table_name: string }
-        Returns: {
-          stock_code: string
-        }[]
+        Returns: string[]
       }
       table_exists: {
         Args: { p_table_name: string }
