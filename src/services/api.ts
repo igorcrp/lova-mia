@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   User, 
@@ -654,7 +653,13 @@ export const api = {
       let maxCapital = currentCapital;
       let maxDrawdown = 0;
 
-      for (const dayData of stockData) {
+      // Sort data by date to ensure correct order
+      const sortedData = [...stockData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      for (let i = 0; i < sortedData.length; i++) {
+        const dayData = sortedData[i];
+        const prevDayData = i > 0 ? sortedData[i - 1] : null;
+        
         const open = Number(dayData.open);
         const high = Number(dayData.high);
         const low = Number(dayData.low);
@@ -665,83 +670,102 @@ export const api = {
           continue;
         }
 
-        // Get reference price
-        let referencePrice = close;
-        switch (params.referencePrice) {
-          case 'open': referencePrice = open; break;
-          case 'high': referencePrice = high; break;
-          case 'low': referencePrice = low; break;
-          case 'close': referencePrice = close; break;
+        // Get previous day's reference price (use close as default)
+        let prevReferencePrice = close; // fallback if no previous day
+        if (prevDayData) {
+          switch (params.referencePrice) {
+            case 'open': prevReferencePrice = Number(prevDayData.open); break;
+            case 'high': prevReferencePrice = Number(prevDayData.high); break;
+            case 'low': prevReferencePrice = Number(prevDayData.low); break;
+            case 'close': prevReferencePrice = Number(prevDayData.close); break;
+          }
         }
 
-        // Calculate entry and stop prices
-        const entryPriceMultiplier = params.operation === 'buy' 
-          ? (1 + params.entryPercentage / 100)
-          : (1 - params.entryPercentage / 100);
-        
-        const suggestedEntryPrice = referencePrice * entryPriceMultiplier;
-        
-        const stopPriceMultiplier = params.operation === 'buy'
-          ? (1 - params.stopPercentage / 100)
-          : (1 + params.stopPercentage / 100);
-        
-        const stopPrice = suggestedEntryPrice * stopPriceMultiplier;
-
-        // Determine if entry condition is met
-        let entryExecuted = false;
-        let actualEntryPrice = suggestedEntryPrice;
-        
+        // Formula 5.7: Suggested Entry Price
+        let suggestedEntryPrice: number;
         if (params.operation === 'buy') {
-          entryExecuted = low <= suggestedEntryPrice;
-          if (entryExecuted) {
-            actualEntryPrice = Math.min(suggestedEntryPrice, open);
-          }
+          // Buy: Previous day's reference price - (Previous day's reference price * % Entry Price)
+          suggestedEntryPrice = prevReferencePrice - (prevReferencePrice * params.entryPercentage / 100);
         } else {
-          entryExecuted = high >= suggestedEntryPrice;
-          if (entryExecuted) {
-            actualEntryPrice = Math.max(suggestedEntryPrice, open);
+          // Sell: Previous day's reference price + (Previous day's reference price * % Entry Price)
+          suggestedEntryPrice = prevReferencePrice + (prevReferencePrice * params.entryPercentage / 100);
+        }
+
+        // Formula 5.8: Actual Price - If Open <= Suggested Entry, use the smaller value (open)
+        let actualPrice = open;
+        if (open <= suggestedEntryPrice) {
+          actualPrice = open;
+        } else {
+          actualPrice = suggestedEntryPrice;
+        }
+
+        // Formula 5.9: Trade execution logic
+        let entryExecuted = false;
+        if (params.operation === 'buy') {
+          // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry, then "Executed"
+          entryExecuted = (actualPrice <= suggestedEntryPrice) || (low <= suggestedEntryPrice);
+        } else {
+          // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry, then "Executed"
+          entryExecuted = (actualPrice >= suggestedEntryPrice) || (high >= suggestedEntryPrice);
+        }
+
+        let trade: TradeHistoryItem['trade'] = entryExecuted ? 'Executed' : '-';
+        
+        // Formula 5.10: Lot Size = Previous day's Current Capital / Actual Price (rounded down to tens)
+        let lotSize = 0;
+        if (entryExecuted) {
+          lotSize = Math.floor(currentCapital / actualPrice);
+          // Round down to tens
+          lotSize = Math.floor(lotSize / 10) * 10;
+        }
+
+        // Formula 5.11: Stop Price
+        let stopPrice = 0;
+        if (entryExecuted) {
+          if (params.operation === 'buy') {
+            // Buy: Actual Price - (Actual Price * % Stop)
+            stopPrice = actualPrice - (actualPrice * params.stopPercentage / 100);
+          } else {
+            // Sell: Actual Price + (Actual Price * % Stop)
+            stopPrice = actualPrice + (actualPrice * params.stopPercentage / 100);
           }
         }
 
-        let trade: TradeHistoryItem['trade'] = entryExecuted ? 
-          (params.operation === 'buy' ? 'Buy' : 'Sell') : '-';
-        
+        // Formula 5.12: Stop Trigger
+        let stopTriggered = false;
+        if (entryExecuted) {
+          if (params.operation === 'buy') {
+            // Buy: If Low < Stop Price, then "Executed"
+            stopTriggered = low < stopPrice;
+          } else {
+            // Sell: If High > Stop Price, then "Executed"
+            stopTriggered = high > stopPrice;
+          }
+        }
+
+        // Formula 5.13: Profit/Loss
         let profitLoss = 0;
-        let lotSize = 0;
-        
         if (entryExecuted) {
           trades++;
           
-          // Calculate lot size based on current capital
-          lotSize = Math.floor(currentCapital / actualEntryPrice);
-          
-          // Check if stop was triggered
-          let stopTriggered = false;
-          if (params.operation === 'buy') {
-            stopTriggered = low < stopPrice;
-          } else {
-            stopTriggered = high > stopPrice;
-          }
-          
-          let exitPrice: number;
           if (stopTriggered) {
+            // If Stop Trigger = "Executed", then [(Stop Price - Actual Price) * Lot Size]
+            if (params.operation === 'buy') {
+              profitLoss = (stopPrice - actualPrice) * lotSize;
+            } else {
+              profitLoss = (actualPrice - stopPrice) * lotSize;
+            }
             stops++;
-            exitPrice = stopPrice;
-            trade = 'Close';
           } else {
-            // Exit at close
-            exitPrice = close;
+            // If Stop Trigger = "-", then [(Close - Actual Price) * Lot Size]
+            if (params.operation === 'buy') {
+              profitLoss = (close - actualPrice) * lotSize;
+            } else {
+              profitLoss = (actualPrice - close) * lotSize;
+            }
           }
           
-          // Calculate profit/loss
-          if (params.operation === 'buy') {
-            profitLoss = (exitPrice - actualEntryPrice) * lotSize;
-          } else {
-            profitLoss = (actualEntryPrice - exitPrice) * lotSize;
-          }
-          
-          currentCapital += profitLoss;
-          
+          // Count profits and losses
           if (profitLoss > 0) {
             profits++;
             totalProfits += profitLoss;
@@ -749,12 +773,17 @@ export const api = {
             losses++;
             totalLosses += Math.abs(profitLoss);
           }
-          
-          // Track max drawdown
-          maxCapital = Math.max(maxCapital, currentCapital);
-          const currentDrawdown = (maxCapital - currentCapital) / maxCapital * 100;
-          maxDrawdown = Math.max(maxDrawdown, currentDrawdown);
         }
+
+        // Formula 5.14: Current Capital
+        if (entryExecuted) {
+          currentCapital += profitLoss;
+        }
+        
+        // Track max drawdown
+        maxCapital = Math.max(maxCapital, currentCapital);
+        const currentDrawdown = (maxCapital - currentCapital) / maxCapital * 100;
+        maxDrawdown = Math.max(maxDrawdown, currentDrawdown);
 
         tradeHistory.push({
           date: dayData.date,
@@ -764,13 +793,14 @@ export const api = {
           exitPrice: close,
           volume,
           suggestedEntryPrice,
-          actualPrice: entryExecuted ? actualEntryPrice : 0,
+          actualPrice: entryExecuted ? actualPrice : 0,
           trade,
           lotSize,
-          stopPrice,
+          stopPrice: entryExecuted ? stopPrice : 0,
+          stop: stopTriggered ? 'Executed' : '-',
           profitLoss,
-          profitPercentage: entryExecuted && actualEntryPrice > 0 ? 
-            (profitLoss / (actualEntryPrice * lotSize)) * 100 : 0,
+          profitPercentage: entryExecuted && actualPrice > 0 ? 
+            (profitLoss / (actualPrice * lotSize)) * 100 : 0,
           currentCapital
         });
 
@@ -780,13 +810,13 @@ export const api = {
         });
       }
 
-      // Calculate metrics
+      // Calculate metrics according to formulas 4.2.1 to 4.2.12
       const totalTrades = trades;
       const profit = currentCapital - params.initialCapital;
-      const tradePercentage = totalTrades > 0 ? (trades / totalTrades) * 100 : 0;
-      const profitPercentage = profits > 0 ? (profits / totalTrades) * 100 : 0;
-      const lossPercentage = losses > 0 ? (losses / totalTrades) * 100 : 0;
-      const stopPercentage = stops > 0 ? (stops / totalTrades) * 100 : 0;
+      const tradePercentage = totalTrades > 0 ? (trades / stockData.length) * 100 : 0;  // 4.2.4
+      const profitPercentage = totalTrades > 0 ? (profits / totalTrades) * 100 : 0;     // 4.2.6
+      const lossPercentage = totalTrades > 0 ? (losses / totalTrades) * 100 : 0;        // 4.2.8
+      const stopPercentage = totalTrades > 0 ? (stops / totalTrades) * 100 : 0;         // 4.2.10
       const successRate = totalTrades > 0 ? (profits / totalTrades) * 100 : 0;
       
       const averageGain = profits > 0 ? totalProfits / profits : 0;
@@ -813,16 +843,16 @@ export const api = {
       const recoveryFactor = maxDrawdown > 0 ? (profit / params.initialCapital * 100) / maxDrawdown : 0;
 
       return {
-        tradingDays: stockData.length,
-        trades: totalTrades,
-        tradePercentage,
-        profits,
-        profitPercentage,
-        losses,
-        lossPercentage,
-        stops,
-        stopPercentage,
-        finalCapital: currentCapital,
+        tradingDays: stockData.length,   // 4.2.2
+        trades: totalTrades,             // 4.2.3
+        tradePercentage,                 // 4.2.4
+        profits,                         // 4.2.5
+        profitPercentage,                // 4.2.6
+        losses,                          // 4.2.7
+        lossPercentage,                  // 4.2.8
+        stops,                           // 4.2.9
+        stopPercentage,                  // 4.2.10
+        finalCapital: currentCapital,    // 4.2.11
         profit,
         averageGain,
         averageLoss,
@@ -885,7 +915,13 @@ export const api = {
       const tradeHistory: TradeHistoryItem[] = [];
       const capitalEvolution: CapitalPoint[] = [];
 
-      for (const dayData of stockData) {
+      // Sort data by date to ensure correct order
+      const sortedData = [...stockData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      for (let i = 0; i < sortedData.length; i++) {
+        const dayData = sortedData[i];
+        const prevDayData = i > 0 ? sortedData[i - 1] : null;
+        
         const open = Number(dayData.open);
         const high = Number(dayData.high);
         const low = Number(dayData.low);
@@ -896,78 +932,107 @@ export const api = {
           continue;
         }
 
-        // Get reference price
-        let referencePrice = close;
-        switch (params.referencePrice) {
-          case 'open': referencePrice = open; break;
-          case 'high': referencePrice = high; break;
-          case 'low': referencePrice = low; break;
-          case 'close': referencePrice = close; break;
+        // Get previous day's reference price
+        let prevReferencePrice = close; // fallback if no previous day
+        if (prevDayData) {
+          switch (params.referencePrice) {
+            case 'open': prevReferencePrice = Number(prevDayData.open); break;
+            case 'high': prevReferencePrice = Number(prevDayData.high); break;
+            case 'low': prevReferencePrice = Number(prevDayData.low); break;
+            case 'close': prevReferencePrice = Number(prevDayData.close); break;
+          }
         }
 
-        // Calculate entry and stop prices
-        const entryPriceMultiplier = params.operation === 'buy' 
-          ? (1 + params.entryPercentage / 100)
-          : (1 - params.entryPercentage / 100);
-        
-        const suggestedEntryPrice = referencePrice * entryPriceMultiplier;
-        
-        const stopPriceMultiplier = params.operation === 'buy'
-          ? (1 - params.stopPercentage / 100)
-          : (1 + params.stopPercentage / 100);
-        
-        const stopPrice = suggestedEntryPrice * stopPriceMultiplier;
-
-        // Determine if entry condition is met
-        let entryExecuted = false;
-        let actualEntryPrice = suggestedEntryPrice;
-        
+        // Formula 5.7: Calculate suggested entry price based on previous day's reference price
+        let suggestedEntryPrice: number;
         if (params.operation === 'buy') {
-          entryExecuted = low <= suggestedEntryPrice;
-          if (entryExecuted) {
-            actualEntryPrice = Math.min(suggestedEntryPrice, open);
-          }
+          // Buy: Previous day's reference price - (Previous day's reference price * % Entry Price)
+          suggestedEntryPrice = prevReferencePrice - (prevReferencePrice * params.entryPercentage / 100);
         } else {
+          // Sell: Previous day's reference price + (Previous day's reference price * % Entry Price)
+          suggestedEntryPrice = prevReferencePrice + (prevReferencePrice * params.entryPercentage / 100);
+        }
+
+        // Formula 5.8: Actual Price - If Open <= Suggested Entry, use the smaller value (open)
+        let actualPrice = suggestedEntryPrice;
+        if (params.operation === 'buy' && open <= suggestedEntryPrice) {
+          actualPrice = open;
+        } else if (params.operation === 'sell' && open >= suggestedEntryPrice) {
+          actualPrice = open;
+        }
+
+        // Formula 5.9: Trade execution logic
+        let entryExecuted = false;
+        if (params.operation === 'buy') {
+          // Buy: If low <= Suggested Entry, then "Executed"
+          entryExecuted = low <= suggestedEntryPrice;
+        } else {
+          // Sell: If high >= Suggested Entry, then "Executed"
           entryExecuted = high >= suggestedEntryPrice;
-          if (entryExecuted) {
-            actualEntryPrice = Math.max(suggestedEntryPrice, open);
+        }
+
+        let trade: TradeHistoryItem['trade'] = entryExecuted ? 'Executed' : '-';
+        
+        // Formula 5.10: Lot Size = Previous day's Current Capital / Actual Price (rounded down)
+        let lotSize = 0;
+        if (entryExecuted) {
+          // Get previous day's current capital (or initial capital if first day)
+          const prevCapital = i > 0 && tradeHistory[i-1] ? 
+            tradeHistory[i-1].currentCapital || params.initialCapital : 
+            params.initialCapital;
+          
+          lotSize = Math.floor(prevCapital / actualPrice);
+          // Round down to tens
+          lotSize = Math.floor(lotSize / 10) * 10;
+          if (lotSize <= 0) lotSize = 0;
+        }
+
+        // Formula 5.11: Stop Price
+        let stopPrice = 0;
+        if (entryExecuted) {
+          if (params.operation === 'buy') {
+            // Buy: Actual Price - (Actual Price * % Stop)
+            stopPrice = actualPrice - (actualPrice * params.stopPercentage / 100);
+          } else {
+            // Sell: Actual Price + (Actual Price * % Stop)
+            stopPrice = actualPrice + (actualPrice * params.stopPercentage / 100);
           }
         }
 
-        let trade: TradeHistoryItem['trade'] = entryExecuted ? 
-          (params.operation === 'buy' ? 'Buy' : 'Sell') : '-';
-        
-        let profitLoss = 0;
-        let lotSize = 0;
-        
+        // Formula 5.12: Stop Trigger
+        let stopTriggered = '-';
         if (entryExecuted) {
-          // Calculate lot size based on current capital
-          lotSize = Math.floor(currentCapital / actualEntryPrice);
-          
-          // Check if stop was triggered
-          let stopTriggered = false;
           if (params.operation === 'buy') {
-            stopTriggered = low < stopPrice;
+            // Buy: If Low < Stop Price, then "Executed"
+            stopTriggered = low < stopPrice ? 'Executed' : '-';
           } else {
-            stopTriggered = high > stopPrice;
+            // Sell: If High > Stop Price, then "Executed"
+            stopTriggered = high > stopPrice ? 'Executed' : '-';
           }
-          
-          let exitPrice: number;
-          if (stopTriggered) {
-            exitPrice = stopPrice;
-            trade = 'Close';
+        }
+
+        // Formula 5.13: Profit/Loss
+        let profitLoss = 0;
+        if (entryExecuted && lotSize > 0) {
+          if (stopTriggered === 'Executed') {
+            // If Stop Trigger = "Executed", then [(Stop Price - Actual Price) * Lot Size]
+            if (params.operation === 'buy') {
+              profitLoss = (stopPrice - actualPrice) * lotSize;
+            } else {
+              profitLoss = (actualPrice - stopPrice) * lotSize;
+            }
           } else {
-            // Exit at close
-            exitPrice = close;
+            // If Stop Trigger = "-", then [(Close - Actual Price) * Lot Size]
+            if (params.operation === 'buy') {
+              profitLoss = (close - actualPrice) * lotSize;
+            } else {
+              profitLoss = (actualPrice - close) * lotSize;
+            }
           }
-          
-          // Calculate profit/loss
-          if (params.operation === 'buy') {
-            profitLoss = (exitPrice - actualEntryPrice) * lotSize;
-          } else {
-            profitLoss = (actualEntryPrice - exitPrice) * lotSize;
-          }
-          
+        }
+
+        // Formula 5.14: Current Capital (Adds profit/loss to previous day's capital)
+        if (entryExecuted && lotSize > 0) {
           currentCapital += profitLoss;
         }
 
@@ -979,13 +1044,14 @@ export const api = {
           exitPrice: close,
           volume,
           suggestedEntryPrice,
-          actualPrice: entryExecuted ? actualEntryPrice : 0,
+          actualPrice: entryExecuted ? actualPrice : 0,
           trade,
           lotSize,
-          stopPrice,
+          stopPrice: entryExecuted ? stopPrice : 0,
+          stop: stopTriggered,
           profitLoss,
-          profitPercentage: entryExecuted && actualEntryPrice > 0 ? 
-            (profitLoss / (actualEntryPrice * lotSize)) * 100 : 0,
+          profitPercentage: entryExecuted && actualPrice > 0 && lotSize > 0 ? 
+            (profitLoss / (actualPrice * lotSize)) * 100 : 0,
           currentCapital
         });
 
