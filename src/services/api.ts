@@ -12,12 +12,6 @@ import {
 } from "@/types";
 import { getDateRangeForPeriod } from "@/utils/dateUtils";
 
-// Helper function to create dynamic queries when RLS allows
-function fromDynamic(tableName: string) {
-  console.info(`Creating dynamic query for table: ${tableName}`);
-  return supabase.from(tableName);
-}
-
 // Function names available in Supabase
 type FunctionName = "check_user_by_email" | "get_stock_data" | "get_unique_stock_codes" | "table_exists";
 
@@ -218,6 +212,37 @@ export const api = {
 
       console.info("User email confirmed successfully");
       return data;
+    },
+
+    async resendConfirmationEmail(email: string) {
+      console.info("Resending confirmation email for:", email);
+      const { data, error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
+      });
+
+      if (error) {
+        console.error("Error resending confirmation email:", error);
+        throw error;
+      }
+
+      console.info("Confirmation email resent successfully");
+      return data;
+    },
+
+    async googleLogin() {
+      console.info("Attempting Google login");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google'
+      });
+
+      if (error) {
+        console.error("Google login error:", error);
+        throw error;
+      }
+
+      console.info("Google login initiated successfully");
+      return data;
     }
   },
 
@@ -249,6 +274,54 @@ export const api = {
         created_at: user.created_at,
         last_login: user.updated_at
       }));
+    },
+
+    async getAll(): Promise<User[]> {
+      return this.getAllUsers();
+    },
+
+    async getUserStats() {
+      console.info("Fetching user statistics");
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('status_users, level_id');
+
+      if (error) {
+        console.error("Error fetching user stats:", error);
+        throw error;
+      }
+
+      const total = data.length;
+      const active = data.filter(u => u.status_users === 'active').length;
+      const pending = data.filter(u => u.status_users === 'pending').length;
+      const admins = data.filter(u => u.level_id === 2).length;
+
+      return { total, active, pending, admins };
+    },
+
+    async create(userData: Partial<User>) {
+      console.info("Creating new user:", userData.email);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          email: userData.email!,
+          name: userData.full_name,
+          level_id: userData.level_id || 1,
+          status_users: userData.status || 'pending',
+          email_verified: userData.email_verified || false
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating user:", error);
+        throw error;
+      }
+
+      console.info("User created successfully");
+      return data;
     }
   },
 
@@ -277,6 +350,29 @@ export const api = {
           status: "active"
         }
       ];
+    },
+
+    async getAll(): Promise<Asset[]> {
+      return this.getAllAssets();
+    },
+
+    async getTotalCount(): Promise<number> {
+      const assets = await this.getAllAssets();
+      return assets.length;
+    },
+
+    async create(assetData: Partial<Asset>) {
+      console.info("Creating new asset:", assetData.code);
+      // Mock implementation - in real app would create in database
+      return {
+        id: Date.now().toString(),
+        code: assetData.code!,
+        name: assetData.name!,
+        country: assetData.country!,
+        stock_market: assetData.stock_market!,
+        asset_class: assetData.asset_class!,
+        status: assetData.status || 'active'
+      };
     }
   },
 
@@ -284,7 +380,8 @@ export const api = {
     async getAvailableCountries(): Promise<string[]> {
       console.info("Fetching available countries");
       
-      const { data, error } = await fromDynamic('market_data_sources')
+      const { data, error } = await supabase
+        .from('market_data_sources')
         .select('country')
         .order('country');
 
@@ -298,10 +395,15 @@ export const api = {
       return uniqueCountries;
     },
 
+    async getCountries(): Promise<string[]> {
+      return this.getAvailableCountries();
+    },
+
     async getAvailableStockMarkets(country: string): Promise<string[]> {
       console.info(`Fetching stock markets for country: ${country}`);
       
-      const { data, error } = await fromDynamic('market_data_sources')
+      const { data, error } = await supabase
+        .from('market_data_sources')
         .select('stock_market')
         .eq('country', country)
         .order('stock_market');
@@ -316,10 +418,15 @@ export const api = {
       return uniqueMarkets;
     },
 
+    async getStockMarkets(country: string): Promise<string[]> {
+      return this.getAvailableStockMarkets(country);
+    },
+
     async getAvailableAssetClasses(country: string, stockMarket: string): Promise<string[]> {
       console.info(`Fetching asset classes for ${country} - ${stockMarket}`);
       
-      const { data, error } = await fromDynamic('market_data_sources')
+      const { data, error } = await supabase
+        .from('market_data_sources')
         .select('asset_class')
         .eq('country', country)
         .eq('stock_market', stockMarket)
@@ -335,10 +442,15 @@ export const api = {
       return uniqueClasses;
     },
 
+    async getAssetClasses(country: string, stockMarket: string): Promise<string[]> {
+      return this.getAvailableAssetClasses(country, stockMarket);
+    },
+
     async getDataTableName(country: string, stockMarket: string, assetClass: string): Promise<string | null> {
       console.info(`Getting data table name for ${country} - ${stockMarket} - ${assetClass}`);
       
-      const { data, error } = await fromDynamic('market_data_sources')
+      const { data, error } = await supabase
+        .from('market_data_sources')
         .select('stock_table')
         .eq('country', country)
         .eq('stock_market', stockMarket)
@@ -352,6 +464,28 @@ export const api = {
 
       console.info("Data table name:", data.stock_table);
       return data.stock_table;
+    },
+
+    async checkTableExists(tableName: string): Promise<boolean> {
+      console.info(`Checking if table exists: ${tableName}`);
+      
+      try {
+        const { data, error } = await rpc('table_exists', {
+          p_table_name: tableName
+        });
+
+        if (error) {
+          console.error("Error checking table existence:", error);
+          return false;
+        }
+
+        console.info(`Table ${tableName} exists:`, data);
+        return data || false;
+
+      } catch (error) {
+        console.error("Error in checkTableExists:", error);
+        return false;
+      }
     },
 
     async getAvailableStocks(tableName: string): Promise<StockInfo[]> {
@@ -388,17 +522,15 @@ export const api = {
       
       try {
         // First check if table exists
-        const { data: tableExists, error: checkError } = await rpc('table_exists', {
-          p_table_name: tableName
-        });
+        const tableExists = await this.checkTableExists(tableName);
 
-        if (checkError || !tableExists) {
+        if (!tableExists) {
           console.error(`Table ${tableName} does not exist or is not accessible`);
           return [];
         }
 
         const { data, error } = await supabase
-          .from(tableName)
+          .from(tableName as any)
           .select('stock_code')
           .limit(1000);
 

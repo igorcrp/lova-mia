@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,7 +71,7 @@ export function StockSetupForm({
     async function loadCountries() {
       setLoadingState(prev => ({ ...prev, countries: true }));
       try {
-        const fetchedCountries = await api.marketData.getCountries();
+        const fetchedCountries = await api.marketData.getAvailableCountries();
         if (fetchedCountries && fetchedCountries.length > 0) {
           setCountries(fetchedCountries);
           console.log("Loaded countries:", fetchedCountries);
@@ -107,7 +108,7 @@ export function StockSetupForm({
     async function loadStockMarkets() {
       setLoadingState(prev => ({ ...prev, stockMarkets: true }));
       try {
-        const fetchedMarkets = await api.marketData.getStockMarkets(country);
+        const fetchedMarkets = await api.marketData.getAvailableStockMarkets(country);
         
         if (fetchedMarkets && fetchedMarkets.length > 0) {
           setStockMarkets(fetchedMarkets);
@@ -155,7 +156,7 @@ export function StockSetupForm({
     async function loadAssetClasses() {
       setLoadingState(prev => ({ ...prev, assetClasses: true }));
       try {
-        const fetchedAssetClasses = await api.marketData.getAssetClasses(country, stockMarket);
+        const fetchedAssetClasses = await api.marketData.getAvailableAssetClasses(country, stockMarket);
         
         if (fetchedAssetClasses && fetchedAssetClasses.length > 0) {
           setAssetClasses(fetchedAssetClasses);
@@ -221,21 +222,6 @@ export function StockSetupForm({
         // Save table name for later use
         setDataTableName(tableName);
         console.log(`Found data table: ${tableName}`);
-        
-        // Check if the table exists before trying to access it
-        const tableExists = await api.marketData.checkTableExists(tableName);
-        
-        if (!tableExists) {
-          console.error(`The table ${tableName} does not exist`);
-          toast({
-            variant: "destructive",
-            title: "Table not found",
-            description: `The data table ${tableName} does not exist in the database.`
-          });
-          setIsTableValid(false);
-          setAvailableAssets([]);
-          return;
-        }
         
         try {
           // Fetch assets directly from the dynamic table
