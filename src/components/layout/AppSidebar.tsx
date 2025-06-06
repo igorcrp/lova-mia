@@ -29,10 +29,6 @@ export function AppSidebar() {
             </NavLink>
           </li>
           
-          <li className="px-6 py-2 mt-4">
-            <h3 className="text-xs uppercase text-sidebar-foreground/70 font-medium">INTERVALS</h3>
-          </li>
-          
           <li>
             <NavLink 
               to="/app/daytrade" 
@@ -42,39 +38,6 @@ export function AppSidebar() {
               )}
             >
               <span>Daytrade</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink 
-              to="/app/weekly" 
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-                isActive && "bg-white/10 font-medium"
-              )}
-            >
-              <span>Weekly Portfolio</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink 
-              to="/app/monthly" 
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-                isActive && "bg-white/10 font-medium"
-              )}
-            >
-              <span>Monthly Portfolio</span>
-            </NavLink>
-          </li>
-          <li>
-            <NavLink 
-              to="/app/annual" 
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-                isActive && "bg-white/10 font-medium"
-              )}
-            >
-              <span>Annual Portfolio</span>
             </NavLink>
           </li>
         </ul>
