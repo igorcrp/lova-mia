@@ -246,13 +246,15 @@ export const auth = {
 
       console.log("User data retrieved:", data);
       
-      // Transform the data to match User interface
+      // Transform the data to match User interface with proper type casting
       const userData: User = {
         id: data.id,
         email: data.email,
         full_name: data.name || '',
         level_id: data.level_id || 1,
-        status: data.status_users || 'pending',
+        status: (data.status_users === 'active' || data.status_users === 'pending' || data.status_users === 'inactive') 
+          ? data.status_users as 'active' | 'pending' | 'inactive'
+          : 'pending',
         email_verified: data.email_verified || false,
         account_type: 'free', // Default account type
         created_at: data.created_at,
@@ -285,6 +287,162 @@ export const auth = {
       console.log("Email confirmed successfully");
     } catch (error) {
       console.error("Email confirmation failed:", error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Users API service for admin management
+ */
+const users = {
+  /**
+   * Get all users
+   */
+  async getAll(): Promise<User[]> {
+    try {
+      const { data, error } = await fromDynamic('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(user => ({
+        id: user.id,
+        email: user.email,
+        full_name: user.name || '',
+        level_id: user.level_id || 1,
+        status: (user.status_users === 'active' || user.status_users === 'pending' || user.status_users === 'inactive') 
+          ? user.status_users as 'active' | 'pending' | 'inactive'
+          : 'pending',
+        email_verified: user.email_verified || false,
+        account_type: 'free',
+        created_at: user.created_at,
+        last_login: user.updated_at
+      }));
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get user statistics
+   */
+  async getUserStats(): Promise<any> {
+    try {
+      const { data, error } = await fromDynamic('users')
+        .select('status_users');
+
+      if (error) throw error;
+
+      const stats = {
+        total: data?.length || 0,
+        active: data?.filter(u => u.status_users === 'active').length || 0,
+        pending: data?.filter(u => u.status_users === 'pending').length || 0,
+        inactive: data?.filter(u => u.status_users === 'inactive').length || 0
+      };
+
+      return stats;
+    } catch (error) {
+      console.error('Failed to fetch user stats:', error);
+      return { total: 0, active: 0, pending: 0, inactive: 0 };
+    }
+  },
+
+  /**
+   * Create a new user
+   */
+  async create(userData: any): Promise<User> {
+    try {
+      const { data, error } = await fromDynamic('users')
+        .insert([{
+          email: userData.email,
+          name: userData.full_name,
+          level_id: userData.level_id,
+          status_users: userData.status,
+          email_verified: userData.email_verified
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        email: data.email,
+        full_name: data.name || '',
+        level_id: data.level_id || 1,
+        status: (data.status_users === 'active' || data.status_users === 'pending' || data.status_users === 'inactive') 
+          ? data.status_users as 'active' | 'pending' | 'inactive'
+          : 'pending',
+        email_verified: data.email_verified || false,
+        account_type: 'free',
+        created_at: data.created_at,
+        last_login: data.updated_at
+      };
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Assets API service for admin management
+ */
+const assets = {
+  /**
+   * Get all assets (mock implementation since we don't have an assets table)
+   */
+  async getAll(): Promise<Asset[]> {
+    try {
+      // Since we don't have an assets table, we'll return an empty array
+      // In a real implementation, this would query the assets table
+      console.log('Assets getAll called - returning empty array as no assets table exists');
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch assets:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get total count of assets
+   */
+  async getTotalCount(): Promise<number> {
+    try {
+      // Since we don't have an assets table, return 0
+      console.log('Assets getTotalCount called - returning 0 as no assets table exists');
+      return 0;
+    } catch (error) {
+      console.error('Failed to get assets count:', error);
+      return 0;
+    }
+  },
+
+  /**
+   * Create a new asset
+   */
+  async create(assetData: Partial<Asset>): Promise<Asset> {
+    try {
+      // Mock implementation - in reality this would insert into an assets table
+      console.log('Assets create called with data:', assetData);
+      
+      // Return a mock asset with generated ID
+      const mockAsset: Asset = {
+        id: Math.random().toString(36).substr(2, 9),
+        code: assetData.code || '',
+        name: assetData.name || '',
+        country: assetData.country || '',
+        stock_market: assetData.stock_market || '',
+        asset_class: assetData.asset_class || '',
+        status: assetData.status || 'active'
+      };
+
+      return mockAsset;
+    } catch (error) {
+      console.error('Failed to create asset:', error);
       throw error;
     }
   }
@@ -702,8 +860,6 @@ const analysis = {
       return [];
     }
   },
-
-  // --- Start: Functions copied from api-18.ts ---
 
   /**
    * Run stock analysis with given parameters
@@ -1169,15 +1325,14 @@ const analysis = {
       // Re-throw the error to be caught by the calling function
       throw error; 
     }
-  },
-
-  // --- End: Functions copied from api-18.ts ---
-
+  }
 };
 
 // Export the API services
 export const api = {
   auth,
+  users,
+  assets,
   marketData,
   analysis
 };
