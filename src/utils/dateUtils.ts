@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for working with dates
  */
@@ -175,3 +174,72 @@ export function getNextBusinessDay(date: Date): Date {
   }
   return nextDay;
 }
+
+/**
+ * Verifica se uma data é o primeiro dia útil do mês
+ * @param date Data a ser verificada
+ * @returns true se for o primeiro dia útil do mês
+ */
+export function isFirstBusinessDayOfMonth(date: Date): boolean {
+  const day = date.getDate();
+  const dayOfWeek = date.getDay();
+  
+  // Se for o primeiro dia do mês e não for fim de semana
+  if (day === 1 && dayOfWeek !== 0 && dayOfWeek !== 6) {
+    return true;
+  }
+  
+  // Se for o segundo dia do mês e o primeiro dia foi domingo
+  if (day === 2 && dayOfWeek === 1 && new Date(date.getFullYear(), date.getMonth(), 1).getDay() === 0) {
+    return true;
+  }
+  
+  // Se for o terceiro dia do mês e os dois primeiros foram fim de semana
+  if (day === 3 && dayOfWeek === 1) {
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    const secondDay = new Date(date.getFullYear(), date.getMonth(), 2).getDay();
+    return firstDay === 6 && secondDay === 0;
+  }
+  
+  return false;
+}
+
+/**
+ * Verifica se uma data é o último dia útil do mês
+ * @param date Data a ser verificada
+ * @returns true se for o último dia útil do mês
+ */
+export function isLastBusinessDayOfMonth(date: Date): boolean {
+  const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const lastDayOfMonthDay = lastDayOfMonth.getDay();
+  
+  // Se for o último dia do mês e não for fim de semana
+  if (date.getDate() === lastDayOfMonth.getDate() && lastDayOfMonthDay !== 0 && lastDayOfMonthDay !== 6) {
+    return true;
+  }
+  
+  // Se for o penúltimo dia do mês e o último dia for sábado
+  if (date.getDate() === lastDayOfMonth.getDate() - 1 && lastDayOfMonthDay === 6) {
+    return true;
+  }
+  
+  // Se for o antepenúltimo dia do mês e os dois últimos dias forem fim de semana
+  if (date.getDate() === lastDayOfMonth.getDate() - 2 && lastDayOfMonthDay === 0) {
+    const secondLastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0 - 1).getDay();
+    return secondLastDay === 6;
+  }
+  
+  return false;
+}
+
+/**
+ * Verifica se o período selecionado é válido para análise mensal
+ * @param period Período selecionado (ex: "1m", "3m", "6m", "1y", "2y", "5y")
+ * @returns true se o período for válido para análise mensal
+ */
+export function isValidPeriodForMonthly(period: string): boolean {
+  // Períodos válidos para análise mensal são 2 meses ou mais
+  const validPeriods = ["2m", "3m", "6m", "1y", "2y", "5y"];
+  return validPeriods.includes(period.toLowerCase());
+}
+
