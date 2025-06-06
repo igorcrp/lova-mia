@@ -1,3 +1,4 @@
+
 // This is a service layer to interact with Supabase and process data
 
 import { supabase, fromDynamic, MarketDataSource, StockRecord } from '@/integrations/supabase/client';
@@ -301,7 +302,8 @@ const users = {
    */
   async getAll(): Promise<User[]> {
     try {
-      const { data, error } = await fromDynamic('users')
+      const { data, error } = await supabase
+        .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -331,7 +333,8 @@ const users = {
    */
   async getUserStats(): Promise<any> {
     try {
-      const { data, error } = await fromDynamic('users')
+      const { data, error } = await supabase
+        .from('users')
         .select('status_users');
 
       if (error) throw error;
@@ -355,7 +358,8 @@ const users = {
    */
   async create(userData: any): Promise<User> {
     try {
-      const { data, error } = await fromDynamic('users')
+      const { data, error } = await supabase
+        .from('users')
         .insert([{
           email: userData.email,
           name: userData.full_name,
