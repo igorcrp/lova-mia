@@ -1,3 +1,4 @@
+
 import { AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,12 +21,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-interface TradeDetail {
-  profitLoss: number;
-  trade: string;
-  stop: string;
-}
 
 interface ResultsTableProps {
   results: AnalysisResult[];
@@ -58,7 +53,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-const sortedResults = [...results].sort((a, b) => {
+  const sortedResults = [...results].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -329,7 +324,7 @@ const sortedResults = [...results].sort((a, b) => {
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
+                      ${result.finalCapital.toFixed(2)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 
@@ -350,45 +345,47 @@ const sortedResults = [...results].sort((a, b) => {
       </div>
       
       {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows per page:</span>
-          <select
-            className="bg-transparent border rounded px-2 py-1 text-sm"
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(Number(e.target.value));
-              setPage(1);
-            }}
-            style={{ backgroundColor: "#0f1729" }}
-          >
-            <option value={10}>10</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={500}>500</option>
-          </select>
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Rows per page:</span>
+            <select
+              className="bg-transparent border rounded px-2 py-1 text-sm"
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(1);
+              }}
+              style={{ backgroundColor: "#0f1729" }}
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+            </select>
+          </div>
+          
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  className={cn(page === 1 && "pointer-events-none opacity-50")}
+                />
+              </PaginationItem>
+              
+              {generatePaginationItems()}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  className={cn(page === totalPages && "pointer-events-none opacity-50")}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
-        
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => setPage(Math.max(1, page - 1))}
-                className={cn(page === 1 && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-            
-            {generatePaginationItems()}
-            
-            <PaginationItem>
-              <PaginationNext 
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                className={cn(page === totalPages && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
+      )}
     </div>
   );
 }
