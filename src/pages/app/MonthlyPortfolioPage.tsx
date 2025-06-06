@@ -86,7 +86,7 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
 };
 
 const calculateVolatility = (trades: TradeHistoryItem[]): number => {
-    const profits = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined).map(t => t.profit as number);
+    const profits = trades.filter(t => t.trade === 'Close' && t.profit !== undefined).map(t => t.profit as number);
     if (profits.length < 2) return 0;
     const mean = profits.reduce((sum, p) => sum + p, 0) / profits.length;
     const variance = profits.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / (profits.length - 1);
@@ -102,7 +102,7 @@ const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturnPercentage:
 
 const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02;
-    const negativeReturns = trades.filter(t => t.trade === 'Closed' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number);
+    const negativeReturns = trades.filter(t => t.trade === 'Close' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number);
     if (negativeReturns.length === 0) return Infinity;
     const meanNegative = 0; // Target return
     const downsideVariance = negativeReturns.reduce((sum, p) => sum + Math.pow(p - meanNegative, 2), 0) / negativeReturns.length;
@@ -198,7 +198,7 @@ export default function MonthlyPortfolioPage() {
             profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
             closeRecord = {
               ...currentDayData,
-              trade: 'Closed',
+              trade: 'Close',
               stop: 'Executed',
               profit: profit, // Profit calculated on close
               capital: capitalBeforeCurrentTrade + profit, // Capital updated on close
@@ -212,12 +212,12 @@ export default function MonthlyPortfolioPage() {
             capitalBeforeCurrentTrade += profit; // Update tracker for next potential trade
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
-            exitPrice = typeof currentDayData.close === 'number' ? currentDayData.close : undefined;
+            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
             if (exitPrice !== undefined) {
               profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
               closeRecord = {
                 ...currentDayData,
-                trade: 'Closed',
+                trade: 'Close',
                 stop: '-',
                 profit: profit, // Profit calculated on close
                 capital: capitalBeforeCurrentTrade + profit, // Capital updated on close
@@ -309,7 +309,27 @@ export default function MonthlyPortfolioPage() {
               const maxDrawdownAmount = maxDrawdown / 100 * params.initialCapital;
               const recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
               
-              return { ...result, tradingDays: processedHistory.length, trades, profits: profitsCount, losses: lossesCount, stops: stopsCount, finalCapital, profit: totalProfit, successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, averageGain, averageLoss, maxDrawdown, sharpeRatio, sortinoRatio, recoveryFactor };
+              // Adicionar o histórico detalhado ao resultado
+              const resultWithHistory = { 
+                ...result, 
+                tradingDays: processedHistory.length, 
+                trades, 
+                profits: profitsCount, 
+                losses: lossesCount, 
+                stops: stopsCount, 
+                finalCapital, 
+                profit: totalProfit, 
+                successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, 
+                averageGain, 
+                averageLoss, 
+                maxDrawdown, 
+                sharpeRatio, 
+                sortinoRatio, 
+                recoveryFactor,
+                detailedHistory: processedHistory // Adicionando o histórico detalhado
+              };
+              
+              return resultWithHistory;
             } else {
                return { ...result, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
             }
@@ -427,7 +447,7 @@ export default function MonthlyPortfolioPage() {
       } else {
         // Handle case where no detailed data/history is found
         console.warn(`[v6] No detailed data or trade history found for ${assetCode}.`);
-        toast({ variant: "warning", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
+        toast({ variant: "default", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
         setDetailedResult(null);
         setShowDetailView(false); // Ensure view is hidden
         setSelectedAsset(null); // Deselect asset
@@ -516,7 +536,7 @@ export default function MonthlyPortfolioPage() {
          
        } else {
          console.warn(`[v6] No detailed data or trade history found during update for ${selectedAsset}.`);
-         toast({ variant: "warning", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
+         toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
        }
      } catch (error) { 
        console.error(`[v6] Failed to update detailed analysis for ${selectedAsset}`, error); 
@@ -554,28 +574,30 @@ export default function MonthlyPortfolioPage() {
               <Progress value={progress} className="h-2" />
             </div>
           )}
-          {/* Render ResultsTable only if not loading AND results exist */}
+          {/* Render ResultsTable only if not loading AND we have results */}
           {!isLoading && analysisResults.length > 0 && (
-            <ResultsTable 
-              results={analysisResults} 
-              onViewDetails={viewDetails} // Pass the corrected viewDetails function
-            />
+            <div className="mt-6">
+              <ResultsTable 
+                results={analysisResults} 
+                onViewDetails={viewDetails} 
+                isLoading={isLoadingDetails}
+              />
+            </div>
           )}
         </div>
       ) : (
-        // View 2: Stock Detail View
-        // Render StockDetailView only if detailedResult and analysisParams exist
-        detailedResult && analysisParams && (
-          <div className="bg-card p-6 rounded-lg border">
-            <StockDetailView
-              result={detailedResult} 
-              params={analysisParams} 
-              onClose={closeDetails} 
-              onUpdateParams={updateAnalysis} 
-              isLoading={isLoadingDetails} 
+        // View 2: Detailed Stock View
+        <div className="bg-card p-6 rounded-lg border">
+          {detailedResult && (
+            <StockDetailView 
+              result={detailedResult}
+              params={analysisParams!}
+              onUpdateParams={updateAnalysis}
+              onBack={closeDetails}
+              isLoading={isLoadingDetails}
             />
-          </div>
-        )
+          )}
+        </div>
       )}
     </div>
   );
