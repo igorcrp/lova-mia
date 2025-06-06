@@ -99,7 +99,7 @@ export function StockDetailsTable({
     high: number | string | null;
   }
 
-  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
+  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
     }
@@ -193,9 +193,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
-      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
+      initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
     };
     onUpdateParams(cleanParams);
   };
@@ -595,3 +595,4 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
+
