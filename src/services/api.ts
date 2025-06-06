@@ -232,8 +232,10 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use the secure function to get user data
-      const { data, error } = await supabase.rpc('get_current_user');
+      // Use a função check_user_by_email em vez de get_current_user
+      const { data, error } = await supabase.rpc('check_user_by_email', {
+        p_email: userId // Usando userId como email para compatibilidade
+      });
 
       if (error) {
         console.error("Get user data error:", error);
@@ -241,7 +243,24 @@ export const auth = {
       }
 
       console.log("User data retrieved:", data);
-      return data as User;
+      
+      // Converter o resultado para o tipo User
+      if (Array.isArray(data) && data.length > 0) {
+        const userData = data[0];
+        return {
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.name,
+          level_id: userData.level_id,
+          status: userData.status_users as any,
+          email_verified: userData.email_verified,
+          account_type: 'free', // Valor padrão
+          created_at: new Date().toISOString(),
+          last_login: null
+        } as User;
+      }
+      
+      return null;
     } catch (error) {
       console.error("Get user data failed:", error);
       return null;
@@ -554,11 +573,10 @@ const analysis = {
     try {
       console.log(`Trying direct query to get stock codes from ${tableName}`);
       
-      // Use fromDynamic to handle the dynamic table name
+      // Implementação alternativa sem usar groupBy
       const { data, error } = await fromDynamic(tableName)
-        .select('stock_code') // Corrected based on user feedback
-        .groupBy('stock_code') // Corrected based on user feedback
-        .order('stock_code');
+        .select('stock_code')
+        .limit(1000); // Limitar para evitar problemas de performance
       
       if (error) {
         console.error('Error in direct stock code query:', error);
@@ -571,13 +589,16 @@ const analysis = {
         return [];
       }
       
-      // Extract stock codes with proper type safety
-      const stocks: StockInfo[] = (data as any[])
+      // Extract stock codes with proper type safety and remove duplicates
+      const uniqueCodes = new Set<string>();
+      (data as any[])
         .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .map(item => ({
-          code: String(item.stock_code),
-          name: String(item.stock_code) // Use stock_code as name since 'name' column doesn't exist
-        }));
+        .forEach(item => uniqueCodes.add(String(item.stock_code)));
+      
+      const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
+        code: code,
+        name: code // Use stock_code as name since 'name' column doesn't exist
+      }));
       
       console.log(`Direct query found ${stocks.length} stock codes`);
       return stocks;
@@ -871,14 +892,14 @@ const analysis = {
         : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: TradeHistoryItem['stopTrigger'] = '-'; // Type corrected
+      let stopTrigger: string = '-'; // Type corrected
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = currentData.low <= stopPrice ? "Executed" : "-";
+          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = currentData.high >= stopPrice ? "Executed" : "-";
+          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
