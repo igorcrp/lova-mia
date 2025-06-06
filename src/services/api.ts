@@ -276,10 +276,6 @@ export const api = {
       }));
     },
 
-    async getAll(): Promise<User[]> {
-      return this.getAllUsers();
-    },
-
     async getUserStats() {
       console.info("Fetching user statistics");
       
@@ -352,10 +348,6 @@ export const api = {
       ];
     },
 
-    async getAll(): Promise<Asset[]> {
-      return this.getAllAssets();
-    },
-
     async getTotalCount(): Promise<number> {
       const assets = await this.getAllAssets();
       return assets.length;
@@ -373,6 +365,10 @@ export const api = {
         asset_class: assetData.asset_class!,
         status: assetData.status || 'active'
       };
+    },
+
+    async getAll(): Promise<Asset[]> {
+      return this.getAllAssets();
     }
   },
 
@@ -395,10 +391,6 @@ export const api = {
       return uniqueCountries;
     },
 
-    async getCountries(): Promise<string[]> {
-      return this.getAvailableCountries();
-    },
-
     async getAvailableStockMarkets(country: string): Promise<string[]> {
       console.info(`Fetching stock markets for country: ${country}`);
       
@@ -416,10 +408,6 @@ export const api = {
       const uniqueMarkets = [...new Set(data.map(item => item.stock_market))];
       console.info("Loaded stock markets:", uniqueMarkets);
       return uniqueMarkets;
-    },
-
-    async getStockMarkets(country: string): Promise<string[]> {
-      return this.getAvailableStockMarkets(country);
     },
 
     async getAvailableAssetClasses(country: string, stockMarket: string): Promise<string[]> {
@@ -440,10 +428,6 @@ export const api = {
       const uniqueClasses = [...new Set(data.map(item => item.asset_class))];
       console.info("Loaded asset classes:", uniqueClasses);
       return uniqueClasses;
-    },
-
-    async getAssetClasses(country: string, stockMarket: string): Promise<string[]> {
-      return this.getAvailableAssetClasses(country, stockMarket);
     },
 
     async getDataTableName(country: string, stockMarket: string, assetClass: string): Promise<string | null> {
@@ -479,8 +463,8 @@ export const api = {
           return false;
         }
 
-        console.info(`Table ${tableName} exists:`, data);
-        return data || false;
+        console.info(`Table ${tableName} exists:`, !!data);
+        return !!data;
 
       } catch (error) {
         console.error("Error in checkTableExists:", error);
@@ -501,7 +485,7 @@ export const api = {
           throw error;
         }
 
-        const stockCodes = data || [];
+        const stockCodes = Array.isArray(data) ? data : [];
         console.info(`Found ${stockCodes.length} stock codes`);
 
         // Convert to StockInfo format
@@ -529,24 +513,8 @@ export const api = {
           return [];
         }
 
-        const { data, error } = await supabase
-          .from(tableName as any)
-          .select('stock_code')
-          .limit(1000);
-
-        if (error) {
-          console.error("Error fetching stock codes directly:", error);
-          throw error;
-        }
-
-        const uniqueCodes = [...new Set(data.map(item => item.stock_code))];
-        console.info(`Found ${uniqueCodes.length} unique stock codes`);
-
-        return uniqueCodes.map(code => ({
-          code,
-          name: code,
-          fullName: code
-        }));
+        // Use RPC function instead of direct table access
+        return this.getAvailableStocks(tableName);
 
       } catch (error) {
         console.error("Error in getAvailableStocksDirect:", error);
@@ -656,8 +624,9 @@ export const api = {
           throw error;
         }
 
-        console.info(`Retrieved ${data?.length || 0} records for ${stockCode}`);
-        return data || [];
+        const stockData = Array.isArray(data) ? data : [];
+        console.info(`Retrieved ${stockData.length} records for ${stockCode}`);
+        return stockData;
 
       } catch (error) {
         console.error("Error in getStockData:", error);

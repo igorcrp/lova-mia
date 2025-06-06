@@ -9,9 +9,7 @@ interface UserStats {
   total: number;
   active: number;
   pending: number;
-  inactive: number;
-  premium?: number;
-  new?: number;
+  admins: number;
 }
 
 interface AssetCount {
@@ -61,14 +59,11 @@ export default function AdminDashboardPage() {
         const assetsTotal = await api.assets.getTotalCount();
         
         // Create a complete UserStats object with all required properties
-        // Making sure we provide default values for all required fields
         const completeUserStats: UserStats = {
           total: usersData.total || 0,
           active: usersData.active || 0,
-          pending: usersData.pending || 0, // Default to 0 if not provided
-          inactive: usersData.inactive || 0, // Default to 0 if not provided
-          premium: usersData.premium,
-          new: usersData.new
+          pending: usersData.pending || 0,
+          admins: usersData.admins || 0
         };
         
         setUserStats(completeUserStats);

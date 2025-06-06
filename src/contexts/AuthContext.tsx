@@ -1,3 +1,4 @@
+
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
@@ -23,6 +24,7 @@ interface AuthResponse {
     access_token?: string;
     token?: string;
   } | string;
+  error?: any;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -123,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting login for:", email);
-      const response = await api.auth.login(email, password) as AuthResponse;
+      const response = await api.auth.login(email, password);
       console.log("Login response:", response);
       
       if (!response || !response.session) {
@@ -182,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting Google login");
-      const response = await api.auth.googleLogin() as AuthResponse;
+      const response = await api.auth.googleLogin();
       console.log("Google login response:", response);
       
       if (!response.user?.email) {
@@ -241,35 +243,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Attempting to register user:", email);
       
-    // Call the API function
-    const result = await api.auth.register(email, password, fullName);
+      // Call the API function
+      const result = await api.auth.register(email, password, fullName);
 
-    // Check if the API call was successful (adapt if needed)
-    if (result && !result.error) {
-      console.log("Registration successful, navigating to login...");
-      // Try navigating FIRST
-      navigate("/login");
-      // Then show messages
-      toast.success("Cadastro realizado com sucesso!");
-      toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
-    } else {
-      // Handle API error case
-      console.error("Registration API call failed or returned error:", result);
-      toast.error("Ocorreu um erro durante o registro. Tente novamente.");
-      // Optionally re-throw or handle specific errors from 'result' if available
-      throw new Error(result?.error?.message || "Erro desconhecido no registro");
+      // Check if the API call was successful (adapt if needed)
+      if (result && !result.error) {
+        console.log("Registration successful, navigating to login...");
+        // Try navigating FIRST
+        navigate("/login");
+        // Then show messages
+        toast.success("Cadastro realizado com sucesso!");
+        toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
+      } else {
+        // Handle API error case
+        console.error("Registration API call failed or returned error:", result);
+        toast.error("Ocorreu um erro durante o registro. Tente novamente.");
+        // Optionally re-throw or handle specific errors from 'result' if available
+        throw new Error(result?.error?.message || "Erro desconhecido no registro");
+      }
+
+      return result; // Return result for potential further use
+
+    } catch (error: any) { // Catch errors from await or thrown errors
+      console.error("Registration failed in AuthContext:", error);
+      // Display a generic error or a specific one if available
+      toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
+      throw error; // Re-throw the error so the calling component knows about it
+    } finally {
+      setIsLoading(false);
     }
-
-    return result; // Return result for potential further use
-
-  } catch (error: any) { // Catch errors from await or thrown errors
-    console.error("Registration failed in AuthContext:", error);
-    // Display a generic error or a specific one if available
-    toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
-    throw error; // Re-throw the error so the calling component knows about it
-  } finally {
-    setIsLoading(false);
-  }
   };
   
   const resetPassword = async (email: string) => {
