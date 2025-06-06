@@ -60,7 +60,7 @@ export function AppSidebar() {
           <li>
             <div 
               className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
-              onMouseEnter={(e) => handleMouseEnter("Coming soon! We'll release this feature shortly.", e)}
+              onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
               onMouseLeave={handleMouseLeave}
             >
               <span>Weekly Portfolio</span>
@@ -69,7 +69,7 @@ export function AppSidebar() {
           <li>
             <div 
               className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
-              onMouseEnter={(e) => handleMouseEnter("Coming soon! We'll release this feature shortly.", e)}
+              onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
               onMouseLeave={handleMouseLeave}
             >
               <span>Monthly Portfolio</span>
@@ -78,7 +78,7 @@ export function AppSidebar() {
           <li>
             <div 
               className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
-              onMouseEnter={(e) => handleMouseEnter("Coming soon! We'll release this feature shortly.", e)}
+              onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
               onMouseLeave={handleMouseLeave}
             >
               <span>Annual Portfolio</span>
