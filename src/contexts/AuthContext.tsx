@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.info('Initial session:', session?.user?.email);
       setSession(session);
       if (session?.user) {
         loadUserData(session.user);
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await api.auth.getCurrentUser();
       
       if (userData) {
+        console.info('User data loaded successfully:', userData.email);
         setUser(userData);
       } else {
         // Create minimal user object from auth data
@@ -74,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: authUser.created_at,
           last_login: authUser.last_sign_in_at
         };
+        console.info('Created minimal user object:', minimalUser.email);
         setUser(minimalUser);
       }
     } catch (error) {
@@ -91,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         last_login: authUser.last_sign_in_at,
         avatar_url: authUser.user_metadata?.avatar_url
       };
+      console.info('Created fallback user object:', fallbackUser.email);
       setUser(fallbackUser);
     } finally {
       setIsLoading(false);
@@ -100,10 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      const result = await api.auth.login(email, password);
+      console.info('Attempting login for:', email);
       
-      if (result?.user) {
-        await loadUserData(result.user);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Login error:', error);
+        throw error;
+      }
+
+      if (data?.user) {
+        console.info('Login successful, loading user data');
+        await loadUserData(data.user);
       }
     } catch (error: any) {
       console.error('Login error:', error);
