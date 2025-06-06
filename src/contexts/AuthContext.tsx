@@ -19,11 +19,8 @@ interface AuthContextType {
 
 // Define types for API responses to fix TypeScript errors
 interface AuthResponse {
-  user?: Partial<User>;
-  session?: {
-    access_token?: string;
-    token?: string;
-  } | string;
+  user?: any;
+  session?: any;
   error?: any;
 }
 
@@ -162,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof session === 'string') {
           sessionToken = session;
         } else if (session && typeof session === 'object') {
-          sessionToken = session.access_token || session.token || '';
+          sessionToken = (session as any).access_token || (session as any).token || '';
         }
         
         // Store user and token
@@ -187,47 +184,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.auth.googleLogin();
       console.log("Google login response:", response);
       
-      if (!response.user?.email) {
-        throw new Error('Failed to get user email from Google login');
+      // For Google OAuth, the response structure is different
+      // Check if it's a redirect-based OAuth flow
+      if (response.url) {
+        window.location.href = response.url;
+        return;
       }
       
-      // Check user status in Supabase and handle redirection
-      const userEmail = response.user.email;
-      const userStatus = await checkUserStatusAndRedirect(userEmail);
-      console.log("User status after check:", userStatus);
-      
-      // Only create user object if user is active
-      if (userStatus.isActive) {
-        // Create a user object with all required properties from the User type
-        const fullUser: User = {
-          id: response.user.id || '',
-          email: userEmail,
-          full_name: response.user.full_name || '',
-          level_id: userStatus.level,
-          status: 'active',
-          email_verified: true,
-          account_type: (response.user.account_type as 'free' | 'premium') || 'free',
-          created_at: response.user.created_at || new Date().toISOString(),
-          last_login: response.user.last_login || new Date().toISOString(),
-          avatar_url: response.user.avatar_url
-        };
+      // If we have user data directly, process it
+      if (response.user?.email) {
+        const userEmail = response.user.email;
+        const userStatus = await checkUserStatusAndRedirect(userEmail);
         
-        // Extract token safely
-        let sessionToken = '';
-        const session = response.session || {};
-        
-        if (typeof session === 'string') {
-          sessionToken = session;
-        } else if (session && typeof session === 'object') {
-          sessionToken = session.access_token || session.token || '';
+        if (userStatus.isActive) {
+          const fullUser: User = {
+            id: response.user.id || '',
+            email: userEmail,
+            full_name: response.user.full_name || '',
+            level_id: userStatus.level,
+            status: 'active',
+            email_verified: true,
+            account_type: (response.user.account_type as 'free' | 'premium') || 'free',
+            created_at: response.user.created_at || new Date().toISOString(),
+            last_login: response.user.last_login || new Date().toISOString(),
+            avatar_url: response.user.avatar_url
+          };
+          
+          let sessionToken = '';
+          const session = response.session || {};
+          
+          if (typeof session === 'string') {
+            sessionToken = session;
+          } else if (session && typeof session === 'object') {
+            sessionToken = (session as any).access_token || (session as any).token || '';
+          }
+          
+          localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
+          localStorage.setItem("alphaquant-token", sessionToken);
+          
+          setUser(fullUser);
+          toast.success("Login realizado com sucesso!");
         }
-        
-        // Store user and token
-        localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-        localStorage.setItem("alphaquant-token", sessionToken);
-        
-        setUser(fullUser);
-        toast.success("Login realizado com sucesso!");
       }
     } catch (error) {
       console.error("Google login failed", error);
