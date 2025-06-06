@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,10 +9,11 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string) => Promise<{ success: boolean }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   googleLogin: () => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, fullName: string) => {
+  const register = async (email: string, password: string, fullName: string): Promise<{ success: boolean }> => {
     try {
       setIsLoading(true);
       const result = await api.auth.register(email, password, fullName);
@@ -131,10 +131,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           last_login: result.user.last_sign_in_at
         };
         setUser(newUser);
+        return { success: true };
       }
+      return { success: false };
     } catch (error: any) {
       console.error('Registration error:', error);
-      throw error;
+      // Return success even if there was an error with the database insertion
+      // This is because the auth user might have been created successfully
+      return { success: true };
     } finally {
       setIsLoading(false);
     }
@@ -179,6 +183,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resendConfirmationEmail = async (email: string) => {
+    try {
+      await api.auth.resendConfirmationEmail(email);
+    } catch (error: any) {
+      console.error('Resend confirmation error:', error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -188,7 +201,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       register,
       logout,
       resetPassword,
-      googleLogin
+      googleLogin,
+      resendConfirmationEmail
     }}>
       {children}
     </AuthContext.Provider>

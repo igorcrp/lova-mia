@@ -732,14 +732,14 @@ export const api = {
         }
 
         // Formula 5.12: Stop Trigger
-        let stopTriggered = false;
+        let stopTriggered: '-' | 'Executed' = '-';
         if (entryExecuted) {
           if (params.operation === 'buy') {
             // Buy: If Low < Stop Price, then "Executed"
-            stopTriggered = low < stopPrice;
+            stopTriggered = low < stopPrice ? 'Executed' : '-';
           } else {
             // Sell: If High > Stop Price, then "Executed"
-            stopTriggered = high > stopPrice;
+            stopTriggered = high > stopPrice ? 'Executed' : '-';
           }
         }
 
@@ -748,7 +748,7 @@ export const api = {
         if (entryExecuted) {
           trades++;
           
-          if (stopTriggered) {
+          if (stopTriggered === 'Executed') {
             // If Stop Trigger = "Executed", then [(Stop Price - Actual Price) * Lot Size]
             if (params.operation === 'buy') {
               profitLoss = (stopPrice - actualPrice) * lotSize;
@@ -797,7 +797,7 @@ export const api = {
           trade,
           lotSize,
           stopPrice: entryExecuted ? stopPrice : 0,
-          stop: stopTriggered ? 'Executed' : '-',
+          stop: stopTriggered,
           profitLoss,
           profitPercentage: entryExecuted && actualPrice > 0 ? 
             (profitLoss / (actualPrice * lotSize)) * 100 : 0,
@@ -1000,7 +1000,7 @@ export const api = {
         }
 
         // Formula 5.12: Stop Trigger
-        let stopTriggered = '-';
+        let stopTriggered: '-' | 'Executed' = '-';
         if (entryExecuted) {
           if (params.operation === 'buy') {
             // Buy: If Low < Stop Price, then "Executed"
