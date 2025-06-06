@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -63,23 +64,31 @@ export default function DaytradePage() {
       
       console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
       
-      // Run the analysis using API with the table name
+      // Run the analysis using API with the table name and better error handling
       const results = await api.analysis.runAnalysis(paramsWithTable, (currentProgress) => {
         // Update progress based on the API's progress reports
-        setProgress(20 + currentProgress * 0.7);
+        const newProgress = 20 + currentProgress * 0.7;
+        console.info(`Analysis progress: ${newProgress.toFixed(1)}%`);
+        setProgress(newProgress);
       });
+      
+      console.info(`Analysis completed with ${results.length} results`);
       
       // Usar diretamente os resultados do backend sem sobrescrever tradingDays
       setAnalysisResults(results);
       
       // Final processing
       setProgress(95);
-      setProgress(100);
       
-      toast({
-        title: "Analysis completed",
-        description: "Analysis was completed successfully",
-      });
+      // Complete progress
+      setTimeout(() => {
+        setProgress(100);
+        toast({
+          title: "Analysis completed",
+          description: `Analysis completed successfully with ${results.length} stocks analyzed`,
+        });
+      }, 200);
+      
     } catch (error) {
       console.error("Analysis failed", error);
       toast({
@@ -89,10 +98,11 @@ export default function DaytradePage() {
       });
       setProgress(0);
     } finally {
-      // Reset progress after a short delay to allow the progress bar to reach 100%
+      // Reset progress and loading state after a short delay
       setTimeout(() => {
         setIsLoading(false);
-      }, 500);
+        setProgress(0);
+      }, 1000);
     }
   };
   
@@ -102,6 +112,8 @@ export default function DaytradePage() {
     try {
       setIsLoadingDetails(true);
       setSelectedAsset(assetCode);
+      
+      console.info(`Loading details for asset: ${assetCode}`);
       
       // Add data table name to params if not already present
       const paramsWithTable = analysisParams.dataTableName
@@ -122,13 +134,7 @@ export default function DaytradePage() {
       // Get detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
       
-      // Não sobrescrever o valor de tradingDays calculado pelo backend
-      // Apenas registrar para fins de depuração
-      if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-        console.info(`Actual trading days in data: ${detailedData.tradingDays}`);
-      } else {
-        console.info(`No trade history found`);
-      }
+      console.info(`Detailed analysis loaded for ${assetCode}`);
       
       setDetailedResult(detailedData);
       setShowDetailView(true);
@@ -156,6 +162,8 @@ export default function DaytradePage() {
     try {
       setIsLoadingDetails(true);
       
+      console.info(`Updating analysis for ${selectedAsset}`);
+      
       // Ensure we have the data table name
       const dataTableName = params.dataTableName || await api.marketData.getDataTableName(
         params.country,
@@ -177,24 +185,12 @@ export default function DaytradePage() {
       // Update both the main results and the detailed result
       const results = await api.analysis.runAnalysis(paramsWithTable);
       
-      // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
-      const today = new Date();
-      const startDate = getStartDateForPeriod(paramsWithTable.period);
-      const tradingDaysCount = countBusinessDays(startDate, today);
+      console.info(`Updated analysis completed with ${results.length} results`);
       
-      console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
-      
-      // Usar diretamente os resultados do backend sem sobrescrever tradingDays
       setAnalysisResults(results);
       
       // Fetch detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
-      
-      // Não sobrescrever o valor de tradingDays calculado pelo backend
-      // Apenas registrar para fins de depuração
-      if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-        console.info(`Actual trading days in updated data: ${detailedData.tradingDays}`);
-      }
       
       setDetailedResult(detailedData);
       
@@ -229,14 +225,25 @@ export default function DaytradePage() {
                 <span>{progress.toFixed(0)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
+              <div className="text-xs text-muted-foreground mt-1">
+                This may take a few minutes depending on the number of stocks to analyze
+              </div>
             </div>
           )}
           
           {analysisResults.length > 0 && !isLoading && (
-            <ResultsTable 
-              results={analysisResults} 
-              onViewDetails={viewDetails} 
-            />
+            <div className="mt-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">Analysis Results</h3>
+                <p className="text-sm text-muted-foreground">
+                  Found {analysisResults.length} stocks with sufficient data for analysis
+                </p>
+              </div>
+              <ResultsTable 
+                results={analysisResults} 
+                onViewDetails={viewDetails} 
+              />
+            </div>
           )}
         </div>
       ) : (
@@ -244,7 +251,7 @@ export default function DaytradePage() {
           <div className="bg-card p-6 rounded-lg border">
             <StockDetailView
               result={detailedResult}
-              params={{ ...analysisParams, interval: 'daytrade' }} // Add interval prop
+              params={{ ...analysisParams, interval: 'daytrade' }}
               onClose={closeDetails}
               onUpdateParams={updateAnalysis}
               isLoading={isLoadingDetails}
