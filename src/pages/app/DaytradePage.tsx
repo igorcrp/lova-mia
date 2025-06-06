@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -251,7 +250,7 @@ export default function DaytradePage() {
           <div className="bg-card p-6 rounded-lg border">
             <StockDetailView
               result={detailedResult}
-              params={{ ...analysisParams, interval: 'daytrade' }}
+              params={analysisParams}
               onClose={closeDetails}
               onUpdateParams={updateAnalysis}
               isLoading={isLoadingDetails}

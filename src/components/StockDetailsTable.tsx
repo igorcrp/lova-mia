@@ -13,7 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StockDetailsTableProps {
   result: DetailedResult;
-  params: StockAnalysisParams & { interval?: string };
+  params: StockAnalysisParams;
   onUpdateParams: (params: StockAnalysisParams) => void;
   isLoading?: boolean;
 }
@@ -93,14 +93,8 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
-  function calculateStopTrigger(item: TradeItemForStopTrigger, operation: string): string {
-    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || !item.low || !item.high) {
         return "-";
     }
     const stopPrice = Number(item.stopPrice);
@@ -193,9 +187,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentage?.toFixed(2)) || 0,
-      stopPercentage: Number(stopPercentage?.toFixed(2)) || 0,
-      initialCapital: Number(initialCapital?.toFixed(2)) || 0
+      entryPercentage: Number(entryPercentage) || 0,
+      stopPercentage: Number(stopPercentage) || 0,
+      initialCapital: Number(initialCapital) || 0
     };
     onUpdateParams(cleanParams);
   };
@@ -457,7 +451,7 @@ export function StockDetailsTable({
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
-                          formattedValue = item.stopTrigger || "-";
+                          formattedValue = (item as any).stopTrigger || "-";
                         } else if (column.id === "trade") {
                           formattedValue = value as string;
                         } else if (typeof value === "number") {

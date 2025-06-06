@@ -83,9 +83,9 @@ export interface TradeHistoryItem {
   profitPercentage: number;
   trade: 'Buy' | 'Sell' | '-'; // Simplified trade types
   stop: 'Executed' | '-'; // Simplified stop types
-  volume?: number;
-  high?: number;
-  low?: number;
+  volume: number; // Made required
+  high: number; // Made required
+  low: number; // Made required
   suggestedEntryPrice: number;
   actualPrice: number | string;
   lotSize: number;

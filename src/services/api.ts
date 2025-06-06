@@ -232,8 +232,12 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use the secure function to get user data
-      const { data, error } = await supabase.rpc('get_current_user');
+      // Use a direct query instead of RPC since get_current_user doesn't exist
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error("Get user data error:", error);
@@ -241,7 +245,21 @@ export const auth = {
       }
 
       console.log("User data retrieved:", data);
-      return data as User;
+      
+      // Transform the data to match User interface
+      const userData: User = {
+        id: data.id,
+        email: data.email,
+        full_name: data.name || '',
+        level_id: data.level_id || 1,
+        status: data.status_users || 'pending',
+        email_verified: data.email_verified || false,
+        account_type: 'free', // Default account type
+        created_at: data.created_at,
+        last_login: data.updated_at
+      };
+      
+      return userData;
     } catch (error) {
       console.error("Get user data failed:", error);
       return null;
@@ -556,8 +574,7 @@ const analysis = {
       
       // Use fromDynamic to handle the dynamic table name
       const { data, error } = await fromDynamic(tableName)
-        .select('stock_code') // Corrected based on user feedback
-        .groupBy('stock_code') // Corrected based on user feedback
+        .select('stock_code')
         .order('stock_code');
       
       if (error) {
@@ -571,13 +588,15 @@ const analysis = {
         return [];
       }
       
-      // Extract stock codes with proper type safety
-      const stocks: StockInfo[] = (data as any[])
+      // Extract unique stock codes with proper type safety
+      const uniqueCodes = [...new Set((data as any[])
         .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .map(item => ({
-          code: String(item.stock_code),
-          name: String(item.stock_code) // Use stock_code as name since 'name' column doesn't exist
-        }));
+        .map(item => String(item.stock_code)))];
+      
+      const stocks: StockInfo[] = uniqueCodes.map(code => ({
+        code: code,
+        name: code // Use stock_code as name since 'name' column doesn't exist
+      }));
       
       console.log(`Direct query found ${stocks.length} stock codes`);
       return stocks;
@@ -776,9 +795,6 @@ const analysis = {
           results.push({
             assetCode: stock.code,
             assetName: stock.name || stock.code,
-            lastCurrentCapital: capitalEvolution.length > 0 
-              ? capitalEvolution[capitalEvolution.length - 1].capital 
-              : params.initialCapital,
             ...metrics
           });
           
@@ -806,8 +822,8 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
-    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+    const tradeHistory: TradeHistoryItem[] = [];
     let capital = params.initialCapital;
     
     // Ensure data is sorted by date in ascending order
@@ -842,59 +858,59 @@ const analysis = {
       
       // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      if (currentData.open <= suggestedEntryPrice) {
-        actualPrice = currentData.open;
-      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+      if (Number(currentData.open) <= suggestedEntryPrice) {
+        actualPrice = Number(currentData.open);
+      } else if (Number(currentData.open) > suggestedEntryPrice && suggestedEntryPrice >= Number(currentData.low)) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
       }
       
       // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
-        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
         : 0;
       
       // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || Number(currentData.low) <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || Number(currentData.high) >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
-        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: TradeHistoryItem['stopTrigger'] = '-'; // Type corrected
+      let stop: TradeHistoryItem['stop'] = '-';
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = currentData.low <= stopPrice ? "Executed" : "-";
+          stop = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = currentData.high >= stopPrice ? "Executed" : "-";
+          stop = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
       // Calculate profit/loss
       let profitLoss = 0;
       if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
-        if (stopTrigger === "Executed" && stopPrice !== '-') {
+        if (stop === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (currentData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - currentData.close) * lotSize;
+            ? (Number(currentData.close) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(currentData.close)) * lotSize;
         }
       }
       
@@ -905,18 +921,19 @@ const analysis = {
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: currentData.open, // Using open as entryPrice for consistency?
-        exitPrice: currentData.close, // Using close as exitPrice
-        high: currentData.high,
-        low: currentData.low,
-        volume: currentData.volume,
+        entryPrice: Number(currentData.open), // Using open as entryPrice for consistency?
+        exitPrice: Number(currentData.close), // Using close as exitPrice
+        high: Number(currentData.high),
+        low: Number(currentData.low),
+        volume: Number(currentData.volume),
         suggestedEntryPrice,
         actualPrice,
         trade,
         lotSize,
         stopPrice,
-        stopTrigger, // Changed from 'stop'
+        stop, // Changed from 'stopTrigger'
         profitLoss, // Changed from 'profit'
+        profitPercentage: 0, // Calculate if needed
         currentCapital: capital // Changed from 'capital'
         });
     }
@@ -928,7 +945,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -973,10 +990,10 @@ const analysis = {
     const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
     const trades = executedTrades.length;
     
-    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
+    // Count profits, losses, and stops based on the profitLoss and stop fields
     const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
-    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
-    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
+    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stop !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stop === 'Executed').length; // Stop is triggered regardless of P/L sign
     
     // Sum the profit/loss values
     let totalProfit = 0;
@@ -1164,4 +1181,3 @@ export const api = {
   marketData,
   analysis
 };
-
