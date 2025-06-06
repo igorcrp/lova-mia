@@ -181,50 +181,5 @@ export default function AppHomePage() {
           </CardContent>
         </Card>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        <Card className="md:col-span-3">
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Access</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Link to="/app/daytrade">
-                <Card className="hover:bg-muted/50 cursor-pointer transition-colors">
-                  <CardContent className="p-6 text-center">
-                    <h3 className="font-medium mb-1">Daytrade</h3>
-                    <p className="text-sm text-muted-foreground">Same day operations</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link to="/app/weekly">
-                <Card className="hover:bg-muted/50 cursor-pointer transition-colors">
-                  <CardContent className="p-6 text-center">
-                    <h3 className="font-medium mb-1">Weekly Portfolio</h3>
-                    <p className="text-sm text-muted-foreground">1st to last business day</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link to="/app/monthly">
-                <Card className="hover:bg-muted/50 cursor-pointer transition-colors">
-                  <CardContent className="p-6 text-center">
-                    <h3 className="font-medium mb-1">Monthly Portfolio</h3>
-                    <p className="text-sm text-muted-foreground">1st to last business day</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link to="/app/annual">
-                <Card className="hover:bg-muted/50 cursor-pointer transition-colors">
-                  <CardContent className="p-6 text-center">
-                    <h3 className="font-medium mb-1">Annual Portfolio</h3>
-                    <p className="text-sm text-muted-foreground">1st to last business day</p>
-                  </CardContent>
-                </Card>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
   );
 }
