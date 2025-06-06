@@ -18,9 +18,6 @@ import AdminAssetsPage from "@/pages/admin/AdminAssetsPage";
 // App Pages
 import AppHomePage from "@/pages/app/AppHomePage";
 import DaytradePage from "@/pages/app/DaytradePage";
-import WeeklyPortfolioPage from "@/pages/app/WeeklyPortfolioPage";
-import MonthlyPortfolioPage from "@/pages/app/MonthlyPortfolioPage";
-import AnnualPortfolioPage from "@/pages/app/AnnualPortfolioPage";
 import ProfilePage from "@/pages/app/ProfilePage";
 
 // Public Pages
@@ -59,9 +56,6 @@ const App = () => (
                 <Route element={<AppLayout />}>
                   <Route path="/app" element={<AppHomePage />} />
                   <Route path="/app/daytrade" element={<DaytradePage />} />
-                  <Route path="/app/weekly" element={<WeeklyPortfolioPage />} />
-                  <Route path="/app/monthly" element={<MonthlyPortfolioPage />} />
-                  <Route path="/app/annual" element={<AnnualPortfolioPage />} />
                   <Route path="/app/profile" element={<ProfilePage />} />
                 </Route>
               </Route>
