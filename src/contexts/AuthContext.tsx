@@ -1,10 +1,10 @@
-
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
+import type { AuthResponse } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
@@ -135,31 +135,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Only create user object if user is active
       if (userStatus.isActive) {
-        // Safely extract user data with default values
-        const userResponse = response.user || {};
+        // Safely extract user data with proper typing
+        const userResponse = response.user || null;
         
         // Create a user object with all required properties from the User type
         const fullUser: User = {
-          id: userResponse.id || '',
-          email: userResponse.email || email,
-          full_name: userResponse.full_name || '',
+          id: userResponse?.id || '',
+          email: userResponse?.email || email,
+          full_name: userResponse?.user_metadata?.full_name || '',
           level_id: userStatus.level,
           status: 'active',
           email_verified: true,
-          account_type: (userResponse.account_type as 'free' | 'premium') || 'free',
-          created_at: userResponse.created_at || new Date().toISOString(),
-          last_login: userResponse.last_login || new Date().toISOString(),
-          avatar_url: userResponse.avatar_url
+          account_type: (userResponse?.user_metadata?.account_type as 'free' | 'premium') || 'free',
+          created_at: userResponse?.created_at || new Date().toISOString(),
+          last_login: userResponse?.last_sign_in_at || new Date().toISOString(),
+          avatar_url: userResponse?.user_metadata?.avatar_url
         };
         
         // Extract token safely
         let sessionToken = '';
-        const session = response.session || {};
+        const session = response.session;
         
-        if (typeof session === 'string') {
-          sessionToken = session;
-        } else if (session && typeof session === 'object') {
-          sessionToken = (session as any).access_token || (session as any).token || '';
+        if (session && typeof session === 'object' && 'access_token' in session) {
+          sessionToken = session.access_token;
         }
         
         // Store user and token
@@ -181,51 +179,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       console.log("Attempting Google login");
-      const response = await api.auth.googleLogin();
-      console.log("Google login response:", response);
       
-      // For Google OAuth, the response structure is different
-      // Check if it's a redirect-based OAuth flow
-      if (response.url) {
-        window.location.href = response.url;
+      // Use Supabase auth directly for Google OAuth
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/app`
+        }
+      });
+      
+      if (error) {
+        console.error("Google login error:", error);
+        toast.error("Falha no login com Google.");
+        throw error;
+      }
+      
+      console.log("Google login response:", data);
+      
+      // For OAuth, the response contains a URL for redirection
+      if (data.url) {
+        window.location.href = data.url;
         return;
       }
       
-      // If we have user data directly, process it
-      if (response.user?.email) {
-        const userEmail = response.user.email;
-        const userStatus = await checkUserStatusAndRedirect(userEmail);
-        
-        if (userStatus.isActive) {
-          const fullUser: User = {
-            id: response.user.id || '',
-            email: userEmail,
-            full_name: response.user.full_name || '',
-            level_id: userStatus.level,
-            status: 'active',
-            email_verified: true,
-            account_type: (response.user.account_type as 'free' | 'premium') || 'free',
-            created_at: response.user.created_at || new Date().toISOString(),
-            last_login: response.user.last_login || new Date().toISOString(),
-            avatar_url: response.user.avatar_url
-          };
-          
-          let sessionToken = '';
-          const session = response.session || {};
-          
-          if (typeof session === 'string') {
-            sessionToken = session;
-          } else if (session && typeof session === 'object') {
-            sessionToken = (session as any).access_token || (session as any).token || '';
-          }
-          
-          localStorage.setItem("alphaquant-user", JSON.stringify(fullUser));
-          localStorage.setItem("alphaquant-token", sessionToken);
-          
-          setUser(fullUser);
-          toast.success("Login realizado com sucesso!");
-        }
-      }
     } catch (error) {
       console.error("Google login failed", error);
       toast.error("Falha no login com Google.");
@@ -243,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Call the API function
       const result = await api.auth.register(email, password, fullName);
 
-      // Check if the API call was successful (adapt if needed)
+      // Check if the API call was successful
       if (result && !result.error) {
         console.log("Registration successful, navigating to login...");
         // Try navigating FIRST
@@ -255,17 +231,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Handle API error case
         console.error("Registration API call failed or returned error:", result);
         toast.error("Ocorreu um erro durante o registro. Tente novamente.");
-        // Optionally re-throw or handle specific errors from 'result' if available
         throw new Error(result?.error?.message || "Erro desconhecido no registro");
       }
 
       return result; // Return result for potential further use
 
-    } catch (error: any) { // Catch errors from await or thrown errors
+    } catch (error: any) {
       console.error("Registration failed in AuthContext:", error);
-      // Display a generic error or a specific one if available
       toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
-      throw error; // Re-throw the error so the calling component knows about it
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -276,11 +250,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Attempting to reset password for:", email);
       
-      await api.auth.resetPassword(email);
+      const result = await api.auth.resetPassword(email);
+      
+      // Check if there was an error in the result
+      if (result && result.error) {
+        throw new Error(result.error.message || "Failed to send reset email");
+      }
       
       toast.success("Email de redefinição de senha enviado com sucesso!");
       toast.info("Por favor, verifique sua caixa de entrada e siga as instruções para redefinir sua senha.");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Password reset failed", error);
       toast.error("Falha ao enviar email de redefinição de senha. Tente novamente mais tarde.");
       throw error;
