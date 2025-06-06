@@ -755,7 +755,9 @@ export const api = {
             } else {
               profitLoss = (actualPrice - stopPrice) * lotSize;
             }
-            stops++;
+            if (profitLoss < 0) { // Only count as stop if it's a loss
+              stops++;
+            }
           } else {
             // If Stop Trigger = "-", then [(Close - Actual Price) * Lot Size]
             if (params.operation === 'buy') {
@@ -766,10 +768,10 @@ export const api = {
           }
           
           // Count profits and losses
-          if (profitLoss > 0) {
+          if (profitLoss > 0 && trade === 'Executed' && stopTriggered === '-') {
             profits++;
             totalProfits += profitLoss;
-          } else {
+          } else if (profitLoss < 0 && trade === 'Executed' && stopTriggered === '-') {
             losses++;
             totalLosses += Math.abs(profitLoss);
           }
