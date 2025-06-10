@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -70,7 +71,7 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
     trades.forEach(trade => {
         // Update capital only if it's defined in the record
         if (trade.capital !== undefined) {
-            currentCapital = trade.capital;
+            currentCapital = Number(trade.capital);
             // Update peak capital encountered so far
             if (currentCapital > peakCapital) {
                 peakCapital = currentCapital;
@@ -179,7 +180,7 @@ export default function MonthlyPortfolioPage() {
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value
               };
               activeTradeEntry = entryDayRecord;
-              stopPriceCalculated = entryDayRecord.stopPrice;
+              stopPriceCalculated = Number(entryDayRecord.stopPrice);
               finalProcessedHistory.push(entryDayRecord);
             }
           }
@@ -275,7 +276,7 @@ export default function MonthlyPortfolioPage() {
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
-            const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, result.assetCode); // Corrected call
+            const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
               // Use the verified processMonthlyTrades (v5 logic)
@@ -293,7 +294,7 @@ export default function MonthlyPortfolioPage() {
               
               const lastTradeRecord = processedHistory.length > 0 ? processedHistory[processedHistory.length - 1] : null;
               const finalCapital = lastTradeRecord?.capital ?? params.initialCapital;
-              const totalProfit = finalCapital - params.initialCapital;
+              const totalProfit = Number(finalCapital) - params.initialCapital;
               const profitPercentageTotal = params.initialCapital === 0 ? 0 : (totalProfit / params.initialCapital) * 100;
               
               const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
@@ -318,7 +319,7 @@ export default function MonthlyPortfolioPage() {
                 profits: profitsCount,
                 losses: lossesCount,
                 stops: stopsCount,
-                finalCapital,
+                finalCapital: Number(finalCapital),
                 profit: totalProfit,
                 successRate: trades > 0 ? (profitsCount / trades) * 100 : 0,
                 averageGain,
@@ -327,7 +328,7 @@ export default function MonthlyPortfolioPage() {
                 sharpeRatio,
                 sortinoRatio,
                 recoveryFactor,
-                detailedHistory: processedHistory, // Add processed history here
+                detailedHistory: { capitalEvolution: processedHistory.map(item => ({ date: item.date, capital: item.capital ?? 0 })).filter(item => item.capital !== 0), tradeHistory: processedHistory }, // Add processed history here
               };
             }
           } catch (detailError) {
@@ -374,11 +375,9 @@ export default function MonthlyPortfolioPage() {
       if (foundResult && foundResult.detailedHistory) {
         // Construct a DetailedResult from the found data
         const detailedData: DetailedResult = {
-          assetCode: foundResult.assetCode,
-          capitalEvolution: foundResult.detailedHistory.map(item => ({ date: item.date, capital: item.capital ?? 0 })).filter(item => item.capital !== 0),
-          tradeHistory: foundResult.detailedHistory,
-          tradingDays: foundResult.tradingDays ?? 0,
-          // Add other properties of DetailedResult if they exist in AnalysisResult
+          ...foundResult,
+          capitalEvolution: foundResult.detailedHistory.capitalEvolution,
+          tradeHistory: foundResult.detailedHistory.tradeHistory,
         };
         setDetailedResult(detailedData);
         setShowDetailView(true);
@@ -399,7 +398,7 @@ export default function MonthlyPortfolioPage() {
           throw new Error("Could not determine data table name");
         }
         
-        const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, assetCode);
+        const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
         if (detailedData) {
           const { processedHistory } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
           setDetailedResult({ ...detailedData, tradeHistory: processedHistory });
@@ -460,7 +459,7 @@ export default function MonthlyPortfolioPage() {
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
-            const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, result.assetCode); // Corrected call
+            const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
             
             if (detailedData && detailedData.tradeHistory) {
               const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
@@ -477,7 +476,7 @@ export default function MonthlyPortfolioPage() {
               
               const lastTradeRecord = processedHistory.length > 0 ? processedHistory[processedHistory.length - 1] : null;
               const finalCapital = lastTradeRecord?.capital ?? params.initialCapital;
-              const totalProfit = finalCapital - params.initialCapital;
+              const totalProfit = Number(finalCapital) - params.initialCapital;
               const profitPercentageTotal = params.initialCapital === 0 ? 0 : (totalProfit / params.initialCapital) * 100;
               
               const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
@@ -501,7 +500,7 @@ export default function MonthlyPortfolioPage() {
                 profits: profitsCount,
                 losses: lossesCount,
                 stops: stopsCount,
-                finalCapital,
+                finalCapital: Number(finalCapital),
                 profit: totalProfit,
                 successRate: trades > 0 ? (profitsCount / trades) * 100 : 0,
                 averageGain,
@@ -510,7 +509,7 @@ export default function MonthlyPortfolioPage() {
                 sharpeRatio,
                 sortinoRatio,
                 recoveryFactor,
-                detailedHistory: processedHistory, // Add processed history here
+                detailedHistory: { capitalEvolution: processedHistory.map(item => ({ date: item.date, capital: item.capital ?? 0 })).filter(item => item.capital !== 0), tradeHistory: processedHistory }, // Add processed history here
               };
             }
           } catch (detailError) {
@@ -523,7 +522,7 @@ export default function MonthlyPortfolioPage() {
       setAnalysisResults(processedResults.filter(Boolean) as AnalysisResult[]);
       
       // Fetch detailed analysis for the selected asset again to update the view
-      const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, selectedAsset);
+      const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
       if (detailedData) {
         const { processedHistory } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
         setDetailedResult({ ...detailedData, tradeHistory: processedHistory });
@@ -587,5 +586,3 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
-
-

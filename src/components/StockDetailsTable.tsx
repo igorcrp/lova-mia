@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -194,9 +195,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
-      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
-      initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
+      entryPercentage: typeof entryPercentage === 'number' ? entryPercentage : Number(entryPercentage) || 0,
+      stopPercentage: typeof stopPercentage === 'number' ? stopPercentage : Number(stopPercentage) || 0,
+      initialCapital: initialCapital !== null ? Number(initialCapital) : 0
     };
     onUpdateParams(cleanParams);
   };
@@ -466,7 +467,7 @@ export function StockDetailsTable({
                   <TableCell className="text-right">{formatCurrency(item.actualPrice)}</TableCell>
                   <TableCell className="text-center">{formatTradeValue(item.trade)}</TableCell>
                   <TableCell className="text-right">{item.lotSize || '-'}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.stopPrice)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(typeof item.stopPrice === 'number' ? item.stopPrice : undefined)}</TableCell>
                   <TableCell className="text-center">{item.stopTrigger}</TableCell>
                   <TableCell className="text-right">
                     <span className={item.profitLoss && item.profitLoss >= 0 ? 'text-green-500' : 'text-red-500'}>
