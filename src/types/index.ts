@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   email: string;
@@ -29,6 +28,7 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
+  created_at?: string; // Add created_at as optional
 }
 
 export interface StockAnalysisParams {
@@ -68,6 +68,7 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
+  detailedHistory?: TradeHistoryItem[]; // Add detailedHistory for compatibility
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -84,13 +85,14 @@ export interface TradeHistoryItem {
   profitPercentage: number;
   trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
   stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  stopTrigger?: string; // Add stopTrigger property
   volume?: number;
   high?: number;
   low?: number;
   suggestedEntryPrice?: number;
-  actualPrice?: number;
+  actualPrice?: number | string; // Allow string for '-'
   lotSize?: number;
-  stopPrice?: number;
+  stopPrice?: number | string; // Allow string for '-'
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
 }
@@ -113,3 +115,27 @@ export interface TradeDetail {
   stop: string;
 }
 
+// Add AuthContextType interface
+export interface AuthContextType {
+  user: User | null;
+  session: any; // Add session property
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  loading: boolean;
+}
+
+// Add ResultsTableProps interface
+export interface ResultsTableProps {
+  results: AnalysisResult[];
+  onViewDetails: (assetCode: string) => Promise<void>;
+  isLoading?: boolean; // Add isLoading as optional
+}
+
+// Add StockDetailViewProps interface
+export interface StockDetailViewProps {
+  result: DetailedResult;
+  params: StockAnalysisParams;
+  onUpdateParams: (updatedParams: StockAnalysisParams) => Promise<void>;
+  onBack?: () => void; // Add onBack as optional
+  isLoading?: boolean; // Add isLoading as optional
+}

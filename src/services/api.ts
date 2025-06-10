@@ -248,12 +248,12 @@ export const auth = {
       if (Array.isArray(data) && data.length > 0) {
         const userData = data[0];
         return {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.name,
+          id: userId, // Use the provided userId
+          email: userId, // Use userId as email for compatibility
+          full_name: userData.status_users || 'Unknown', // Use available field
           level_id: userData.level_id,
           status: userData.status_users as any,
-          email_verified: userData.email_verified,
+          email_verified: userData.user_exists,
           account_type: 'free', // Valor padrão
           created_at: new Date().toISOString(),
           last_login: null
@@ -546,17 +546,18 @@ const analysis = {
       console.log(`Found ${data.length} unique stock codes`);
       
       // Transform the data into StockInfo objects
-      // Corrected to handle potential object return from RPC
-      const stocks: StockInfo[] = data.map(item => {
-        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
-        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
-                          ? String(item.stock_code) 
-                          : String(item); // Fallback if it's just a string
-        return {
-          code: stockCode,
-          name: stockCode, // Use code as name if no name is available
-        };
-      });
+      const stocks: StockInfo[] = data
+        .filter(item => item !== null && item !== undefined) // Filter out null/undefined items
+        .map(item => {
+          // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+          const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                            ? String(item.stock_code) 
+                            : String(item); // Fallback if it's just a string
+          return {
+            code: stockCode,
+            name: stockCode, // Use code as name if no name is available
+          };
+        });
       
       return stocks;
     } catch (error) {
@@ -827,8 +828,8 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
-    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+    const tradeHistory: TradeHistoryItem[] = [];
     let capital = params.initialCapital;
     
     // Ensure data is sorted by date in ascending order
@@ -850,7 +851,7 @@ const analysis = {
       
       // Calculate suggested entry price based on previous day's reference price
       // Use current day's reference price if previous day is not available
-      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+      const referencePrice = previousData ? Number(previousData[params.referencePrice]) : Number(currentData[params.referencePrice]);
       let suggestedEntryPrice: number;
       
       if (params.operation === 'buy') {
@@ -863,36 +864,40 @@ const analysis = {
       
       // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      if (currentData.open <= suggestedEntryPrice) {
-        actualPrice = currentData.open;
-      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+      const currentOpen = Number(currentData.open);
+      const currentLow = Number(currentData.low);
+      
+      if (currentOpen <= suggestedEntryPrice) {
+        actualPrice = currentOpen;
+      } else if (currentOpen > suggestedEntryPrice && suggestedEntryPrice >= currentLow) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
       }
       
       // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
-        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
         : 0;
       
       // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || currentLow <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        const currentHigh = Number(currentData.high);
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || currentHigh >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
-        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: string = '-'; // Type corrected
+      let stopTrigger: string = '-';
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
@@ -909,13 +914,13 @@ const analysis = {
         if (stopTrigger === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (currentData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - currentData.close) * lotSize;
+            ? (Number(currentData.close) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(currentData.close)) * lotSize;
         }
       }
       
@@ -926,20 +931,21 @@ const analysis = {
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: currentData.open, // Using open as entryPrice for consistency?
-        exitPrice: currentData.close, // Using close as exitPrice
-        high: currentData.high,
-        low: currentData.low,
-        volume: currentData.volume,
+        entryPrice: Number(currentData.open), // Using open as entryPrice for consistency
+        exitPrice: Number(currentData.close), // Using close as exitPrice
+        high: Number(currentData.high),
+        low: Number(currentData.low),
+        volume: Number(currentData.volume),
         suggestedEntryPrice,
         actualPrice,
         trade,
         lotSize,
         stopPrice,
-        stopTrigger, // Changed from 'stop'
+        stopTrigger, // Add stopTrigger property
         profitLoss, // Changed from 'profit'
-        currentCapital: capital // Changed from 'capital'
-        });
+        currentCapital: capital, // Changed from 'capital'
+        profitPercentage: 0 // Add required property
+      });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
@@ -949,7 +955,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -1185,4 +1191,3 @@ export const api = {
   marketData,
   analysis
 };
-
