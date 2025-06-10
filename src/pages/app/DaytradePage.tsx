@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -181,7 +180,7 @@ export default function DaytradePage() {
       setAnalysisParams(paramsWithTable);
       
       // Update both the main results and the detailed result
-      const results = await api.analysis.runAnalysis(paramsWithTable);
+      const results = await api.analysis.runAnalysis(paramsWithTable, () => {});
       
       // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
       const today = new Date();

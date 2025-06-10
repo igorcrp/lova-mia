@@ -54,7 +54,7 @@ export default function AppHomePage() {
           // Now comparisonStocks is valid in the interface
           comparisonStocks: []
         };
-        const results = await api.analysis.runAnalysis(params);
+        const results = await api.analysis.runAnalysis(params, () => {});
 
         // Sort by profit percentage
         const sorted = [...results].sort((a, b) => b.profitPercentage - a.profitPercentage);

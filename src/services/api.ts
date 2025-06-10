@@ -1,5 +1,5 @@
+
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
-import { Database } from './schema';
 import {
   Asset,
   MarketDataSource,
@@ -11,7 +11,7 @@ import {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Auth Actions
 const getCurrentUser = async (): Promise<User | null> => {
@@ -37,14 +37,14 @@ const getCurrentUser = async (): Promise<User | null> => {
     return {
       id: data.id,
       email: data.email,
-      full_name: data.full_name,
-      avatar_url: data.avatar_url,
+      full_name: data.name || '',
+      avatar_url: '',
       level_id: data.level_id,
-      status: data.status,
+      status: data.status_users === 'active' ? 'active' : 'inactive',
       email_verified: data.email_verified,
-      account_type: data.account_type,
+      account_type: data.plan_type === 'premium' ? 'premium' : 'free',
       created_at: data.created_at,
-      last_login: data.last_login,
+      last_login: '',
       session: user,
     };
   }
@@ -98,6 +98,73 @@ const updateUserProfile = async (
   }
 
   return { data, error };
+};
+
+// Additional auth methods needed by AuthContext
+const login = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    user: data.user,
+    session: data.session?.access_token || '',
+  };
+};
+
+const googleLogin = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    user: data.user || {},
+    session: '',
+  };
+};
+
+const register = async (email: string, password: string, fullName: string) => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: fullName,
+      },
+    },
+  });
+
+  return { data, error };
+};
+
+const resetPassword = async (email: string) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  if (error) {
+    throw error;
+  }
+};
+
+const resendConfirmationEmail = async (email: string) => {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+  });
+  if (error) {
+    throw error;
+  }
+};
+
+const logout = async () => {
+  return await supabase.auth.signOut();
 };
 
 // Market Data Source Actions
@@ -184,6 +251,70 @@ const deleteMarketDataSource = async (id: string): Promise<boolean> => {
   }
 };
 
+// Additional helper methods for admin functionality
+const getCountries = async (): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('market_data_sources')
+      .select('country')
+      .order('country');
+
+    if (error) {
+      console.error('Error fetching countries:', error);
+      return [];
+    }
+
+    const uniqueCountries = [...new Set(data?.map(item => item.country) || [])];
+    return uniqueCountries;
+  } catch (error) {
+    console.error('Error in getCountries:', error);
+    return [];
+  }
+};
+
+const getStockMarkets = async (country: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('market_data_sources')
+      .select('stock_market')
+      .eq('country', country)
+      .order('stock_market');
+
+    if (error) {
+      console.error('Error fetching stock markets:', error);
+      return [];
+    }
+
+    const uniqueMarkets = [...new Set(data?.map(item => item.stock_market) || [])];
+    return uniqueMarkets;
+  } catch (error) {
+    console.error('Error in getStockMarkets:', error);
+    return [];
+  }
+};
+
+const getAssetClasses = async (country: string, stockMarket: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('market_data_sources')
+      .select('asset_class')
+      .eq('country', country)
+      .eq('stock_market', stockMarket)
+      .order('asset_class');
+
+    if (error) {
+      console.error('Error fetching asset classes:', error);
+      return [];
+    }
+
+    const uniqueClasses = [...new Set(data?.map(item => item.asset_class) || [])];
+    return uniqueClasses;
+  } catch (error) {
+    console.error('Error in getAssetClasses:', error);
+    return [];
+  }
+};
+
 // Assets Actions
 const getAssets = async (): Promise<Asset[]> => {
   try {
@@ -264,7 +395,7 @@ const deleteAsset = async (id: string): Promise<boolean> => {
 // Analysis Actions
 const runAnalysis = async (
   params: StockAnalysisParams,
-  onProgress: (progress: number) => void
+  onProgress?: (progress: number) => void
 ) => {
   const apiUrl = '/api/analysis';
 
@@ -314,7 +445,7 @@ const runAnalysis = async (
 
             if (parsedData.type === 'progress') {
               progress = parsedData.value;
-              onProgress(progress);
+              if (onProgress) onProgress(progress);
             } else if (parsedData.type === 'result') {
               result = parsedData.value;
             }
@@ -391,7 +522,6 @@ const getDataTableName = async (
   }
 };
 
-// Fix null checks for item in getAvailableStocks method
 const getAvailableStocks = async (country: string, stockMarket: string, dataTableName: string): Promise<StockInfo[]> => {
   try {
     const { data, error } = await supabase
@@ -439,6 +569,12 @@ export const api = {
     signUp,
     signOut,
     updateUserProfile,
+    login,
+    googleLogin,
+    register,
+    resetPassword,
+    resendConfirmationEmail,
+    logout,
   },
   marketData: {
     getMarketDataSources,
@@ -447,6 +583,9 @@ export const api = {
     deleteMarketDataSource,
     getDataTableName,
     getAvailableStocks,
+    getCountries,
+    getStockMarkets,
+    getAssetClasses,
   },
   assets: {
     getAssets,
