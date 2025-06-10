@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   email: string;
@@ -42,10 +41,7 @@ export interface StockAnalysisParams {
   initialCapital: number;
   dataTableName?: string;
   period: string; // Period parameter (now required)
-  startDate?: string; // Add startDate property
-  endDate?: string; // Add endDate property
   comparisonStocks?: string[]; // Added comparisonStocks parameter
-  assetCode?: string; // Add assetCode property
 }
 
 export interface AnalysisResult {
@@ -71,10 +67,6 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
-  detailedHistory?: { // Add detailedHistory property for compatibility
-    capitalEvolution: CapitalPoint[];
-    tradeHistory: TradeHistoryItem[];
-  };
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -97,7 +89,7 @@ export interface TradeHistoryItem {
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
-  stopPrice?: number | string; // Allow both number and string
+  stopPrice?: number;
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
 }
@@ -109,7 +101,7 @@ export interface CapitalPoint {
 
 export interface StockInfo {
   code: string;
-  name?: string; // Make name optional
+  name: string;
   fullName?: string;
 }
 

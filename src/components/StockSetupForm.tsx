@@ -19,7 +19,7 @@ interface StockSetupFormProps {
 
 // Helper function to get date string in YYYY-MM-DD format
 const getDateString = (date: Date): string => {
-  return date.toISOString().split("T")[0];
+  return date.toISOString().split('T')[0];
 };
 
 export function StockSetupForm({ onSubmit, isLoading }: StockSetupFormProps) {
@@ -63,7 +63,7 @@ export function StockSetupForm({ onSubmit, isLoading }: StockSetupFormProps) {
   useEffect(() => {
     const loadDataSources = async () => {
       try {
-        const sources = await api.marketData.getAllMarketDataSources(); // Corrected call
+        const sources = await api.marketData.getDataSources();
         setDataSources(sources);
         
         // Extract unique countries
@@ -127,13 +127,7 @@ export function StockSetupForm({ onSubmit, isLoading }: StockSetupFormProps) {
       return;
     }
     
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-      // Ensure startDate and endDate are handled correctly if they are part of StockAnalysisParams
-      ...(field === "startDate" && { startDate: value as string }),
-      ...(field === "endDate" && { endDate: value as string }),
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -378,5 +372,3 @@ export function StockSetupForm({ onSubmit, isLoading }: StockSetupFormProps) {
     </Card>
   );
 }
-
-
