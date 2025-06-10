@@ -546,26 +546,26 @@ const analysis = {
       console.log(`Found ${data.length} unique stock codes`);
       
       // Transform the data into StockInfo objects
-      const stocks: StockInfo[] = data.map(item => {
-        // Add null check for item
-        if (!item) {
-          return { code: '', name: '' };
-        }
+		const stocks: StockInfo[] = data.map(item => {
+		  // Add null check for item
+		  if (!item) {
+			return { code: '', name: '' };
+		  }
         
         // Check if item is an object and has 'asset_code' property
-        if (typeof item === 'object' && item !== null && 'asset_code' in item) {
-          const typedItem = item as { asset_code: string };
-          return { 
-            code: typedItem.asset_code,
-            name: typedItem.asset_code // Use code as name fallback
-          };
-        }
+		  if (typeof item === 'object' && item !== null && 'asset_code' in item) {
+			const typedItem = item as { asset_code: string };
+			return { 
+			  code: typedItem.asset_code,
+			  name: typedItem.asset_code // Use code as name fallback
+			};
+		  }
         // If item is directly a string (e.g., from a simple select query)
-        return { 
-          code: String(item),
-          name: String(item) // Use code as name fallback
-        };
-      }).filter(stock => stock.code); // Filter out empty codes
+		  return { 
+			code: String(item),
+			name: String(item) // Use code as name fallback
+		  };
+		}).filter(stock => stock.code); // Filter out empty codes
       
       return stocks;
     } catch (error) {
