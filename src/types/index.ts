@@ -1,16 +1,16 @@
 
-
 export interface User {
   id: string;
   email: string;
-  full_name: string;
-  avatar_url?: string;
+  full_name?: string;
   level_id: number; // 1 = Investor, 2 = Admin
-  status: 'active' | 'inactive' | 'pending';
+  status: string;
   email_verified: boolean;
   account_type: 'free' | 'premium';
   created_at: string;
   last_login?: string;
+  avatar_url?: string;
+  plan_type?: string; // Add plan_type to track subscription tier
 }
 
 export interface MarketDataSource {
@@ -42,7 +42,10 @@ export interface StockAnalysisParams {
   initialCapital: number;
   dataTableName?: string;
   period: string; // Period parameter (now required)
+  startDate?: string; // Add startDate property
+  endDate?: string; // Add endDate property
   comparisonStocks?: string[]; // Added comparisonStocks parameter
+  assetCode?: string; // Add assetCode property
 }
 
 export interface AnalysisResult {
@@ -68,6 +71,10 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
+  detailedHistory?: { // Add detailedHistory property for compatibility
+    capitalEvolution: CapitalPoint[];
+    tradeHistory: TradeHistoryItem[];
+  };
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -90,7 +97,7 @@ export interface TradeHistoryItem {
   suggestedEntryPrice?: number;
   actualPrice?: number;
   lotSize?: number;
-  stopPrice?: number;
+  stopPrice?: number | string; // Allow both number and string
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
 }
@@ -102,7 +109,7 @@ export interface CapitalPoint {
 
 export interface StockInfo {
   code: string;
-  name: string;
+  name?: string; // Make name optional
   fullName?: string;
 }
 
@@ -112,4 +119,3 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
-

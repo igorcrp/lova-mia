@@ -19,6 +19,7 @@ import AdminAssetsPage from "@/pages/admin/AdminAssetsPage";
 import AppHomePage from "@/pages/app/AppHomePage";
 import DaytradePage from "@/pages/app/DaytradePage";
 import ProfilePage from "@/pages/app/ProfilePage";
+import SubscriptionPage from "@/pages/app/SubscriptionPage";
 
 // Public Pages
 import LoginPage from "@/pages/LoginPage";
@@ -57,6 +58,7 @@ const App = () => (
                   <Route path="/app" element={<AppHomePage />} />
                   <Route path="/app/daytrade" element={<DaytradePage />} />
                   <Route path="/app/profile" element={<ProfilePage />} />
+                  <Route path="/app/subscription" element={<SubscriptionPage />} />
                 </Route>
               </Route>
               

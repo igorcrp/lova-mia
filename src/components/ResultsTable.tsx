@@ -1,5 +1,5 @@
-import { AnalysisResult } from "@/types";
-import { Button } from "@/components/ui/button";
+
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -8,387 +8,279 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-
-interface TradeDetail {
-  profitLoss: number;
-  trade: string;
-  stop: string;
-}
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Eye, ArrowUpDown, Filter } from "lucide-react";
+import { AnalysisResult } from "@/types";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
+  isLoading: boolean;
 }
 
-type SortField = 
-  | "assetCode" 
-  | "tradingDays"
-  | "trades"
-  | "tradePercentage"
-  | "profits"
-  | "profitPercentage"
-  | "losses"
-  | "lossPercentage"
-  | "stops"
-  | "stopPercentage"
-  | "finalCapital";
+export function ResultsTable({ results, onViewDetails, isLoading }: ResultsTableProps) {
+  const { isFree } = useSubscription();
+  const [sortField, setSortField] = useState<keyof AnalysisResult>("profit");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterProfit, setFilterProfit] = useState<"all" | "positive" | "negative">("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
-interface SortConfig {
-  field: SortField;
-  direction: "asc" | "desc";
-}
+  // Apply sorting, filtering, and searching
+  const processedResults = useMemo(() => {
+    let filtered = [...results];
 
-export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    field: "assetCode",
-    direction: "asc"
-  });
-  const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-const sortedResults = [...results].sort((a, b) => {
-    const fieldA = a[sortConfig.field];
-    const fieldB = b[sortConfig.field];
-    
-    if (fieldA < fieldB) {
-      return sortConfig.direction === "asc" ? -1 : 1;
+    // Apply search filter (disabled for free users)
+    if (!isFree && searchTerm) {
+      filtered = filtered.filter(result => 
+        result.assetCode.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-    if (fieldA > fieldB) {
-      return sortConfig.direction === "asc" ? 1 : -1;
-    }
-    return 0;
-  });
 
-  // Pagination
-  const totalPages = Math.ceil(sortedResults.length / rowsPerPage);
-  const paginatedResults = sortedResults.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
-  
-  const handleSort = (field: SortField) => {
-    setSortConfig({
-      field,
-      direction:
-        sortConfig.field === field && sortConfig.direction === "asc"
-          ? "desc"
-          : "asc",
-    });
-  };
-  
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortConfig.field !== field) {
-      return null;
+    // Apply profit filter (disabled for free users)
+    if (!isFree && filterProfit !== "all") {
+      filtered = filtered.filter(result => {
+        if (filterProfit === "positive") return (result.profit || 0) > 0;
+        if (filterProfit === "negative") return (result.profit || 0) < 0;
+        return true;
+      });
     }
-    
-    return sortConfig.direction === "asc" ? (
-      <ChevronUp className="ml-1 h-4 w-4" />
-    ) : (
-      <ChevronDown className="ml-1 h-4 w-4" />
-    );
-  };
 
-  // Generate pagination items
-  const generatePaginationItems = () => {
-    const items = [];
-    const maxVisiblePages = 5;
+    // Apply sorting (disabled for free users)
+    if (!isFree) {
+      filtered.sort((a, b) => {
+        const aValue = a[sortField] || 0;
+        const bValue = b[sortField] || 0;
+        
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+        }
+        
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        return sortDirection === "asc" 
+          ? aStr.localeCompare(bStr) 
+          : bStr.localeCompare(aStr);
+      });
+    }
+
+    // Limit results for free users (only first 10)
+    if (isFree) {
+      filtered = filtered.slice(0, 10);
+    }
+
+    return filtered;
+  }, [results, sortField, sortDirection, filterProfit, searchTerm, isFree]);
+
+  const handleSort = (field: keyof AnalysisResult) => {
+    if (isFree) return; // Disable sorting for free users
     
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              isActive={page === i}
-              onClick={() => setPage(i)}
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      items.push(
-        <PaginationItem key={1}>
-          <PaginationLink
-            isActive={page === 1}
-            onClick={() => setPage(1)}
-          >
-            1
-          </PaginationLink>
-        </PaginationItem>
-      );
-      
-      if (page > 3) {
-        items.push(
-          <PaginationItem key="start-ellipsis">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-      
-      let startPage = Math.max(2, page - 1);
-      let endPage = Math.min(totalPages - 1, page + 1);
-      
-      if (page <= 3) {
-        endPage = Math.min(totalPages - 1, 4);
-      } else if (page >= totalPages - 2) {
-        startPage = Math.max(2, totalPages - 3);
-      }
-      
-      for (let i = startPage; i <= endPage; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              isActive={page === i}
-              onClick={() => setPage(i)}
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-      
-      if (page < totalPages - 2) {
-        items.push(
-          <PaginationItem key="end-ellipsis">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-      
-      items.push(
-        <PaginationItem key={totalPages}>
-          <PaginationLink
-            isActive={page === totalPages}
-            onClick={() => setPage(totalPages)}
-          >
-            {totalPages}
-          </PaginationLink>
-        </PaginationItem>
-      );
+      setSortField(field);
+      setSortDirection("desc");
     }
-    
-    return items;
   };
-  
+
+  const formatCurrency = (value: number | undefined): string => {
+    if (value === undefined || value === null) return "$0.00";
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number | undefined): string => {
+    if (value === undefined || value === null) return "0.00%";
+    return `${value.toFixed(2)}%`;
+  };
+
+  const getProfitBadgeVariant = (profit: number | undefined) => {
+    if (!profit) return "secondary";
+    return profit > 0 ? "default" : "destructive";
+  };
+
+  if (results.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center">
+          <p className="text-muted-foreground">No results available. Run an analysis to see data.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="mt-6 space-y-4">
-      <h2 className="text-xl font-semibold">Results</h2>
-      
-      <div className="rounded-md border overflow-hidden">
-        <div className="overflow-x-auto">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Analysis Results</CardTitle>
+          <div className="flex items-center space-x-2">
+            {isFree && (
+              <Badge variant="secondary" className="text-xs">
+                Showing 10 of {results.length} results (Free Plan)
+              </Badge>
+            )}
+            {!isFree && (
+              <Badge variant="outline" className="text-xs">
+                {processedResults.length} results
+              </Badge>
+            )}
+          </div>
+        </div>
+        
+        {/* Filters - disabled for free users */}
+        {!isFree && (
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by asset code..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <Select value={filterProfit} onValueChange={(value: "all" | "positive" | "negative") => setFilterProfit(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by profit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Results</SelectItem>
+                <SelectItem value="positive">Positive Only</SelectItem>
+                <SelectItem value="negative">Negative Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead 
-                  className="w-20 cursor-pointer text-center"
-                  onClick={() => handleSort("assetCode")}
-                >
-                  <div className="flex items-center justify-center">
-                    Stock Code
-                    <SortIcon field="assetCode" />
-                  </div>
+                <TableHead className="w-[120px]">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort("assetCode")}
+                    className={`h-auto p-0 font-semibold ${isFree ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={isFree}
+                  >
+                    Asset Code
+                    {!isFree && sortField === "assetCode" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead 
-                  className="cursor-pointer text-center"
-                  onClick={() => handleSort("tradingDays")}
-                >
-                  <div className="flex items-center justify-center">
-                    Trading Days
-                    <SortIcon field="tradingDays" />
-                  </div>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort("trades")}
+                    className={`h-auto p-0 font-semibold ${isFree ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={isFree}
+                  >
+                    Trades
+                    {!isFree && sortField === "trades" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("trades")}
-                >
-                  <div className="flex items-center justify-center">
-                    Nº of Trades
-                    <SortIcon field="trades" />
-                  </div>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort("profit")}
+                    className={`h-auto p-0 font-semibold ${isFree ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={isFree}
+                  >
+                    Profit/Loss
+                    {!isFree && sortField === "profit" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("tradePercentage")}
-                >
-                  <div className="flex items-center justify-center">
-                    % Trade
-                    <SortIcon field="tradePercentage" />
-                  </div>
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort("successRate")}
+                    className={`h-auto p-0 font-semibold ${isFree ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={isFree}
+                  >
+                    Success Rate
+                    {!isFree && sortField === "successRate" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("profits")}
-                >
-                  <div className="flex items-center justify-center">
-                    Profits
-                    <SortIcon field="profits" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("profitPercentage")}
-                >
-                  <div className="flex items-center justify-center">
-                    % Profits
-                    <SortIcon field="profitPercentage" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("losses")}
-                >
-                  <div className="flex items-center justify-center">
-                    Losses
-                    <SortIcon field="losses" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("lossPercentage")}
-                >
-                  <div className="flex items-center justify-center">
-                    % Losses
-                    <SortIcon field="lossPercentage" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("stops")}
-                >
-                  <div className="flex items-center justify-center">
-                    Nº of Stop
-                    <SortIcon field="stops" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("stopPercentage")}
-                >
-                  <div className="flex items-center justify-center">
-                    % Stop
-                    <SortIcon field="stopPercentage" />
-                  </div>
-                </TableHead>
-                <TableHead 
-                  className="text-center cursor-pointer"
-                  onClick={() => handleSort("finalCapital")}
-                >
-                  <div className="flex items-center justify-center">
+                <TableHead className="text-right">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort("finalCapital")}
+                    className={`h-auto p-0 font-semibold ${isFree ? 'cursor-not-allowed opacity-50' : ''}`}
+                    disabled={isFree}
+                  >
                     Final Capital
-                    <SortIcon field="finalCapital" />
-                  </div>
+                    {!isFree && sortField === "finalCapital" && (
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    )}
+                  </Button>
                 </TableHead>
-                <TableHead className="w-24 text-center">Details</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedResults.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
-                    No results to display
+              {processedResults.map((result) => (
+                <TableRow key={result.assetCode}>
+                  <TableCell className="font-medium">
+                    {result.assetCode}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {result.trades || 0}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={getProfitBadgeVariant(result.profit)}>
+                      {formatCurrency(result.profit)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatPercentage(result.successRate)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(result.finalCapital)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onViewDetails(result.assetCode)}
+                      disabled={isLoading}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
                   </TableCell>
                 </TableRow>
-              ) : (
-                paginatedResults.map((result) => (
-                  <TableRow key={result.assetCode}>
-                    <TableCell className="font-medium text-center">{result.assetCode}</TableCell>
-                    <TableCell className="text-center">{result.tradingDays}</TableCell>
-                    <TableCell className="text-center">{result.trades}</TableCell>
-                    <TableCell className="text-center">
-                      {result.tradePercentage.toFixed(2)}%
-                    </TableCell>
-                    <TableCell className="text-center">{result.profits}</TableCell>
-                    <TableCell className={cn(
-                      "text-center",
-                      "text-green-600 dark:text-green-400"
-                    )}>
-                      {result.profitPercentage.toFixed(2)}%
-                    </TableCell>
-                    <TableCell className="text-center">{result.losses}</TableCell>
-                    <TableCell className={cn(
-                      "text-center",
-                      "text-red-600 dark:text-red-400"
-                    )}>
-                      {result.lossPercentage.toFixed(2)}%
-                    </TableCell>
-                    <TableCell className="text-center">{result.stops}</TableCell>
-                    <TableCell className="text-center">
-                      {result.stopPercentage.toFixed(2)}%
-                    </TableCell>
-                    <TableCell className="text-center font-medium">
-                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button 
-                        size="icon" 
-                        variant="outline" 
-                        onClick={() => onViewDetails(result.assetCode)}
-                      >
-                        <Search className="h-4 w-4" />
-                        <span className="sr-only">View Details</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </div>
-      </div>
-      
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows per page:</span>
-          <select
-            className="bg-transparent border rounded px-2 py-1 text-sm"
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(Number(e.target.value));
-              setPage(1);
-            }}
-            style={{ backgroundColor: "#0f1729" }}
-          >
-            <option value={10}>10</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={500}>500</option>
-          </select>
-        </div>
         
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => setPage(Math.max(1, page - 1))}
-                className={cn(page === 1 && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-            
-            {generatePaginationItems()}
-            
-            <PaginationItem>
-              <PaginationNext 
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                className={cn(page === totalPages && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
-    </div>
+        {isFree && results.length > 10 && (
+          <div className="mt-4 text-center text-sm text-muted-foreground">
+            Showing 10 of {results.length} results. 
+            <span className="ml-1 font-medium">Upgrade to Premium to see all results and use filters.</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
