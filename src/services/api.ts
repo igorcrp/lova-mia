@@ -554,9 +554,10 @@ const analysis = {
         
         // Check if item is an object and has 'asset_code' property
         if (typeof item === 'object' && item !== null && 'asset_code' in item) {
+          const typedItem = item as { asset_code: string };
           return { 
-            code: (item as { asset_code: string }).asset_code,
-            name: (item as { asset_code: string }).asset_code // Use code as name fallback
+            code: typedItem.asset_code,
+            name: typedItem.asset_code // Use code as name fallback
           };
         }
         // If item is directly a string (e.g., from a simple select query)
