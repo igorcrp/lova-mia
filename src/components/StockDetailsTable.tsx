@@ -57,6 +57,27 @@ export function StockDetailsTable({
     };
   }, []);
 
+  // Function to calculate stop trigger
+  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+        return "-";
+    }
+    const stopPrice = Number(item.stopPrice);
+    const low = Number(item.low);
+    const high = Number(item.high);
+    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
+        return "-";
+    }
+    const lowerCaseOperation = operation?.toLowerCase();
+    if (lowerCaseOperation === 'buy') {
+        return low < stopPrice ? "Executed" : "-";
+    } else if (lowerCaseOperation === 'sell') {
+        return high > stopPrice ? "Executed" : "-";
+    } else {
+        return "-";
+    }
+  }
+
   // Process and sort data
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
@@ -91,27 +112,6 @@ export function StockDetailsTable({
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
-
-  // Function to calculate stop trigger
-  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
-    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
-        return "-";
-    }
-    const stopPrice = Number(item.stopPrice);
-    const low = Number(item.low);
-    const high = Number(item.high);
-    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
-        return "-";
-    }
-    const lowerCaseOperation = operation?.toLowerCase();
-    if (lowerCaseOperation === 'buy') {
-        return low < stopPrice ? "Executed" : "-";
-    } else if (lowerCaseOperation === 'sell') {
-        return high > stopPrice ? "Executed" : "-";
-    } else {
-        return "-";
-    }
-  }
 
   // Função para formatar o valor do trade com cores
   const formatTradeValue = (trade: string) => {
