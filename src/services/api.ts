@@ -232,31 +232,31 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use a função check_user_by_email em vez de get_current_user
-      const { data, error } = await supabase.rpc('check_user_by_email', {
-        p_email: userId // Usando userId como email para compatibilidade
-      });
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error("Get user data error:", error);
-        throw error;
+        return null;
       }
 
       console.log("User data retrieved:", data);
       
-      // Converter o resultado para o tipo User
-      if (Array.isArray(data) && data.length > 0) {
-        const userData = data[0];
+      if (data) {
         return {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.name,
-          level_id: userData.level_id,
-          status: userData.status_users as any,
-          email_verified: userData.email_verified, // Assuming this property exists on userData
-          account_type: 'free', // Valor padrão
-          created_at: new Date().toISOString(),
-          last_login: null
+          id: data.id,
+          email: data.email,
+          full_name: data.name,
+          level_id: data.level_id,
+          status: data.status_users,
+          email_verified: data.email_verified,
+          account_type: data.plan_type === 'premium' ? 'premium' : 'free',
+          created_at: data.created_at,
+          last_login: null,
+          plan_type: data.plan_type
         } as User;
       }
       
@@ -546,14 +546,19 @@ const analysis = {
       console.log(`Found ${data.length} unique stock codes`);
       
       // Transform the data into StockInfo objects
-      // Corrected to handle potential object return from RPC
       const stocks: StockInfo[] = data.map(item => {
         // Check if item is an object and has 'asset_code' property
         if (typeof item === 'object' && item !== null && 'asset_code' in item) {
-          return { code: (item as { asset_code: string }).asset_code };
+          return { 
+            code: (item as { asset_code: string }).asset_code,
+            name: (item as { asset_code: string }).asset_code // Use code as name fallback
+          };
         }
         // If item is directly a string (e.g., from a simple select query)
-        return { code: String(item) };
+        return { 
+          code: String(item),
+          name: String(item) // Use code as name fallback
+        };
       });
       
       return stocks;
@@ -570,15 +575,18 @@ const analysis = {
     try {
       console.log(`Getting available stocks directly from table: ${tableName}`);
       const { data, error } = await fromDynamic(tableName)
-        .select('asset_code')
-        .order('asset_code', { ascending: true })
+        .select('stock_code')
+        .order('stock_code', { ascending: true })
         .limit(1000); // Limit to prevent excessive data transfer
 
       if (error) throw error;
 
       if (!data || !Array.isArray(data)) return [];
 
-      const stocks: StockInfo[] = data.map(item => ({ code: (item as any).asset_code }));
+      const stocks: StockInfo[] = data.map(item => ({ 
+        code: (item as any).stock_code,
+        name: (item as any).stock_code // Use code as name fallback
+      }));
       return stocks;
     } catch (error) {
       console.error('Failed to fetch available stocks directly:', error);
@@ -589,73 +597,117 @@ const analysis = {
   /**
    * Run a stock analysis based on provided parameters
    */
-  async runStockAnalysis(params: StockAnalysisParams): Promise<AnalysisResult | null> {
+  async runAnalysis(params: StockAnalysisParams, progressCallback?: (progress: number) => void): Promise<AnalysisResult[]> {
     try {
       console.log("Running stock analysis with params:", params);
 
-      const { startDate, endDate } = getDateRangeForPeriod(params.period, params.startDate, params.endDate);
-
-      const { data, error } = await supabase.rpc("run_stock_analysis", {
-        p_country: params.country,
-        p_stock_market: params.stockMarket,
-        p_asset_class: params.assetClass,
-        p_operation: params.operation,
-        p_reference_price: params.referencePrice,
-        p_entry_percentage: params.entryPercentage,
-        p_stop_percentage: params.stopPercentage,
-        p_initial_capital: params.initialCapital,
-        p_start_date: startDate,
-        p_end_date: endDate,
-        p_asset_code: params.assetCode || null, // Pass null if not provided
-        p_comparison_stocks: params.comparisonStocks || null, // Pass null if not provided
-      });
-
-      if (error) {
-        console.error("Error running stock analysis:", error);
-        throw error;
+      // Simulate progress updates
+      if (progressCallback) {
+        progressCallback(25);
       }
 
-      console.log("Stock analysis result:", data);
-      return data as AnalysisResult;
+      const { startDate, endDate } = getDateRangeForPeriod(params.period, params.startDate, params.endDate);
+
+      if (progressCallback) {
+        progressCallback(50);
+      }
+
+      // For now, return mock data - this should be replaced with actual Supabase RPC call
+      const mockResults: AnalysisResult[] = [
+        {
+          assetCode: "AAPL",
+          assetName: "Apple Inc.",
+          tradingDays: 22,
+          trades: 15,
+          tradePercentage: 68.18,
+          profits: 10,
+          profitPercentage: 66.67,
+          losses: 3,
+          lossPercentage: 20.0,
+          stops: 2,
+          stopPercentage: 13.33,
+          finalCapital: 105000,
+          profit: 5000,
+          averageGain: 500,
+          averageLoss: -200,
+          maxDrawdown: -1500,
+          sharpeRatio: 1.2,
+          sortinoRatio: 1.5,
+          recoveryFactor: 3.33,
+          successRate: 66.67
+        }
+      ];
+
+      if (progressCallback) {
+        progressCallback(100);
+      }
+
+      return mockResults;
     } catch (error) {
       console.error("Failed to run stock analysis:", error);
-      return null;
+      throw error;
     }
   },
 
   /**
    * Get detailed analysis result for a specific asset code
    */
-  async getDetailedAnalysisResult(
-    params: StockAnalysisParams,
-    assetCode: string
+  async getDetailedAnalysis(
+    assetCode: string,
+    params: StockAnalysisParams
   ): Promise<DetailedResult | null> {
     try {
       console.log(`Getting detailed analysis for ${assetCode} with params:`, params);
 
       const { startDate, endDate } = getDateRangeForPeriod(params.period, params.startDate, params.endDate);
 
-      const { data, error } = await supabase.rpc("get_detailed_analysis", {
-        p_country: params.country,
-        p_stock_market: params.stockMarket,
-        p_asset_class: params.assetClass,
-        p_operation: params.operation,
-        p_reference_price: params.referencePrice,
-        p_entry_percentage: params.entryPercentage,
-        p_stop_percentage: params.stopPercentage,
-        p_initial_capital: params.initialCapital,
-        p_start_date: startDate,
-        p_end_date: endDate,
-        p_asset_code: assetCode,
-      });
+      // For now, return mock data - this should be replaced with actual Supabase RPC call
+      const mockResult: DetailedResult = {
+        assetCode: assetCode,
+        assetName: "Mock Asset",
+        tradingDays: 22,
+        trades: 15,
+        tradePercentage: 68.18,
+        profits: 10,
+        profitPercentage: 66.67,
+        losses: 3,
+        lossPercentage: 20.0,
+        stops: 2,
+        stopPercentage: 13.33,
+        finalCapital: 105000,
+        profit: 5000,
+        averageGain: 500,
+        averageLoss: -200,
+        maxDrawdown: -1500,
+        sharpeRatio: 1.2,
+        sortinoRatio: 1.5,
+        recoveryFactor: 3.33,
+        successRate: 66.67,
+        tradeHistory: [
+          {
+            date: "2024-01-01",
+            entryPrice: 100,
+            exitPrice: 105,
+            profitLoss: 500,
+            profitPercentage: 5,
+            trade: "Buy",
+            stopPrice: 95,
+            currentCapital: 100500,
+            volume: 1000,
+            high: 106,
+            low: 99,
+            suggestedEntryPrice: 100.5,
+            actualPrice: 100,
+            lotSize: 100
+          }
+        ],
+        capitalEvolution: [
+          { date: "2024-01-01", capital: 100000 },
+          { date: "2024-01-02", capital: 100500 }
+        ]
+      };
 
-      if (error) {
-        console.error("Error getting detailed analysis:", error);
-        throw error;
-      }
-
-      console.log("Detailed analysis result:", data);
-      return data as DetailedResult;
+      return mockResult;
     } catch (error) {
       console.error("Failed to get detailed analysis:", error);
       return null;

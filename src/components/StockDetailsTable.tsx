@@ -100,12 +100,6 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";

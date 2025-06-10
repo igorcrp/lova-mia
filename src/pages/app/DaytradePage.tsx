@@ -66,7 +66,7 @@ export default function DaytradePage() {
       
       // Run the analysis using API with the table name
       const results = await api.analysis.runAnalysis(paramsWithTable, (currentProgress) => {
-        // Update progress based on the API\'s progress reports
+        // Update progress based on the API's progress reports
         setProgress(20 + currentProgress * 0.7);
       });
       
