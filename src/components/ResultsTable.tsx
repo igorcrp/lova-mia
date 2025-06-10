@@ -1,3 +1,4 @@
+
 import { AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ interface TradeDetail {
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
+  planType?: "free" | "premium";
 }
 
 type SortField = 
@@ -50,7 +52,7 @@ interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
+export function ResultsTable({ results, onViewDetails, planType = "free" }: ResultsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
@@ -58,7 +60,7 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-const sortedResults = [...results].sort((a, b) => {
+  const sortedResults = [...results].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -79,6 +81,11 @@ const sortedResults = [...results].sort((a, b) => {
   );
   
   const handleSort = (field: SortField) => {
+    // Disable sorting for free users
+    if (planType === "free") {
+      return;
+    }
+    
     setSortConfig({
       field,
       direction:
@@ -89,7 +96,7 @@ const sortedResults = [...results].sort((a, b) => {
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortConfig.field !== field) {
+    if (sortConfig.field !== field || planType === "free") {
       return null;
     }
     
@@ -187,108 +194,149 @@ const sortedResults = [...results].sort((a, b) => {
     <div className="mt-6 space-y-4">
       <h2 className="text-xl font-semibold">Results</h2>
       
+      {planType === "free" && results.length >= 10 && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Showing first 10 results. Upgrade to Premium to see all results and enable sorting.
+          </p>
+        </div>
+      )}
+      
       <div className="rounded-md border overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className="w-20 cursor-pointer text-center"
+                  className={cn(
+                    "w-20 text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
                     Stock Code
-                    <SortIcon field="assetCode" />
+                    {planType === "premium" && <SortIcon field="assetCode" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer text-center"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
                     Trading Days
-                    <SortIcon field="tradingDays" />
+                    {planType === "premium" && <SortIcon field="tradingDays" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
                     Nº of Trades
-                    <SortIcon field="trades" />
+                    {planType === "premium" && <SortIcon field="trades" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
                     % Trade
-                    <SortIcon field="tradePercentage" />
+                    {planType === "premium" && <SortIcon field="tradePercentage" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
                     Profits
-                    <SortIcon field="profits" />
+                    {planType === "premium" && <SortIcon field="profits" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
                     % Profits
-                    <SortIcon field="profitPercentage" />
+                    {planType === "premium" && <SortIcon field="profitPercentage" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
                     Losses
-                    <SortIcon field="losses" />
+                    {planType === "premium" && <SortIcon field="losses" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
                     % Losses
-                    <SortIcon field="lossPercentage" />
+                    {planType === "premium" && <SortIcon field="lossPercentage" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
                     Nº of Stop
-                    <SortIcon field="stops" />
+                    {planType === "premium" && <SortIcon field="stops" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
                     % Stop
-                    <SortIcon field="stopPercentage" />
+                    {planType === "premium" && <SortIcon field="stopPercentage" />}
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    planType === "premium" && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">
                     Final Capital
-                    <SortIcon field="finalCapital" />
+                    {planType === "premium" && <SortIcon field="finalCapital" />}
                   </div>
                 </TableHead>
                 <TableHead className="w-24 text-center">Details</TableHead>
