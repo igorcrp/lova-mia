@@ -547,6 +547,11 @@ const analysis = {
       
       // Transform the data into StockInfo objects
       const stocks: StockInfo[] = data.map(item => {
+        // Add null check for item
+        if (!item) {
+          return { code: '', name: '' };
+        }
+        
         // Check if item is an object and has 'asset_code' property
         if (typeof item === 'object' && item !== null && 'asset_code' in item) {
           return { 
@@ -559,7 +564,7 @@ const analysis = {
           code: String(item),
           name: String(item) // Use code as name fallback
         };
-      });
+      }).filter(stock => stock.code); // Filter out empty codes
       
       return stocks;
     } catch (error) {
@@ -606,7 +611,8 @@ const analysis = {
         progressCallback(25);
       }
 
-      const { startDate, endDate } = getDateRangeForPeriod(params.period, params.startDate, params.endDate);
+      // Fix: Use only the period parameter for getDateRangeForPeriod
+      const { startDate, endDate } = getDateRangeForPeriod(params.period);
 
       if (progressCallback) {
         progressCallback(50);
@@ -659,7 +665,8 @@ const analysis = {
     try {
       console.log(`Getting detailed analysis for ${assetCode} with params:`, params);
 
-      const { startDate, endDate } = getDateRangeForPeriod(params.period, params.startDate, params.endDate);
+      // Fix: Use only the period parameter for getDateRangeForPeriod
+      const { startDate, endDate } = getDateRangeForPeriod(params.period);
 
       // For now, return mock data - this should be replaced with actual Supabase RPC call
       const mockResult: DetailedResult = {
@@ -733,7 +740,8 @@ const admin = {
         return [];
       }
 
-      return (data || []) as Asset[];
+      // Fix: Add proper type assertion and null check
+      return (data || []) as unknown as Asset[];
     } catch (error) {
       console.error('Failed to fetch assets:', error);
       return [];
@@ -758,7 +766,8 @@ const admin = {
         throw error;
       }
 
-      return data as Asset;
+      // Fix: Add proper type assertion
+      return data as unknown as Asset;
     } catch (error) {
       console.error('Failed to add asset:', error);
       return null;
@@ -781,7 +790,8 @@ const admin = {
         throw error;
       }
 
-      return data as Asset;
+      // Fix: Add proper type assertion
+      return data as unknown as Asset;
     } catch (error) {
       console.error('Failed to update asset:', error);
       return null;
