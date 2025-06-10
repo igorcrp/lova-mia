@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   Select,
@@ -17,8 +18,8 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
   const [country, setCountry] = useState("brazil");
   const [stockMarket, setStockMarket] = useState("b3");
   const [assetClass, setAssetClass] = useState("stocks");
-  const [operation, setOperation] = useState("buy");
-  const [referencePrice, setReferencePrice] = useState("open");
+  const [operation, setOperation] = useState<"buy" | "sell">("buy");
+  const [referencePrice, setReferencePrice] = useState<"open" | "high" | "low" | "close">("open");
   const [entryPercentage, setEntryPercentage] = useState("2");
   const [stopPercentage, setStopPercentage] = useState("1");
   const [initialCapital, setInitialCapital] = useState("1000");
@@ -91,7 +92,7 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="operation">Operation</Label>
-          <Select value={operation} onValueChange={setOperation}>
+          <Select value={operation} onValueChange={(value: "buy" | "sell") => setOperation(value)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -104,7 +105,7 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
 
         <div>
           <Label htmlFor="referencePrice">Reference Price</Label>
-          <Select value={referencePrice} onValueChange={setReferencePrice}>
+          <Select value={referencePrice} onValueChange={(value: "open" | "high" | "low" | "close") => setReferencePrice(value)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -128,7 +129,7 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
             min="0"
             max="100"
             value={entryPercentage}
-            onChange={(e) => setEntryPercentage(Number(e.target.value))}
+            onChange={(e) => setEntryPercentage(e.target.value)}
             required
           />
         </div>
@@ -142,7 +143,7 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
             min="0"
             max="100"
             value={stopPercentage}
-            onChange={(e) => setStopPercentage(Number(e.target.value))}
+            onChange={(e) => setStopPercentage(e.target.value)}
             required
           />
         </div>
@@ -155,7 +156,7 @@ export function StockSetupForm({ onSubmit, isLoading, planType, subscriptionLoad
             step="0.01"
             min="0"
             value={initialCapital}
-            onChange={(e) => setInitialCapital(Number(e.target.value))}
+            onChange={(e) => setInitialCapital(e.target.value)}
             required
           />
         </div>

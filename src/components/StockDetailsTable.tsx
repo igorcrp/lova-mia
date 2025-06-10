@@ -595,4 +595,3 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
-

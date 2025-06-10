@@ -4,9 +4,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from '@/components/ui/use-toast';
 
+interface CustomUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  status?: 'active' | 'inactive' | 'pending';
+  level_id?: number;
+  account_type?: 'free' | 'premium';
+  email_verified?: boolean;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: CustomUser | null;
   loading: boolean;
+  isLoading: boolean;
   subscriptionLoading: boolean;
   planType: 'free' | 'premium';
   subscribed: boolean;
@@ -15,6 +26,12 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string, fullName?: string) => Promise<{ success: boolean }>;
+  resetPassword: (email: string) => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<void>;
+  googleLogin: () => Promise<void>;
   checkSubscription: () => Promise<void>;
   createCheckout: () => Promise<void>;
   openCustomerPortal: () => Promise<void>;
@@ -23,7 +40,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [planType, setPlanType] = useState<'free' | 'premium'>('free');
@@ -34,8 +51,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
       if (session?.user) {
+        const customUser: CustomUser = {
+          id: session.user.id,
+          email: session.user.email || '',
+          full_name: session.user.user_metadata?.full_name,
+          status: 'active',
+          level_id: 1,
+          account_type: 'free',
+          email_verified: !!session.user.email_confirmed_at,
+        };
+        setUser(customUser);
         checkSubscription();
       }
       setLoading(false);
@@ -44,10 +70,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user && event === 'SIGNED_IN') {
-          await checkSubscription();
-        } else if (event === 'SIGNED_OUT') {
+        if (session?.user) {
+          const customUser: CustomUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name,
+            status: 'active',
+            level_id: 1,
+            account_type: 'free',
+            email_verified: !!session.user.email_confirmed_at,
+          };
+          setUser(customUser);
+          if (event === 'SIGNED_IN') {
+            await checkSubscription();
+          }
+        } else {
+          setUser(null);
           setPlanType('free');
           setSubscribed(false);
           setSubscriptionTier('free');
@@ -216,9 +254,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Aliases for compatibility
+  const login = signIn;
+  const logout = signOut;
+  
+  const register = async (email: string, password: string, fullName?: string) => {
+    await signUp(email, password, fullName);
+    return { success: true };
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      
+      toast({
+        title: "Reset email sent",
+        description: "Check your email for password reset instructions",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Reset failed",
+        description: error.message,
+      });
+      throw error;
+    }
+  };
+
+  const resendConfirmationEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+      if (error) throw error;
+      
+      toast({
+        title: "Confirmation email sent",
+        description: "Please check your email",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Resend failed",
+        description: error.message,
+      });
+      throw error;
+    }
+  };
+
+  const googleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Google login failed",
+        description: error.message,
+      });
+      throw error;
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
+    isLoading: loading,
     subscriptionLoading,
     planType,
     subscribed,
@@ -227,6 +332,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signIn,
     signOut,
+    login,
+    logout,
+    register,
+    resetPassword,
+    resendConfirmationEmail,
+    googleLogin,
     checkSubscription,
     createCheckout,
     openCustomerPortal,

@@ -48,10 +48,10 @@ export function ProtectedRoute({ requireLevel }: ProtectedRouteProps) {
   }
   
   // Check required level
-  if (requireLevel !== undefined && user.level_id < requireLevel) {
+  if (requireLevel !== undefined && (user.level_id || 1) < requireLevel) {
     console.log(`User level ${user.level_id} is insufficient, required: ${requireLevel}`);
     // Redirect to appropriate dashboard based on user level
-    return <Navigate to={user.level_id === 1 ? "/app" : "/admin"} replace />;
+    return <Navigate to={(user.level_id || 1) === 1 ? "/app" : "/admin"} replace />;
   }
   
   return <Outlet />;
