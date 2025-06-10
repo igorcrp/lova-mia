@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -86,7 +85,7 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields - fix the type comparison issue
+      // Numeric comparison for other fields - ensure both values are converted to numbers
       const numA = typeof valA === 'number' ? valA : (typeof valA === 'string' ? parseFloat(valA) || 0 : 0);
       const numB = typeof valB === 'number' ? valB : (typeof valB === 'string' ? parseFloat(valB) || 0 : 0);
       return sortDirection === "asc" ? numA - numB : numB - numA;
@@ -94,12 +93,6 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";

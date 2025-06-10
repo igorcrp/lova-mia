@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -12,7 +13,7 @@ import { Crown, Check } from "lucide-react";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function DaytradePage() {
+export default function MonthlyPortfolioPage() {
   const { planType, subscriptionLoading, createCheckout, openCustomerPortal, user } = useAuth();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
@@ -265,7 +266,7 @@ export default function DaytradePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Daytrade Portfolio</h1>
+      <h1 className="text-2xl font-bold mb-6">Monthly Portfolio</h1>
       
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
@@ -333,6 +334,7 @@ export default function DaytradePage() {
               results={analysisResults} 
               onViewDetails={viewDetails}
               planType={planType}
+              isLoading={false}
             />
           )}
         </div>
@@ -344,7 +346,6 @@ export default function DaytradePage() {
               params={analysisParams}
               onClose={closeDetails}
               onUpdateParams={updateAnalysis}
-              onBack={closeDetails}
               isLoading={isLoadingDetails}
             />
           </div>
