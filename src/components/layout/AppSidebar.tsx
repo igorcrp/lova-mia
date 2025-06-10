@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Home, LogOut, User } from "lucide-react";
@@ -124,3 +123,4 @@ export function AppSidebar() {
     </aside>
   );
 }
+

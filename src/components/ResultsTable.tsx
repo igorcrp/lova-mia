@@ -30,7 +30,6 @@ interface TradeDetail {
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
-  isPremium?: boolean;
 }
 
 type SortField = 
@@ -51,7 +50,7 @@ interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export function ResultsTable({ results, onViewDetails, isPremium = false }: ResultsTableProps) {
+export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
@@ -59,10 +58,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Limit results to 10 for free users
-  const limitedResults = isPremium ? results : results.slice(0, 10);
-
-  const sortedResults = [...limitedResults].sort((a, b) => {
+const sortedResults = [...results].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -83,8 +79,6 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
   );
   
   const handleSort = (field: SortField) => {
-    if (!isPremium) return; // Disable sorting for free users
-    
     setSortConfig({
       field,
       direction:
@@ -95,7 +89,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (!isPremium || sortConfig.field !== field) {
+    if (sortConfig.field !== field) {
       return null;
     }
     
@@ -199,10 +193,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className={cn(
-                    "w-20 text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="w-20 cursor-pointer text-center"
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
@@ -211,10 +202,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="cursor-pointer text-center"
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
@@ -223,10 +211,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
@@ -235,10 +220,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -247,10 +229,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
@@ -259,10 +238,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -271,10 +247,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
@@ -283,10 +256,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -295,10 +265,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
@@ -307,10 +274,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -319,10 +283,7 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isPremium ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">
@@ -387,15 +348,6 @@ export function ResultsTable({ results, onViewDetails, isPremium = false }: Resu
           </Table>
         </div>
       </div>
-      
-      {!isPremium && results.length > 10 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-sm text-blue-700">
-            <strong>Free Plan:</strong> Showing 10 of {results.length} results. 
-            Upgrade to Premium to see all results and enable column sorting.
-          </p>
-        </div>
-      )}
       
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">

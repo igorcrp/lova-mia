@@ -93,20 +93,22 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
-    if (!item || !item.stopPrice || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
     }
-    
-    // Convert stopPrice to number if it's a string
-    const stopPrice = typeof item.stopPrice === 'string' ? parseFloat(item.stopPrice) : item.stopPrice;
+    const stopPrice = Number(item.stopPrice);
     const low = Number(item.low);
     const high = Number(item.high);
-    
     if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
         return "-";
     }
-    
     const lowerCaseOperation = operation?.toLowerCase();
     if (lowerCaseOperation === 'buy') {
         return low < stopPrice ? "Executed" : "-";
@@ -593,3 +595,4 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
+
