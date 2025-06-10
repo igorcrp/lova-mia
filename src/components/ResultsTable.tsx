@@ -151,7 +151,7 @@ export function ResultsTable({ results, onViewDetails, isLoading }: ResultsTable
                 className="max-w-sm"
               />
             </div>
-            <Select value={filterProfit} onValueChange={setFilterProfit}>
+            <Select value={filterProfit} onValueChange={(value: "all" | "positive" | "negative") => setFilterProfit(value)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by profit" />
               </SelectTrigger>

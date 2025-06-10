@@ -275,7 +275,7 @@ export default function MonthlyPortfolioPage() {
       const processedResults = await Promise.all(
         results.map(async (result) => {
           try {
-            const detailedData = await api.analysis.getDetailedAnalysis(result.assetCode, paramsWithTable);
+            const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, result.assetCode); // Corrected call
             
             if (detailedData && detailedData.tradeHistory) {
               // Use the verified processMonthlyTrades (v5 logic)
@@ -306,300 +306,286 @@ export default function MonthlyPortfolioPage() {
               const maxDrawdown = calculateMaxDrawdown(processedHistory, params.initialCapital);
               const sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
               const sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
-              const maxDrawdownAmount = maxDrawdown / 100 * params.initialCapital;
-              const recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
               
-              // Adicionar o histórico detalhado ao resultado
-              const resultWithHistory = { 
-                ...result, 
-                tradingDays: processedHistory.length, 
-                trades, 
-                profits: profitsCount, 
-                losses: lossesCount, 
-                stops: stopsCount, 
-                finalCapital, 
-                profit: totalProfit, 
-                successRate: trades > 0 ? (profitsCount / trades) * 100 : 0, 
-                averageGain, 
-                averageLoss, 
-                maxDrawdown, 
-                sharpeRatio, 
-                sortinoRatio, 
+              // Recovery Factor: (Final Capital - Initial Capital) / Max Drawdown Amount
+              const maxDrawdownAmount = maxDrawdown / 100 * params.initialCapital; // Convert percentage to amount
+              const recoveryFactor = maxDrawdownAmount === 0 ? Infinity : totalProfit / maxDrawdownAmount;
+
+              return {
+                ...result,
+                tradingDays: processedHistory.length,
+                trades,
+                profits: profitsCount,
+                losses: lossesCount,
+                stops: stopsCount,
+                finalCapital,
+                profit: totalProfit,
+                successRate: trades > 0 ? (profitsCount / trades) * 100 : 0,
+                averageGain,
+                averageLoss,
+                maxDrawdown,
+                sharpeRatio,
+                sortinoRatio,
                 recoveryFactor,
-                detailedHistory: processedHistory // Adicionando o histórico detalhado
+                detailedHistory: processedHistory, // Add processed history here
               };
-              
-              return resultWithHistory;
-            } else {
-               return { ...result, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
             }
-          } catch (error) { 
-            console.error(`Error processing summary metrics for ${result.assetCode}:`, error); 
-            return { ...result, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 }; 
+          } catch (detailError) {
+            console.error(`Failed to get detailed analysis for ${result.assetCode}:`, detailError);
           }
+          return result; // Return original result if detailed processing fails
         })
       );
       
-      setProgress(95);
-      setAnalysisResults(processedResults);
-      setProgress(100);
-      toast({ title: "Monthly analysis completed", description: "Analysis was completed successfully (v6 logic)." });
+      setAnalysisResults(processedResults.filter(Boolean) as AnalysisResult[]); // Filter out any nulls
       
-    } catch (error) { 
-      console.error("Monthly analysis run failed", error); 
-      toast({ variant: "destructive", title: "Analysis failed", description: error instanceof Error ? error.message : "An unknown error occurred" }); 
-      setProgress(0); 
-      setAnalysisResults([]); 
-      setAnalysisParams(null); 
-    }
-    finally { 
-      setTimeout(() => setIsLoading(false), 300); 
-    }
-  };
-
-  // --- View Details Function (Reverted Flow Logic - v6) --- 
-  const viewDetails = async (assetCode: string) => {
-    // 1. Check for analysis parameters
-    if (!analysisParams) {
-      toast({ variant: "destructive", title: "Error", description: "Analysis parameters not available. Please run analysis first." });
-      return;
-    }
-
-    console.log(`[v6] Attempting to view details for: ${assetCode}`);
-    setIsLoadingDetails(true); 
-    setSelectedAsset(assetCode); 
-    setDetailedResult(null); // Clear previous result
-
-    try {
-      // 2. Ensure data table name is available
-      let paramsForDetails = analysisParams;
-      if (!paramsForDetails.dataTableName) {
-        console.log(`[v6] Data table name missing, fetching...`);
-        const tableName = await api.marketData.getDataTableName(paramsForDetails.country, paramsForDetails.stockMarket, paramsForDetails.assetClass);
-        if (!tableName) throw new Error("Could not determine data table name for details view");
-        paramsForDetails = { ...paramsForDetails, dataTableName: tableName };
-        // Update the main state if needed, though maybe not necessary just for viewing
-        // setAnalysisParams(paramsForDetails); 
-      }
-
-      // 3. Fetch detailed analysis data
-      console.log(`[v6] Fetching detailed analysis for ${assetCode} with params:`, paramsForDetails);
-      const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsForDetails);
-      console.log(`[v6] Fetched detailed data for ${assetCode}:`, detailedData ? 'Data received' : 'No data');
-
-      // 4. Process data if received successfully
-      if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-        console.log(`[v6] Processing trade history for ${assetCode}...`);
-        // *** Use the CORRECTED processMonthlyTrades (v5 logic) ***
-        const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsForDetails);
-
-        // Assign processed history back
-        detailedData.tradeHistory = processedHistory;
-        detailedData.tradingDays = processedHistory.length;
-
-        // Sort processed history for capital evolution chart
-        const sortedProcessedHistory = [...processedHistory].sort((a, b) =>
-            new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-        );
-
-        // Recalculate capital evolution and metrics based on processed history
-        if (sortedProcessedHistory.length > 0) {
-           detailedData.capitalEvolution = sortedProcessedHistory
-             .filter(trade => trade.capital !== undefined)
-             .map(trade => ({ date: trade.date, capital: trade.capital as number }));
-           
-           // Add initial capital point logic
-           // Need original full history for the very first date point
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || []; // Fallback
-           const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
-              new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-           );
-           const firstOriginalDate = fullSortedOriginalHistory[0]?.date;
-           if (firstOriginalDate && (detailedData.capitalEvolution.length === 0 || detailedData.capitalEvolution[0]?.date !== firstOriginalDate)) {
-              detailedData.capitalEvolution.unshift({ date: firstOriginalDate, capital: paramsForDetails.initialCapital });
-           }
-
-           const lastTradeRecord = sortedProcessedHistory[sortedProcessedHistory.length - 1];
-           const finalCapital = lastTradeRecord?.capital ?? paramsForDetails.initialCapital;
-           const totalProfit = finalCapital - paramsForDetails.initialCapital;
-           const profitPercentageTotal = paramsForDetails.initialCapital === 0 ? 0 : (totalProfit / paramsForDetails.initialCapital) * 100;
-
-           detailedData.maxDrawdown = calculateMaxDrawdown(sortedProcessedHistory, paramsForDetails.initialCapital);
-           detailedData.sharpeRatio = calculateSharpeRatio(sortedProcessedHistory, profitPercentageTotal);
-           detailedData.sortinoRatio = calculateSortinoRatio(sortedProcessedHistory, profitPercentageTotal);
-           const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsForDetails.initialCapital;
-           detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
-
-        } else {
-           // Handle case with no processed trades
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === assetCode)?.detailedHistory || detailedData.tradeHistory || [];
-           const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
-           detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsForDetails.initialCapital }];
-           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
-        }
-
-        // 5. Set state to display results
-        console.log(`[v6] Processing complete for ${assetCode}. Setting state.`);
-        setDetailedResult(detailedData); // Set the processed data
-        setShowDetailView(true); // *** Show the detail view ***
-        console.log(`[v6] State set for ${assetCode}. Should show details now.`);
-
-      } else {
-        // Handle case where no detailed data/history is found
-        console.warn(`[v6] No detailed data or trade history found for ${assetCode}.`);
-        toast({ variant: "default", title: "No Details", description: `No detailed trade history could be processed for ${assetCode}.` });
-        setDetailedResult(null);
-        setShowDetailView(false); // Ensure view is hidden
-        setSelectedAsset(null); // Deselect asset
-      }
-
+      setProgress(95);
+      setProgress(100);
+      
+      toast({
+        title: "Analysis completed",
+        description: "Monthly analysis was completed successfully",
+      });
     } catch (error) {
-      // 6. Handle errors during fetch or processing
-      console.error(`[v6] Failed to fetch or process details for ${assetCode}`, error);
-      toast({ variant: "destructive", title: "Failed to fetch details", description: error instanceof Error ? error.message : "An unknown error occurred" });
-      setDetailedResult(null); // Clear results on error
-      setShowDetailView(false); // Hide view on error
-      setSelectedAsset(null); // Deselect asset on error
+      console.error("Monthly analysis failed", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+      setProgress(0);
     } finally {
-      // 7. Stop loading indicator
-      setTimeout(() => setIsLoadingDetails(false), 300);
-      console.log(`[v6] Finished viewDetails attempt for ${assetCode}. Loading state off.`);
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
     }
   };
-
-  // --- Update Analysis Function (from Detail View) --- 
-  // This function likely needs the same v5 trade processing logic if it recalculates
-  const updateAnalysis = async (updatedParams: StockAnalysisParams) => {
-     if (!selectedAsset || !analysisParams) return; 
-     console.log(`[v6] Updating analysis for ${selectedAsset} with new params:`, updatedParams);
-     setIsLoadingDetails(true);
-     try {
-       const tableName = analysisParams.dataTableName || await api.marketData.getDataTableName(updatedParams.country, updatedParams.stockMarket, updatedParams.assetClass);
-       if (!tableName) throw new Error("Could not determine data table name for update");
-       
-       const paramsWithTable = { ...updatedParams, dataTableName: tableName };
-
-       console.log(`[v6] Fetching detailed analysis for update on ${selectedAsset}...`);
-       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
-       console.log(`[v6] Fetched data for update on ${selectedAsset}:`, detailedData ? 'Data received' : 'No data');
-
-       if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-         console.log(`[v6] Processing updated trade history for ${selectedAsset}...`);
-         // *** Use the CORRECTED processMonthlyTrades (v5 logic) ***
-         const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
-         detailedData.tradeHistory = processedHistory;
-         detailedData.tradingDays = processedHistory.length;
-         
-         const sortedProcessedHistory = [...processedHistory].sort((a, b) =>
-            new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-         );
-
-         // --- Recalculate metrics --- 
-         if (sortedProcessedHistory.length > 0) {
-            detailedData.capitalEvolution = sortedProcessedHistory
-              .filter(trade => trade.capital !== undefined)
-              .map(trade => ({ date: trade.date, capital: trade.capital as number }));
-              
-            // Add initial capital point logic (needs original history)
-            const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
-            const fullSortedOriginalHistory = [...originalHistoryForAsset].sort((a, b) => 
-               new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
-            );
-            const firstOriginalDate = fullSortedOriginalHistory[0]?.date;
-            if (firstOriginalDate && (detailedData.capitalEvolution.length === 0 || detailedData.capitalEvolution[0]?.date !== firstOriginalDate)) {
-               detailedData.capitalEvolution.unshift({ date: firstOriginalDate, capital: paramsWithTable.initialCapital });
-            }
-            
-            const lastTradeRecord = sortedProcessedHistory[sortedProcessedHistory.length - 1];
-            const finalCapital = lastTradeRecord?.capital ?? paramsWithTable.initialCapital;
-            const totalProfit = finalCapital - paramsWithTable.initialCapital;
-            const profitPercentageTotal = paramsWithTable.initialCapital === 0 ? 0 : (totalProfit / paramsWithTable.initialCapital) * 100;
-            
-            detailedData.maxDrawdown = calculateMaxDrawdown(sortedProcessedHistory, paramsWithTable.initialCapital);
-            detailedData.sharpeRatio = calculateSharpeRatio(sortedProcessedHistory, profitPercentageTotal);
-            detailedData.sortinoRatio = calculateSortinoRatio(sortedProcessedHistory, profitPercentageTotal);
-            const maxDrawdownAmount = detailedData.maxDrawdown / 100 * paramsWithTable.initialCapital;
-            detailedData.recoveryFactor = maxDrawdownAmount !== 0 ? Math.abs(totalProfit / maxDrawdownAmount) : (totalProfit > 0 ? Infinity : 0);
-            
-         } else {
-           const originalHistoryForAsset = analysisResults.find(r => r.assetCode === selectedAsset)?.detailedHistory || detailedData.tradeHistory || [];
-           const firstOriginalDate = [...originalHistoryForAsset].sort((a, b) => new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime())[0]?.date;
-           detailedData.capitalEvolution = [{ date: firstOriginalDate || '', capital: paramsWithTable.initialCapital }];
-           detailedData.maxDrawdown = 0; detailedData.sharpeRatio = 0; detailedData.sortinoRatio = 0; detailedData.recoveryFactor = 0;
-         }
-         // --- End Recalculation --- 
-         console.log(`[v6] Processing update complete for ${selectedAsset}. Setting state.`);
-         setDetailedResult(detailedData); // Update the detailed results
-         setAnalysisParams(paramsWithTable); // Update the analysis params used for this view
-         toast({ title: "Analysis Updated", description: "Detailed view updated (monthly v6 logic)." });
-         console.log(`[v6] State updated for ${selectedAsset}.`);
-         
-       } else {
-         console.warn(`[v6] No detailed data or trade history found during update for ${selectedAsset}.`);
-         toast({ variant: "default", title: "Update Warning", description: `Could not retrieve updated details for ${selectedAsset}. Displaying previous data.` });
-       }
-     } catch (error) { 
-       console.error(`[v6] Failed to update detailed analysis for ${selectedAsset}`, error); 
-       toast({ variant: "destructive", title: "Update Failed", description: error instanceof Error ? error.message : "Unknown error" }); 
-     }
-     finally { 
-       setTimeout(() => setIsLoadingDetails(false), 300); 
-       console.log(`[v6] Finished update attempt for ${selectedAsset}. Loading state off.`);
-     }
+  
+  const viewDetails = async (assetCode: string) => {
+    if (!analysisParams) return;
+    
+    try {
+      setIsLoadingDetails(true);
+      setSelectedAsset(assetCode);
+      
+      // Find the detailed history from the already processed analysisResults
+      const foundResult = analysisResults.find(r => r.assetCode === assetCode);
+      
+      if (foundResult && foundResult.detailedHistory) {
+        // Construct a DetailedResult from the found data
+        const detailedData: DetailedResult = {
+          assetCode: foundResult.assetCode,
+          capitalEvolution: foundResult.detailedHistory.map(item => ({ date: item.date, capital: item.capital ?? 0 })).filter(item => item.capital !== 0),
+          tradeHistory: foundResult.detailedHistory,
+          tradingDays: foundResult.tradingDays ?? 0,
+          // Add other properties of DetailedResult if they exist in AnalysisResult
+        };
+        setDetailedResult(detailedData);
+        setShowDetailView(true);
+      } else {
+        // Fallback to fetching if detailedHistory is not found (should not happen if processing is correct)
+        const paramsWithTable = analysisParams.dataTableName
+          ? analysisParams
+          : {
+              ...analysisParams,
+              dataTableName: await api.marketData.getDataTableName(
+                analysisParams.country,
+                analysisParams.stockMarket,
+                analysisParams.assetClass
+              )
+            };
+        
+        if (!paramsWithTable.dataTableName) {
+          throw new Error("Could not determine data table name");
+        }
+        
+        const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, assetCode);
+        if (detailedData) {
+          const { processedHistory } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+          setDetailedResult({ ...detailedData, tradeHistory: processedHistory });
+          setShowDetailView(true);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Failed to fetch details",
+            description: "Detailed history not found for this asset.",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch detailed analysis", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch details",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
   };
-
-  // --- Close Details Function --- 
+  
   const closeDetails = () => {
-    console.log("[v6] Closing details view.");
     setShowDetailView(false);
     setDetailedResult(null);
     setSelectedAsset(null);
   };
+  
+  const updateAnalysis = async (params: StockAnalysisParams) => {
+    if (!selectedAsset) return;
+    
+    try {
+      setIsLoadingDetails(true);
+      
+      // Ensure we have the data table name
+      const dataTableName = params.dataTableName || await api.marketData.getDataTableName(
+        params.country,
+        params.stockMarket,
+        params.assetClass
+      );
+      
+      if (!dataTableName) {
+        throw new Error("Failed to identify data source");
+      }
+      
+      const paramsWithTable = {
+        ...params,
+        dataTableName
+      };
+      
+      setAnalysisParams(paramsWithTable);
+      
+      // Update both the main results and the detailed result
+      const results = await api.analysis.runAnalysis(paramsWithTable);
+      
+      const processedResults = await Promise.all(
+        results.map(async (result) => {
+          try {
+            const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, result.assetCode); // Corrected call
+            
+            if (detailedData && detailedData.tradeHistory) {
+              const { processedHistory, tradePairs } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+              const tradePairsFiltered = tradePairs.filter(pair => pair.close.profit !== undefined);
+              const trades = tradePairsFiltered.length;
+              
+              if (trades === 0) {
+                return { ...result, tradingDays: processedHistory.length, trades: 0, profits: 0, losses: 0, stops: 0, finalCapital: params.initialCapital, profit: 0, successRate: 0, averageGain: 0, averageLoss: 0, maxDrawdown: 0, sharpeRatio: 0, sortinoRatio: 0, recoveryFactor: 0 };
+              }
+              
+              const profitsCount = tradePairsFiltered.filter(pair => pair.close.profit > 0).length;
+              const lossesCount = trades - profitsCount;
+              const stopsCount = tradePairsFiltered.filter(pair => pair.close.stop === 'Executed').length;
+              
+              const lastTradeRecord = processedHistory.length > 0 ? processedHistory[processedHistory.length - 1] : null;
+              const finalCapital = lastTradeRecord?.capital ?? params.initialCapital;
+              const totalProfit = finalCapital - params.initialCapital;
+              const profitPercentageTotal = params.initialCapital === 0 ? 0 : (totalProfit / params.initialCapital) * 100;
+              
+              const gainTrades = tradePairsFiltered.filter(pair => pair.close.profit > 0);
+              const lossTrades = tradePairsFiltered.filter(pair => pair.close.profit < 0);
+              const totalGain = gainTrades.reduce((sum, pair) => sum + pair.close.profit, 0);
+              const totalLoss = lossTrades.reduce((sum, pair) => sum + pair.close.profit, 0);
+              const averageGain = gainTrades.length > 0 ? totalGain / gainTrades.length : 0;
+              const averageLoss = lossTrades.length > 0 ? totalLoss / lossTrades.length : 0;
+              
+              const maxDrawdown = calculateMaxDrawdown(processedHistory, params.initialCapital);
+              const sharpeRatio = calculateSharpeRatio(processedHistory, profitPercentageTotal);
+              const sortinoRatio = calculateSortinoRatio(processedHistory, profitPercentageTotal);
+              
+              const maxDrawdownAmount = maxDrawdown / 100 * params.initialCapital; 
+              const recoveryFactor = maxDrawdownAmount === 0 ? Infinity : totalProfit / maxDrawdownAmount;
 
-  // --- RETURN JSX --- 
+              return {
+                ...result,
+                tradingDays: processedHistory.length,
+                trades,
+                profits: profitsCount,
+                losses: lossesCount,
+                stops: stopsCount,
+                finalCapital,
+                profit: totalProfit,
+                successRate: trades > 0 ? (profitsCount / trades) * 100 : 0,
+                averageGain,
+                averageLoss,
+                maxDrawdown,
+                sharpeRatio,
+                sortinoRatio,
+                recoveryFactor,
+                detailedHistory: processedHistory, // Add processed history here
+              };
+            }
+          } catch (detailError) {
+            console.error(`Failed to get detailed analysis for ${result.assetCode}:`, detailError);
+          }
+          return result; // Return original result if detailed processing fails
+        })
+      );
+      
+      setAnalysisResults(processedResults.filter(Boolean) as AnalysisResult[]);
+      
+      // Fetch detailed analysis for the selected asset again to update the view
+      const detailedData = await api.analysis.getDetailedAnalysisResult(paramsWithTable, selectedAsset);
+      if (detailedData) {
+        const { processedHistory } = processMonthlyTrades(detailedData.tradeHistory, paramsWithTable);
+        setDetailedResult({ ...detailedData, tradeHistory: processedHistory });
+      }
+      
+      toast({
+        title: "Analysis updated",
+        description: "Analysis was updated successfully",
+      });
+    } catch (error) {
+      console.error("Analysis update failed", error);
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Monthly Portfolio</h1>
-      {/* Conditional Rendering based on showDetailView state */}
+      <h1 className="text-2xl font-bold mb-6">Monthly Portfolio Analysis</h1>
+      
       {!showDetailView ? (
-        // View 1: Setup Form and Results Table
         <div className="bg-card p-6 rounded-lg border">
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
+          
           {isLoading && (
             <div className="mt-6">
               <div className="flex justify-between text-sm mb-2">
-                <span>Processing monthly analysis...</span>
+                <span>Processing analysis...</span>
                 <span>{progress.toFixed(0)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
           )}
-          {/* Render ResultsTable only if not loading AND we have results */}
-          {!isLoading && analysisResults.length > 0 && (
-            <div className="mt-6">
-              <ResultsTable 
-                results={analysisResults} 
-                onViewDetails={viewDetails} 
-                isLoading={isLoadingDetails}
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        // View 2: Detailed Stock View
-        <div className="bg-card p-6 rounded-lg border">
-          {detailedResult && (
-            <StockDetailView 
-              result={detailedResult}
-              params={analysisParams!}
-              onUpdateParams={updateAnalysis}
-              onBack={closeDetails}
-              isLoading={isLoadingDetails}
+          
+          {analysisResults.length > 0 && !isLoading && (
+            <ResultsTable 
+              results={analysisResults} 
+              onViewDetails={viewDetails} 
+              isLoading={isLoading} // Pass isLoading prop
             />
           )}
         </div>
+      ) : (
+        detailedResult && analysisParams && (
+          <div className="bg-card p-6 rounded-lg border">
+            <StockDetailView
+              result={detailedResult}
+              params={analysisParams}
+              onClose={closeDetails}
+              onUpdateParams={updateAnalysis}
+              isLoading={isLoadingDetails}
+            />
+          </div>
+        )
       )}
     </div>
   );
 }
+
 
