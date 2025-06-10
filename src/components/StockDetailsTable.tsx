@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -50,11 +49,11 @@ export function StockDetailsTable({
     };
 
     const timer = setTimeout(updateHeight, 100);
-    window.addEventListener("resize", updateHeight);
+    window.addEventListener('resize', updateHeight);
     
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("resize", updateHeight);
+      window.removeEventListener('resize', updateHeight);
     };
   }, []);
 
@@ -86,21 +85,20 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Attempt numeric comparison first, then fallback to string comparison
-      const numA = Number(valA);
-      const numB = Number(valB);
-
-      if (!isNaN(numA) && !isNaN(numB)) {
-        return sortDirection === "asc" ? numA - numB : numB - numA;
-      } else {
-        const strA = String(valA);
-        const strB = String(valB);
-        return sortDirection === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
-      }
+      // Numeric comparison for other fields
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
+      return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
@@ -195,9 +193,9 @@ export function StockDetailsTable({
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? entryPercentage : Number(entryPercentage) || 0,
-      stopPercentage: typeof stopPercentage === 'number' ? stopPercentage : Number(stopPercentage) || 0,
-      initialCapital: initialCapital !== null ? Number(initialCapital) : 0
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
+      initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
     };
     onUpdateParams(cleanParams);
   };
@@ -265,31 +263,6 @@ export function StockDetailsTable({
       </Alert>
     );
   }
-
-  const handleDecimalInputChange = (value: string, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
-    // Allow empty string or string ending with a dot for partial input
-    if (value === '' || value === '.') {
-      setter(value);
-      return;
-    }
-    // Allow numbers with one dot
-    if (/^\d*\.?\d*$/.test(value)) {
-      setter(value);
-    }
-  };
-
-  const handleBlurFormatting = (value: number | string | null, setter: React.Dispatch<React.SetStateAction<number | string | null>>) => {
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value);
-      if (!isNaN(parsed)) {
-        setter(parsed);
-      } else {
-        setter(null); // Clear if not a valid number
-      }
-    } else if (value === null) {
-      setter(null);
-    }
-  };
 
   return (
     <div className="w-full flex flex-col gap-6">
@@ -441,76 +414,185 @@ export function StockDetailsTable({
             <TableHeader>
               <TableRow>
                 {columns.map((column) => (
-                  <TableHead key={column.id} className={`${column.width} ${column.id === 'trade' || column.id === 'stopTrigger' ? 'text-center' : 'text-right'}`}>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSortChange(column.id as keyof TradeHistoryItem)}
-                      className="h-auto p-0 font-semibold"
-                    >
-                      {column.label}
-                      {getSortIcon(column.id as keyof TradeHistoryItem)}
-                    </Button>
+                  <TableHead 
+                    key={column.id}
+                    className={`text-center px-2 py-2 text-sm cursor-pointer ${column.width}`}
+                    onClick={() => handleSortChange(column.id as keyof TradeHistoryItem)}
+                  >
+                    <div className="flex items-center justify-center">
+                      {column.label} {getSortIcon(column.id as keyof TradeHistoryItem)}
+                    </div>
                   </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentData.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium">{formatDate(item.date)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.entryPrice)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.high)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.low)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.exitPrice)}</TableCell>
-                  <TableCell className="text-right">{item.volume?.toLocaleString() || '-'}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.suggestedEntryPrice)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.actualPrice)}</TableCell>
-                  <TableCell className="text-center">{formatTradeValue(item.trade)}</TableCell>
-                  <TableCell className="text-right">{item.lotSize || '-'}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(typeof item.stopPrice === 'number' ? item.stopPrice : undefined)}</TableCell>
-                  <TableCell className="text-center">{item.stopTrigger}</TableCell>
-                  <TableCell className="text-right">
-                    <span className={item.profitLoss && item.profitLoss >= 0 ? 'text-green-500' : 'text-red-500'}>
-                      {formatCurrency(item.profitLoss)}
-                    </span>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-6">
+                    Loading data...
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.currentCapital)}</TableCell>
                 </TableRow>
-              ))}
+              ) : currentData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-6">
+                    No data to display
+                  </TableCell>
+                </TableRow>
+              ) : (
+                currentData.map((item) => (
+                  <TableRow 
+                    key={`${item.date}-${item.profitLoss}`}
+                    className={"hover:bg-muted/50"}
+                  >
+                    {columns.map((column) => {
+                      const value = item[column.id as keyof TradeHistoryItem];
+                      let formattedValue = "-";
+                      
+                      if (value !== undefined && value !== null) {
+                        if (column.id === "date") {
+                          formattedValue = formatDate(value as string);
+                        } else if (column.id === "profitLoss" || column.id === "currentCapital") {
+                          formattedValue = formatCurrency(value as number);
+                        } else if (column.id === "volume" || column.id === "lotSize") {
+                          formattedValue = (value as number).toLocaleString();
+                        } else if (column.id === "stopTrigger") {
+                          formattedValue = item.stopTrigger || "-";
+                        } else if (column.id === "trade") {
+                          formattedValue = value as string;
+                        } else if (typeof value === "number") {
+                          formattedValue = value.toFixed(2);
+                        } else {
+                          formattedValue = String(value);
+                        }
+                      }
+                      
+                      return (
+                        <TableCell 
+                          key={column.id}
+                          className={`text-center px-2 py-2 text-sm ${
+                            column.id === "currentCapital" ? "font-medium" : ""
+                          } ${
+                            column.id === "profitLoss" ? 
+                              (Number(item.profitLoss) > 0 ? "text-green-600" : 
+                               Number(item.profitLoss) < 0 ? "text-red-600" : "") : ""
+                          }`}
+                        >
+                          {column.id === "trade" ? formatTradeValue(formattedValue) : formattedValue}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <Pagination className="mt-4">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-              {[...Array(totalPages)].map((_, i) => (
-                <PaginationItem key={i}>
-                  <PaginationLink 
-                    onClick={() => handlePageChange(i + 1)}
-                    isActive={i + 1 === currentPage}
-                  >
-                    {i + 1}
-                  </PaginationLink>
+          <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t">
+            <div className="flex items-center gap-2 mb-4 sm:mb-0">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <select
+                className="bg-card border rounded px-2 py-1 text-sm"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {[10, 50, 100, 500].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+            
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  />
                 </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = currentPage <= 3
+                    ? i + 1
+                    : currentPage >= totalPages - 2
+                      ? totalPages - 4 + i
+                      : currentPage - 2 + i;
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        isActive={currentPage === pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
         )}
       </div>
     </div>
   );
 }
+
+// Função auxiliar para lidar com a entrada de números decimais positivos
+function handleDecimalInputChange(value: string, onChange: (val: number | string | null) => void) {
+  if (value === "") {
+    onChange(null);
+    return;
+  }
+  const regex = /^(?:\d+)?(?:\.\d{0,2})?$/;
+  if (regex.test(value)) {
+    if (value === "." || value.endsWith(".")) {
+      onChange(value);
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onChange(numValue);
+      }
+    }
+  } else if (value === "-") {
+    // Não faz nada se tentar digitar "-"
+  } else {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 0) {
+      onChange(parseFloat(numValue.toFixed(2)));
+    } else if (value === "") {
+      onChange(null);
+    }
+  }
+}
+
+// Função auxiliar para formatar no blur
+function handleBlurFormatting(value: number | string | null | undefined, onChange: (val: number | null) => void) {
+  let numValue = 0;
+  if (typeof value === "string") {
+    if (value === ".") {
+      numValue = 0;
+    } else {
+      numValue = parseFloat(value) || 0;
+    }
+  } else if (typeof value === "number") {
+    numValue = value;
+  } else if (value === null || value === undefined) {
+    onChange(null);
+    return;
+  }
+  onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
+}
+
