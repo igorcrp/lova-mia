@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -183,11 +184,14 @@ export function StockDetailsTable({
   };
 
   const handleUpdateResults = () => {
+    const entryPercentageValue = typeof entryPercentage === 'number' ? entryPercentage : Number(entryPercentage) || 0;
+    const stopPercentageValue = typeof stopPercentage === 'number' ? stopPercentage : Number(stopPercentage) || 0;
+    
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
-      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
+      entryPercentage: Number(entryPercentageValue.toFixed(2)),
+      stopPercentage: Number(stopPercentageValue.toFixed(2)),
       initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
     };
     onUpdateParams(cleanParams);
