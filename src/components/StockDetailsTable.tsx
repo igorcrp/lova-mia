@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -60,7 +59,7 @@ export function StockDetailsTable({
 
   // Function to calculate stop trigger
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
-    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+    if (!item || !item.stopPrice || item.stopPrice === '-' || item.low === null || item.high === null) {
         return "-";
     }
     const stopPrice = Number(item.stopPrice);
