@@ -138,7 +138,7 @@ export default function MonthlyPortfolioPage() {
       new Date(a.date + 'T00:00:00Z').getTime() - new Date(b.date + 'T00:00:00Z').getTime()
     );
     
-    let capitalBeforeCurrentTrade = params.initialCapital;
+    let capitalBeforeCurrentTrade: number = Number(params.initialCapital);
     let activeTradeEntry: TradeHistoryItem | null = null;
     let stopPriceCalculated: number | null = null;
 
