@@ -594,7 +594,11 @@ const analysis = {
       const uniqueCodes = new Set<string>();
       (data as any[])
         .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .forEach(item => uniqueCodes.add(String(item.stock_code)));
+        .forEach(item => {
+          if (item && item.stock_code) {
+            uniqueCodes.add(String(item.stock_code));
+          }
+        });
       
       const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
         code: code,

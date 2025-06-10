@@ -10,6 +10,7 @@ export interface User {
   account_type: 'free' | 'premium';
   created_at: string;
   last_login?: string;
+  session?: any; // Add session property for AuthContextType
 }
 
 export interface MarketDataSource {
@@ -29,6 +30,7 @@ export interface Asset {
   asset_class: string;
   status: 'active' | 'inactive';
   created_at?: string; // Add created_at as optional
+  updated_at?: string; // Add updated_at as optional
 }
 
 export interface StockAnalysisParams {

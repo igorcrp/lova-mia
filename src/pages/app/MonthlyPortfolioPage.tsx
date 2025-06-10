@@ -33,7 +33,7 @@ function findPreviousDayWithCapital(history: TradeHistoryItem[], currentDateStr:
 // Helper function to get the reference price
 function getReferencePrice(day: TradeHistoryItem, referencePriceKey: string): number {
   const price = day[referencePriceKey as keyof TradeHistoryItem];
-  return typeof price === 'number' ? price : 0;
+  return typeof price === 'number' ? price : Number(price) || 0;
 }
 
 // Helper function to calculate stop price
@@ -44,16 +44,16 @@ function calculateStopPrice(entryPrice: number, params: StockAnalysisParams): nu
 
 // Helper function to check if stop loss is hit
 function checkStopLoss(currentDay: TradeHistoryItem, stopPrice: number, operation: string): boolean {
-  const low = typeof currentDay.low === 'number' ? currentDay.low : -Infinity;
-  const high = typeof currentDay.high === 'number' ? currentDay.high : Infinity;
+  const low = typeof currentDay.low === 'number' ? currentDay.low : Number(currentDay.low) || -Infinity;
+  const high = typeof currentDay.high === 'number' ? currentDay.high : Number(currentDay.high) || Infinity;
   return operation === 'buy' ? low <= stopPrice : high >= stopPrice;
 }
 
 // Helper function to calculate profit/loss
 function calculateProfit(entryPrice: number | undefined, exitPrice: number | undefined, operation: string, lotSize: number | undefined): number {
   if (entryPrice === undefined || exitPrice === undefined || lotSize === undefined || lotSize === 0) return 0;
-  const numEntryPrice = Number(entryPrice);
-  const numExitPrice = Number(exitPrice);
+  const numEntryPrice = typeof entryPrice === 'number' ? entryPrice : Number(entryPrice);
+  const numExitPrice = typeof exitPrice === 'number' ? exitPrice : Number(exitPrice);
   if (isNaN(numEntryPrice) || isNaN(numExitPrice)) return 0;
   return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
 }
@@ -602,4 +602,3 @@ export default function MonthlyPortfolioPage() {
     </div>
   );
 }
-
