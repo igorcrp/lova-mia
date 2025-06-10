@@ -1,22 +1,20 @@
 
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import React from "react";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppLayout() {
+  const isMobile = useIsMobile();
+  
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-          </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <Outlet />
-          </div>
-        </SidebarInset>
+    <div className="min-h-screen bg-background">
+      <AppSidebar />
+      <div className={isMobile ? "pt-[60px]" : "ml-[230px]"}>
+        <div className="p-4 md:p-8">
+          <Outlet />
+        </div>
       </div>
-    </SidebarProvider>
+    </div>
   );
 }
