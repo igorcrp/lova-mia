@@ -232,31 +232,31 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Use a função check_user_by_email em vez de get_current_user
+      const { data, error } = await supabase.rpc('check_user_by_email', {
+        p_email: userId // Usando userId como email para compatibilidade
+      });
 
       if (error) {
         console.error("Get user data error:", error);
-        return null;
+        throw error;
       }
 
       console.log("User data retrieved:", data);
       
-      if (data) {
+      // Converter o resultado para o tipo User
+      if (Array.isArray(data) && data.length > 0) {
+        const userData = data[0];
         return {
-          id: data.id,
-          email: data.email,
-          full_name: data.name,
-          level_id: data.level_id,
-          status: data.status_users,
-          email_verified: data.email_verified,
-          account_type: data.plan_type === 'premium' ? 'premium' : 'free',
-          created_at: data.created_at,
-          last_login: null,
-          plan_type: data.plan_type
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.name,
+          level_id: userData.level_id,
+          status: userData.status_users as any,
+          email_verified: userData.email_verified,
+          account_type: 'free', // Valor padrão
+          created_at: new Date().toISOString(),
+          last_login: null
         } as User;
       }
       
@@ -546,284 +546,643 @@ const analysis = {
       console.log(`Found ${data.length} unique stock codes`);
       
       // Transform the data into StockInfo objects
-		const stocks: StockInfo[] = data.map(item => {
-		  // Add null check for item
-		  if (!item) {
-			return { code: '', name: '' };
-		  }
-        
-        // Check if item is an object and has 'asset_code' property
-		  if (typeof item === 'object' && item !== null && 'asset_code' in item) {
-			const typedItem = item as { asset_code: string };
-			return { 
-			  code: typedItem.asset_code,
-			  name: typedItem.asset_code // Use code as name fallback
-			};
-		  }
-        // If item is directly a string (e.g., from a simple select query)
-		  return { 
-			code: String(item),
-			name: String(item) // Use code as name fallback
-		  };
-		}).filter(stock => stock.code); // Filter out empty codes
+      // Corrected to handle potential object return from RPC
+      const stocks: StockInfo[] = data.map(item => {
+        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                          ? String(item.stock_code) 
+                          : String(item); // Fallback if it's just a string
+        return {
+          code: stockCode,
+          name: stockCode, // Use code as name if no name is available
+        };
+      });
       
       return stocks;
     } catch (error) {
-      console.error('Failed to fetch available stocks:', error);
-      return [];
+      console.error('Failed to get available stocks:', error);
+      // Ensure fallback is called even if the initial try block fails
+      return await this.getAvailableStocksDirect(tableName);
     }
   },
-
+  
   /**
-   * Fallback method to get available stocks by directly querying the table
+   * Fallback method to get stocks directly from the table
    */
   async getAvailableStocksDirect(tableName: string): Promise<StockInfo[]> {
     try {
-      console.log(`Getting available stocks directly from table: ${tableName}`);
+      console.log(`Trying direct query to get stock codes from ${tableName}`);
+      
+      // Implementação alternativa sem usar groupBy
       const { data, error } = await fromDynamic(tableName)
         .select('stock_code')
-        .order('stock_code', { ascending: true })
-        .limit(1000); // Limit to prevent excessive data transfer
+        .limit(1000); // Limitar para evitar problemas de performance
+      
+      if (error) {
+        console.error('Error in direct stock code query:', error);
+        // Throw the error to be caught by the outer catch block
+        throw error;
+      }
 
-      if (error) throw error;
-
-      if (!data || !Array.isArray(data)) return [];
-
-      const stocks: StockInfo[] = data.map(item => ({ 
-        code: (item as any).stock_code,
-        name: (item as any).stock_code // Use code as name fallback
+      if (!data) {
+        console.warn(`No stock codes found in table ${tableName}`);
+        return [];
+      }
+      
+      // Extract stock codes with proper type safety and remove duplicates
+      const uniqueCodes = new Set<string>();
+      (data as any[])
+        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+        .forEach(item => uniqueCodes.add(String(item.stock_code)));
+      
+      const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
+        code: code,
+        name: code // Use stock_code as name since 'name' column doesn't exist
       }));
+      
+      console.log(`Direct query found ${stocks.length} stock codes`);
       return stocks;
     } catch (error) {
-      console.error('Failed to fetch available stocks directly:', error);
+      console.error(`Failed in direct stock query for ${tableName}:`, error);
+      // Return empty array on failure
+      return [];
+    }
+  },
+  
+  /**
+   * Get stock data from a specific table and stock code
+   */
+  async getStockData(tableName: string, stockCode: string, period: string | undefined = undefined, limit: number = 300): Promise<any[]> {
+    try {
+      if (!tableName || !stockCode) {
+        throw new Error('Table name and stock code are required');
+      }
+      
+      // Get date range based on period
+      if (period) {
+        const dateRange = getDateRangeForPeriod(period);
+        console.info(`Getting stock data for ${stockCode} from ${tableName} with period ${period}`);
+        console.info(`Date range: ${dateRange.startDate} to ${dateRange.endDate}`);
+        
+        // Use the period-filtered method
+        return await this.getStockDataDirectWithPeriod(tableName, stockCode, dateRange.startDate, dateRange.endDate);
+      } else {
+        console.info(`Getting stock data for ${stockCode} from ${tableName} without period filtering (using limit: ${limit})`);
+        // If no period, use the limit-based method
+        return await this.getStockDataDirect(tableName, stockCode, limit);
+      }
+    } catch (error) {
+      console.error('Failed to get stock data:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Fallback method to get stock data directly from the table (limit based)
+   */
+  async getStockDataDirect(tableName: string, stockCode: string, limit: number = 300): Promise<any[]> {
+    try {
+      console.log(`Trying direct query to get stock data for ${stockCode} from ${tableName} with limit ${limit}`);
+      
+      const { data, error } = await fromDynamic(tableName)
+        .select('*')
+        .eq('stock_code', stockCode)
+        .order('date', { ascending: false }) // Get latest data first
+        .limit(limit);
+
+      if (error) {
+        console.error('Error in direct stock data query (limit):', error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        console.warn(`No data found for ${stockCode} in table ${tableName}`);
+        return [];
+      }
+      // Reverse the data to have it in ascending order for processing
+      return (data as any[]).reverse(); 
+    } catch (error) {
+      console.error(`Failed in direct stock data query (limit) for ${stockCode}:`, error);
+      return [];
+    }
+  },
+  
+  /**
+   * Get stock data with period filtering
+   */
+  async getStockDataDirectWithPeriod(
+    tableName: string, 
+    stockCode: string, 
+    startDate: string, 
+    endDate: string
+  ): Promise<any[]> {
+    try {
+      console.info(`Fetching stock data for ${stockCode} from ${tableName} between ${startDate} and ${endDate}`);
+      
+      const { data, error } = await fromDynamic(tableName)
+        .select('*')
+        .eq('stock_code', stockCode)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true }); // Ascending order for chronological processing
+      
+      if (error) {
+        console.error('Error in period-filtered stock data query:', error);
+        throw error;
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        console.warn(`No data found for ${stockCode} in table ${tableName} for the specified period`);
+        return [];
+      }
+      
+      console.info(`Found ${data.length} records for ${stockCode} in the specified period`);
+      return data as any[];
+
+    } catch (error) {
+      console.error(`Failed to fetch period-filtered data for ${stockCode}:`, error);
       return [];
     }
   },
 
+  // --- Start: Functions copied from api-18.ts ---
+
   /**
-   * Run a stock analysis based on provided parameters
+   * Run stock analysis with given parameters
    */
-  async runAnalysis(params: StockAnalysisParams, progressCallback?: (progress: number) => void): Promise<AnalysisResult[]> {
+  async runAnalysis(
+    params: StockAnalysisParams,
+    progressCallback?: (progress: number) => void
+  ): Promise<AnalysisResult[]> {
     try {
-      console.log("Running stock analysis with params:", params);
-
-      // Simulate progress updates
-      if (progressCallback) {
-        progressCallback(25);
-      }
-
-      // Fix: Use only the period parameter for getDateRangeForPeriod
-      const { startDate, endDate } = getDateRangeForPeriod(params.period);
-
-      if (progressCallback) {
-        progressCallback(50);
-      }
-
-      // For now, return mock data - this should be replaced with actual Supabase RPC call
-      const mockResults: AnalysisResult[] = [
-        {
-          assetCode: "AAPL",
-          assetName: "Apple Inc.",
-          tradingDays: 22,
-          trades: 15,
-          tradePercentage: 68.18,
-          profits: 10,
-          profitPercentage: 66.67,
-          losses: 3,
-          lossPercentage: 20.0,
-          stops: 2,
-          stopPercentage: 13.33,
-          finalCapital: 105000,
-          profit: 5000,
-          averageGain: 500,
-          averageLoss: -200,
-          maxDrawdown: -1500,
-          sharpeRatio: 1.2,
-          sortinoRatio: 1.5,
-          recoveryFactor: 3.33,
-          successRate: 66.67
+      console.info('Running analysis with parameters:', params);
+      
+      // Set up progress tracking
+      let progress = 0;
+      const updateProgress = (increment: number) => {
+        progress += increment;
+        if (progressCallback) {
+          progressCallback(Math.min(progress, 100));
         }
-      ];
+      };
 
-      if (progressCallback) {
-        progressCallback(100);
+      if (!params.dataTableName) {
+        const tableName = await marketData.getDataTableName(
+          params.country,
+          params.stockMarket,
+          params.assetClass
+        );
+        if (!tableName) {
+          throw new Error('Could not determine data table name');
+        }
+        params.dataTableName = tableName;
       }
 
-      return mockResults;
+      // Get all available stocks for the given asset class
+      updateProgress(10);
+      const stocks = await this.getAvailableStocks(params.dataTableName);
+      
+      console.info(`Found ${stocks.length} stocks for analysis`);
+      
+      if (!stocks || stocks.length === 0) {
+        // Changed from throw to return empty array to avoid breaking the UI
+        console.warn('No stocks found for the selected criteria');
+        return []; 
+      }
+      
+      updateProgress(10);
+      
+      // Process each stock based on the selection criteria
+      const results: AnalysisResult[] = [];
+      
+      // Process each stock sequentially to avoid overloading the database
+      const stocksToProcess = params.comparisonStocks && params.comparisonStocks.length > 0
+        ? stocks.filter(s => params.comparisonStocks!.includes(s.code))
+        : stocks;
+        
+      for (let i = 0; i < stocksToProcess.length; i++) {
+        const stock = stocksToProcess[i];
+        console.info(`Processing stock ${i+1}/${stocksToProcess.length}: ${stock.code}`);
+        
+        try {
+          // Get the stock's historical data with period filtering
+          const stockData = await this.getStockData(
+            params.dataTableName, 
+            stock.code,
+            params.period
+          );
+          
+          if (!stockData || stockData.length === 0) {
+            console.warn(`No data found for stock ${stock.code}, skipping`);
+            continue;
+          }
+          
+          console.info(`Retrieved ${stockData.length} data points for ${stock.code}`);
+          
+          // Generate trade history for the stock
+          const tradeHistory = await this.generateTradeHistory(stockData, params);
+          
+          if (!tradeHistory || tradeHistory.length === 0) {
+            console.warn(`No trade history generated for ${stock.code}, skipping`);
+            continue;
+          }
+          
+          // Calculate capital evolution based on the trade history
+          const capitalEvolution = this.calculateCapitalEvolution(tradeHistory, params.initialCapital);
+
+          // Calculate detailed metrics for the stock
+          const metrics = this.calculateDetailedMetrics(stockData, tradeHistory, capitalEvolution, params);
+          
+          // Add the result to the list
+          results.push({
+            assetCode: stock.code,
+            assetName: stock.name || stock.code,
+            lastCurrentCapital: capitalEvolution.length > 0 
+              ? capitalEvolution[capitalEvolution.length - 1].capital 
+              : params.initialCapital,
+            ...metrics
+          });
+          
+          // Update progress based on how many stocks we've processed
+          const progressIncrement = 70 / stocksToProcess.length;
+          updateProgress(progressIncrement);
+          
+        } catch (e) {
+          console.error(`Error analyzing stock ${stock.code}:`, e);
+          // Continue with other stocks
+        }
+      }
+      
+      // Sort results by profit percentage (descending)
+      results.sort((a, b) => b.profitPercentage - a.profitPercentage);
+      
+      updateProgress(10); // Final progress update
+      return results;
     } catch (error) {
-      console.error("Failed to run stock analysis:", error);
+      console.error('Failed to run analysis:', error);
       throw error;
     }
   },
+  
+  /**
+   * Generate trade history for a stock using the updated formulas
+   */
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
+    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+    let capital = params.initialCapital;
+    
+    // Ensure data is sorted by date in ascending order
+    const sortedData = [...stockData].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    console.info(`Generating trade history for ${sortedData.length} days of stock data`);
+    
+    for (let i = 0; i < sortedData.length; i++) {
+      const currentData = sortedData[i];
+      // Use previous day's data for calculations when available
+      const previousData = i > 0 ? sortedData[i - 1] : null;
+      
+      // Get previous day capital (or initial capital if first day)
+      const previousCapital = i > 0 
+        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital) // Use currentCapital from previous entry
+        : params.initialCapital;
+      
+      // Calculate suggested entry price based on previous day's reference price
+      // Use current day's reference price if previous day is not available
+      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+      let suggestedEntryPrice: number;
+      
+      if (params.operation === 'buy') {
+        // Buy: Previous day's reference price - (Previous day's reference price * entry percentage)
+        suggestedEntryPrice = referencePrice - (referencePrice * params.entryPercentage / 100);
+      } else {
+        // Sell: Previous day's reference price + (Previous day's reference price * entry percentage)
+        suggestedEntryPrice = referencePrice + (referencePrice * params.entryPercentage / 100);
+      }
+      
+      // Determine actual price based on conditional logic:
+      let actualPrice: number | string;
+      if (currentData.open <= suggestedEntryPrice) {
+        actualPrice = currentData.open;
+      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+        actualPrice = suggestedEntryPrice;
+      } else {
+        actualPrice = '-';
+      }
+      
+      // Calculate lot size from previous day's capital and actual price
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
+        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+        : 0;
+      
+      // Determine if trade is executed
+      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      if (params.operation === 'buy') {
+        // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
+        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+      } else {
+        // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
+        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+      }
+      
+      // Calculate stop price
+      const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
+        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
+        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+      
+      // Determine if stop is triggered based on the CURRENT day's low/high
+      let stopTrigger: string = '-'; // Type corrected
+      if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
+        if (params.operation === 'buy') {
+          // Buy: If CURRENT Low <= Stop Price → "Executed"
+          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
+        } else {
+          // Sell: If CURRENT High >= Stop Price → "Executed"
+          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
+        }
+      }
+      
+      // Calculate profit/loss
+      let profitLoss = 0;
+      if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
+        if (stopTrigger === "Executed" && stopPrice !== '-') {
+          // If stop is triggered on the SAME day, use stop price
+          profitLoss = params.operation === 'buy'
+            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+        } else {
+          // Otherwise, use the close price of the CURRENT day
+          profitLoss = params.operation === 'buy'
+            ? (currentData.close - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - currentData.close) * lotSize;
+        }
+      }
+      
+      // Update capital: Previous day's capital + current day's profit/loss
+      // Ensure capital doesn't go below zero (optional, based on requirements)
+      capital = Math.max(0, previousCapital + profitLoss);
+      
+      // Create trade history item
+      tradeHistory.push({
+        date: currentData.date,
+        entryPrice: currentData.open, // Using open as entryPrice for consistency?
+        exitPrice: currentData.close, // Using close as exitPrice
+        high: currentData.high,
+        low: currentData.low,
+        volume: currentData.volume,
+        suggestedEntryPrice,
+        actualPrice,
+        trade,
+        lotSize,
+        stopPrice,
+        stopTrigger, // Changed from 'stop'
+        profitLoss, // Changed from 'profit'
+        currentCapital: capital // Changed from 'capital'
+        });
+    }
+    
+    console.info(`Generated ${tradeHistory.length} trade history entries`);
+    return tradeHistory;
+  },
+  
+  /**
+   * Calculate capital evolution based on trade history
+   */
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+    if (!tradeHistory || tradeHistory.length === 0) {
+      return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
+    }
+
+    const capitalEvolution: { date: string; capital: number }[] = [];
+    
+    // Add initial capital point if the first trade isn't the very first day possible
+    // This might need adjustment based on how the date range is handled
+    capitalEvolution.push({ date: tradeHistory[0].date, capital: initialCapital }); 
+
+    for (const trade of tradeHistory) {
+      // Only add points where capital changes (i.e., a trade happened or stop triggered)
+      if (trade.profitLoss !== 0) { 
+        capitalEvolution.push({
+          date: trade.date,
+          // Use currentCapital which reflects the capital AFTER the day's P/L
+          capital: trade.currentCapital ?? initialCapital 
+        });
+      }
+    }
+    
+    // Ensure the last day's capital is included if no trade happened
+    const lastTrade = tradeHistory[tradeHistory.length - 1];
+    if (capitalEvolution[capitalEvolution.length - 1]?.date !== lastTrade.date) {
+         capitalEvolution.push({ date: lastTrade.date, capital: lastTrade.currentCapital ?? initialCapital });
+    }
+
+    // Remove duplicates based on date, keeping the last entry for that date
+    const uniqueCapitalEvolution = Array.from(new Map(capitalEvolution.map(item => [item.date, item])).values());
+
+    return uniqueCapitalEvolution;
+  },
+  
+  /**
+   * Calculate detailed metrics based on trade history
+   */
+  calculateDetailedMetrics(stockData: any[], tradeHistory: TradeHistoryItem[], capitalEvolution: any[], params: StockAnalysisParams) {
+    // Count the exact number of unique days in the Stock Details table
+    const tradingDays = new Set(stockData.map(item => item.date)).size;
+    
+    // Filter for days where a trade was initiated (Buy or Sell)
+    const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
+    const trades = executedTrades.length;
+    
+    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
+    const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
+    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
+    
+    // Sum the profit/loss values
+    let totalProfit = 0;
+    let totalLoss = 0;
+    
+    // Calculate total profits and losses from executed trades
+    for (const trade of executedTrades) {
+      if (trade.profitLoss > 0) {
+        totalProfit += trade.profitLoss;
+      } else if (trade.profitLoss < 0) {
+        // Accumulate all negative P/L as total loss
+        totalLoss += trade.profitLoss; 
+      }
+    }
+      
+    // Calculate percentages with safety checks to avoid division by zero
+    const tradePercentage = tradingDays > 0 ? (trades / tradingDays) * 100 : 0;
+    // Note: Profit/Loss/Stop percentages are based on the number of TRADES, not trading days
+    const profitRate = trades > 0 ? (profits / trades) * 100 : 0; // Renamed from profitPercentage
+    const lossRate = trades > 0 ? (losses / trades) * 100 : 0; // Renamed from lossPercentage
+    const stopRate = trades > 0 ? (stops / trades) * 100 : 0; // Renamed from stopPercentage
+    
+    // Calculate final capital and profit from capital evolution
+    const finalCapital = capitalEvolution.length > 0 
+      ? capitalEvolution[capitalEvolution.length - 1].capital 
+      : params.initialCapital;
+      
+    const profit = finalCapital - params.initialCapital;
+    const overallProfitPercentage = params.initialCapital > 0 ? (profit / params.initialCapital) * 100 : 0;
+    
+    // Calculate average gain and loss
+    const averageGain = profits > 0 
+      ? totalProfit / profits 
+      : 0;
+      
+    // Use absolute value for average loss calculation
+    const averageLoss = (losses + stops) > 0 // Consider stops as losses for avg loss calculation
+      ? Math.abs(executedTrades.filter(t => t.profitLoss < 0).reduce((sum, t) => sum + t.profitLoss, 0)) / (losses + stops) 
+      : 0;
+    
+    // Calculate max drawdown from capital evolution
+    let maxDrawdown = 0;
+    let peak = params.initialCapital;
+    
+    for (const point of capitalEvolution) {
+      // Ensure capital is treated as a number
+      const currentCapitalPoint = Number(point.capital);
+      if (isNaN(currentCapitalPoint)) continue; // Skip if capital is not a number
+
+      if (currentCapitalPoint > peak) {
+        peak = currentCapitalPoint;
+      }
+      
+      // Calculate drawdown relative to the peak
+      const drawdown = peak > 0 ? (peak - currentCapitalPoint) / peak : 0;
+      
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+    maxDrawdown = maxDrawdown * 100; // Express as percentage
+      
+    // --- Ratios Calculation (Simplified Example) ---
+    // Proper calculation requires more details (e.g., risk-free rate, time period)
+    const sharpeRatio = 0; // Placeholder
+    const sortinoRatio = 0; // Placeholder
+    const recoveryFactor = maxDrawdown > 0 ? Math.abs(profit / (maxDrawdown / 100 * params.initialCapital)) : 0; // Profit / Max Drawdown Value
+    
+    // Calculate success rate (Profits / Total Trades)
+    const successRate = trades > 0 ? (profits / trades) * 100 : 0;
+    
+    return {
+      tradingDays,
+      trades,
+      tradePercentage,
+      profits,
+      profitPercentage: profitRate, // Use the calculated rate
+      losses,
+      lossPercentage: lossRate, // Use the calculated rate
+      stops,
+      stopPercentage: stopRate, // Use the calculated rate
+      finalCapital,
+      profit,
+      averageGain,
+      averageLoss,
+      maxDrawdown,
+      sharpeRatio, // Placeholder
+      sortinoRatio, // Placeholder
+      recoveryFactor,
+      successRate
+    };
+  },
 
   /**
-   * Get detailed analysis result for a specific asset code
+   * Get detailed analysis for a specific stock
    */
   async getDetailedAnalysis(
-    assetCode: string,
+    stockCode: string,
     params: StockAnalysisParams
-  ): Promise<DetailedResult | null> {
+  ): Promise<DetailedResult> {
     try {
-      console.log(`Getting detailed analysis for ${assetCode} with params:`, params);
-
-      // Fix: Use only the period parameter for getDateRangeForPeriod
-      const { startDate, endDate } = getDateRangeForPeriod(params.period);
-
-      // For now, return mock data - this should be replaced with actual Supabase RPC call
-      const mockResult: DetailedResult = {
-        assetCode: assetCode,
-        assetName: "Mock Asset",
-        tradingDays: 22,
-        trades: 15,
-        tradePercentage: 68.18,
-        profits: 10,
-        profitPercentage: 66.67,
-        losses: 3,
-        lossPercentage: 20.0,
-        stops: 2,
-        stopPercentage: 13.33,
-        finalCapital: 105000,
-        profit: 5000,
-        averageGain: 500,
-        averageLoss: -200,
-        maxDrawdown: -1500,
-        sharpeRatio: 1.2,
-        sortinoRatio: 1.5,
-        recoveryFactor: 3.33,
-        successRate: 66.67,
-        tradeHistory: [
-          {
-            date: "2024-01-01",
-            entryPrice: 100,
-            exitPrice: 105,
-            profitLoss: 500,
-            profitPercentage: 5,
-            trade: "Buy",
-            stopPrice: 95,
-            currentCapital: 100500,
-            volume: 1000,
-            high: 106,
-            low: 99,
-            suggestedEntryPrice: 100.5,
-            actualPrice: 100,
-            lotSize: 100
-          }
-        ],
-        capitalEvolution: [
-          { date: "2024-01-01", capital: 100000 },
-          { date: "2024-01-02", capital: 100500 }
-        ]
+      console.info(`Getting detailed analysis for ${stockCode} with params:`, params);
+      
+      if (!params.dataTableName) {
+        const tableName = await marketData.getDataTableName(
+          params.country, 
+          params.stockMarket, 
+          params.assetClass
+        );
+        if (!tableName) {
+          throw new Error('Could not determine data table name');
+        }
+        params.dataTableName = tableName;
+      }
+      
+      // Get the stock data from the database with period filtering
+      const stockData = await this.getStockData(
+        params.dataTableName, 
+        stockCode,
+        params.period // Pass the period parameter to filter by date
+      );
+      
+      if (!stockData || stockData.length === 0) {
+        // Return a default structure instead of throwing error to allow UI to handle it
+        console.warn(`No data found for stock ${stockCode} in table ${params.dataTableName} for the selected period`);
+        return {
+          assetCode: stockCode,
+          assetName: stockCode,
+          tradeHistory: [],
+          capitalEvolution: [{ date: new Date().toISOString().split('T')[0], capital: params.initialCapital }],
+          tradingDays: 0,
+          trades: 0,
+          tradePercentage: 0,
+          profits: 0,
+          profitPercentage: 0,
+          losses: 0,
+          lossPercentage: 0,
+          stops: 0,
+          stopPercentage: 0,
+          finalCapital: params.initialCapital,
+          profit: 0,
+          averageGain: 0,
+          averageLoss: 0,
+          maxDrawdown: 0,
+          sharpeRatio: 0,
+          sortinoRatio: 0,
+          recoveryFactor: 0,
+          successRate: 0
+        };
+      }
+      
+      console.info(`Retrieved ${stockData.length} data points for ${stockCode} in the selected period`);
+      
+      // Generate trade history
+      const tradeHistory = await this.generateTradeHistory(stockData, params);
+      
+      // Calculate capital evolution
+      const capitalEvolution = this.calculateCapitalEvolution(tradeHistory, params.initialCapital);
+      
+      // Calculate metrics
+      const metrics = this.calculateDetailedMetrics(stockData, tradeHistory, capitalEvolution, params);
+      
+      // Return detailed result
+      return {
+        assetCode: stockCode,
+        assetName: stockCode, // Use code as name if name is not available
+        tradeHistory,
+        capitalEvolution,
+        ...metrics
       };
-
-      return mockResult;
     } catch (error) {
-      console.error("Failed to get detailed analysis:", error);
-      return null;
+      console.error(`Failed to get detailed analysis for ${stockCode}:`, error);
+      // Re-throw the error to be caught by the calling function
+      throw error; 
     }
   },
+
+  // --- End: Functions copied from api-18.ts ---
+
 };
 
-/**
- * Admin API service
- */
-const admin = {
-  /**
-   * Get all assets
-   */
-  async getAssets(): Promise<Asset[]> {
-    try {
-      const { data, error } = await fromDynamic('assets')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching assets:', error);
-        return [];
-      }
-
-      // Fix: Add proper type assertion and null check
-      return (data || []) as unknown as Asset[];
-    } catch (error) {
-      console.error('Failed to fetch assets:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Add a new asset
-   */
-  async addAsset(asset: Omit<Asset, 'id' | 'created_at'>): Promise<Asset | null> {
-    try {
-      const { data, error } = await fromDynamic('assets')
-        .insert({
-          ...asset,
-          created_at: new Date().toISOString(), // Ensure created_at is set
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error adding asset:', error);
-        throw error;
-      }
-
-      // Fix: Add proper type assertion
-      return data as unknown as Asset;
-    } catch (error) {
-      console.error('Failed to add asset:', error);
-      return null;
-    }
-  },
-
-  /**
-   * Update an existing asset
-   */
-  async updateAsset(asset: Asset): Promise<Asset | null> {
-    try {
-      const { data, error } = await fromDynamic('assets')
-        .update(asset)
-        .eq('id', asset.id)
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error updating asset:', error);
-        throw error;
-      }
-
-      // Fix: Add proper type assertion
-      return data as unknown as Asset;
-    } catch (error) {
-      console.error('Failed to update asset:', error);
-      return null;
-    }
-  },
-
-  /**
-   * Delete an asset
-   */
-  async deleteAsset(id: string): Promise<boolean> {
-    try {
-      const { error } = await fromDynamic('assets')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting asset:', error);
-        throw error;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Failed to delete asset:', error);
-      return false;
-    }
-  },
-};
-
+// Export the API services
 export const api = {
   auth,
   marketData,
-  analysis,
-  admin,
+  analysis
 };
+
