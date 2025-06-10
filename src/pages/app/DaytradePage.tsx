@@ -27,7 +27,7 @@ export default function DaytradePage() {
       setProgress(0);
       setShowDetailView(false);
       
-      console.info("Running analysis with params:", params);
+      console.info('Running analysis with params:', params);
       
       // Simulating the initial data loading
       setProgress(10);
@@ -237,7 +237,6 @@ export default function DaytradePage() {
             <ResultsTable 
               results={analysisResults} 
               onViewDetails={viewDetails} 
-              isLoading={isLoading} // Added isLoading prop
             />
           )}
         </div>
