@@ -85,20 +85,14 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields
-      const numA = Number(valA) || 0;
-      const numB = Number(valB) || 0;
+      // Numeric comparison for other fields - ensure both values are numbers
+      const numA = typeof valA === 'number' ? valA : Number(valA) || 0;
+      const numB = typeof valB === 'number' ? valB : Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
@@ -120,11 +114,10 @@ export function StockDetailsTable({
   }
 
   // Função para formatar o valor do trade com cores
-  function formatTradeValue(trade: string) {
+  const formatTradeValue = (trade: string) => {
     if (typeof trade !== "string" || !trade) return <span>-</span>;
 
     if (trade.includes("/")) {
-      // Exemplo: "Buy/Closed" ou "Sell/Closed"
       const [firstPart, secondPart] = trade.split("/");
       return (
         <>
@@ -550,7 +543,6 @@ export function StockDetailsTable({
   );
 }
 
-// Função auxiliar para lidar com a entrada de números decimais positivos
 function handleDecimalInputChange(value: string, onChange: (val: number | string | null) => void) {
   if (value === "") {
     onChange(null);
@@ -567,7 +559,7 @@ function handleDecimalInputChange(value: string, onChange: (val: number | string
       }
     }
   } else if (value === "-") {
-    // Não faz nada se tentar digitar "-"
+    // Don't do anything if trying to type "-"
   } else {
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue >= 0) {
@@ -578,7 +570,6 @@ function handleDecimalInputChange(value: string, onChange: (val: number | string
   }
 }
 
-// Função auxiliar para formatar no blur
 function handleBlurFormatting(value: number | string | null | undefined, onChange: (val: number | null) => void) {
   let numValue = 0;
   if (typeof value === "string") {
@@ -595,4 +586,3 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
-

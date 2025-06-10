@@ -35,7 +35,13 @@ export function useSubscription(user: User | null): SubscriptionData {
           setError("Failed to fetch subscription data");
           setPlanType("free");
         } else {
-          setPlanType(data?.plan_type || "free");
+          // Ensure the plan_type is properly typed
+          const userPlanType = data?.plan_type;
+          if (userPlanType === "premium" || userPlanType === "free") {
+            setPlanType(userPlanType);
+          } else {
+            setPlanType("free");
+          }
         }
       } catch (err) {
         console.error("Subscription fetch error:", err);
