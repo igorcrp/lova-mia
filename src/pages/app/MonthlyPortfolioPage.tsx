@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
@@ -180,7 +179,7 @@ export default function MonthlyPortfolioPage() {
                 suggestedEntryPrice: potentialEntryPrice,
                 actualPrice: potentialEntryPrice,
                 stopPrice: calculateStopPrice(potentialEntryPrice, params),
-                lotSize: capitalBeforeCurrentTrade / potentialEntryPrice,
+                lotSize: Number(capitalBeforeCurrentTrade / potentialEntryPrice), // Convert to number
                 stop: '-',
                 profit: undefined, // Profit undefined on entry
                 capital: capitalBeforeCurrentTrade // Capital is pre-entry value

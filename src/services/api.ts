@@ -126,8 +126,9 @@ const googleLogin = async () => {
     throw error;
   }
 
+  // OAuth response doesn't immediately provide user data, return null for user
   return {
-    user: data.user || null,
+    user: null,
     session: '',
   };
 };
