@@ -1,15 +1,16 @@
+
+
 export interface User {
   id: string;
   email: string;
-  full_name?: string;
+  full_name: string;
+  avatar_url?: string;
   level_id: number; // 1 = Investor, 2 = Admin
-  status: string;
+  status: 'active' | 'inactive' | 'pending';
   email_verified: boolean;
   account_type: 'free' | 'premium';
   created_at: string;
   last_login?: string;
-  avatar_url?: string;
-  plan_type?: string; // Add plan_type to track subscription tier
 }
 
 export interface MarketDataSource {
@@ -111,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+
