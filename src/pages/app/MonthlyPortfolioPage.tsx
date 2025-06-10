@@ -55,7 +55,7 @@ function calculateProfit(entryPrice: number | undefined, exitPrice: number | und
   const numEntryPrice = typeof entryPrice === 'number' ? entryPrice : Number(entryPrice);
   const numExitPrice = typeof exitPrice === 'number' ? exitPrice : Number(exitPrice);
   if (isNaN(numEntryPrice) || isNaN(numExitPrice)) return 0;
-  return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
+  return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - exitPrice) * lotSize;
 }
 
 // Risk Calculation Functions (Using Processed History)
@@ -70,7 +70,7 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
     trades.forEach(trade => {
         // Update capital only if it's defined in the record
         if (trade.capital !== undefined) {
-            currentCapital = trade.capital;
+            currentCapital = Number(trade.capital); // Convert to number explicitly for type safety
             // Update peak capital encountered so far
             if (currentCapital > peakCapital) {
                 peakCapital = currentCapital;
@@ -86,7 +86,8 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
 };
 
 const calculateVolatility = (trades: TradeHistoryItem[]): number => {
-    const profits = trades.filter(t => t.trade === 'Close' && t.profit !== undefined).map(t => t.profit as number);
+    const profits = trades.filter(t => t.trade === 'Close' && t.profit !== undefined)
+                          .map(t => Number(t.profit)); // Convert to number explicitly
     if (profits.length < 2) return 0;
     const mean = profits.reduce((sum, p) => sum + p, 0) / profits.length;
     const variance = profits.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / (profits.length - 1);
@@ -102,7 +103,8 @@ const calculateSharpeRatio = (trades: TradeHistoryItem[], totalReturnPercentage:
 
 const calculateSortinoRatio = (trades: TradeHistoryItem[], totalReturnPercentage: number): number => {
     const riskFreeRate = 0.02;
-    const negativeReturns = trades.filter(t => t.trade === 'Close' && t.profit !== undefined && t.profit < 0).map(t => t.profit as number);
+    const negativeReturns = trades.filter(t => t.trade === 'Close' && t.profit !== undefined && Number(t.profit) < 0)
+                                 .map(t => Number(t.profit)); // Convert to number explicitly
     if (negativeReturns.length === 0) return Infinity;
     const meanNegative = 0; // Target return
     const downsideVariance = negativeReturns.reduce((sum, p) => sum + Math.pow(p - meanNegative, 2), 0) / negativeReturns.length;
@@ -580,7 +582,6 @@ export default function MonthlyPortfolioPage() {
               <ResultsTable 
                 results={analysisResults} 
                 onViewDetails={viewDetails} 
-                isLoading={isLoadingDetails}
               />
             </div>
           )}
@@ -593,8 +594,6 @@ export default function MonthlyPortfolioPage() {
               result={detailedResult}
               params={analysisParams!}
               onUpdateParams={updateAnalysis}
-              onBack={closeDetails}
-              isLoading={isLoadingDetails}
             />
           )}
         </div>
