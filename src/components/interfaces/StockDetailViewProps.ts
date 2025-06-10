@@ -6,6 +6,6 @@ export interface StockDetailViewProps {
   params: StockAnalysisParams;
   onClose: () => void;
   onUpdateParams: (params: StockAnalysisParams) => void;
-  onBack?: () => void;
+  onBack?: () => void; // Add missing onBack property
   isLoading: boolean;
 }

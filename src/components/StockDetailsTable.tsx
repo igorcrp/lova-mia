@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -85,9 +86,9 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields
-      const numA = Number(valA) || 0;
-      const numB = Number(valB) || 0;
+      // Numeric comparison for other fields - fix the type comparison issue
+      const numA = typeof valA === 'number' ? valA : (typeof valA === 'string' ? parseFloat(valA) || 0 : 0);
+      const numB = typeof valB === 'number' ? valB : (typeof valB === 'string' ? parseFloat(valB) || 0 : 0);
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);

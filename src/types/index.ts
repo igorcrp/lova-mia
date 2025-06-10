@@ -30,6 +30,7 @@ export interface Asset {
   asset_class: string;
   status: 'active' | 'inactive';
   created_at?: string;
+  updated_at?: string; // Add missing updated_at property
 }
 
 export interface StockAnalysisParams {
@@ -69,7 +70,7 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
-  detailedHistory?: TradeHistoryItem[];
+  detailedHistory?: TradeHistoryItem[]; // Add detailedHistory property
 }
 
 export interface DetailedResult extends AnalysisResult {

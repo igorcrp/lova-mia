@@ -5,5 +5,5 @@ export interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
   planType: 'free' | 'premium';
-  isLoading?: boolean;
+  isLoading?: boolean; // Add missing isLoading property
 }
