@@ -1,10 +1,11 @@
+
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Asset, MarketDataSource, StockAnalysisParams, DetailedResult, TradeHistoryItem, User } from '@/types';
 
 // Initialize Supabase client
-let supabase: SupabaseClient<Database> | null = null;
+let supabase: SupabaseClient | null = null;
 
-export const setSupabaseClient = (client: SupabaseClient<Database>) => {
+export const setSupabaseClient = (client: SupabaseClient) => {
   supabase = client;
 };
 
