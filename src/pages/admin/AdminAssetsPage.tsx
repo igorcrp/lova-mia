@@ -44,8 +44,8 @@ export default function AdminAssetsPage() {
         setIsLoading(true);
         // Mock data for assets as api.assets does not exist
         const assetsData: Asset[] = [
-          { id: "1", code: "AAPL", name: "Apple Inc.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: "2", code: "MSFT", name: "Microsoft Corp.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: "1", code: "AAPL", name: "Apple Inc.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active" },
+          { id: "2", code: "MSFT", name: "Microsoft Corp.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active" },
         ];
         const countriesData = await api.marketData.getCountries();
         
@@ -127,8 +127,7 @@ export default function AdminAssetsPage() {
         id: String(assets.length + 1),
         ...newAsset,
         status: newAsset.status === 'active' ? 'active' : 'inactive',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        // created_at and updated_at are handled by the backend/database
       } as Asset;
       
       setAssets([...assets, createdAsset]);
@@ -394,4 +393,5 @@ export default function AdminAssetsPage() {
     </div>
   );
 }
+
 
