@@ -1,7 +1,9 @@
+
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams, TradeHistoryItem } from "@/types";
 import { toast } from "@/components/ui/use-toast";
@@ -9,7 +11,9 @@ import { Progress } from "@/components/ui/progress";
 import { 
   isFirstBusinessDayOfMonth, 
   isLastBusinessDayOfMonth, 
-  isValidPeriodForMonthly
+  isValidPeriodForMonthly,
+  getStartDateForPeriod,
+  countBusinessDays
 } from "@/utils/dateUtils";
 
 // Helper function to get month key (e.g., YYYY-MM)
@@ -55,7 +59,7 @@ function calculateProfit(entryPrice: number | undefined, exitPrice: number | und
   const numEntryPrice = typeof entryPrice === 'number' ? entryPrice : Number(entryPrice);
   const numExitPrice = typeof exitPrice === 'number' ? exitPrice : Number(exitPrice);
   if (isNaN(numEntryPrice) || isNaN(numExitPrice)) return 0;
-  return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - exitPrice) * lotSize;
+  return (operation === 'buy' ? numExitPrice - numEntryPrice : numEntryPrice - numExitPrice) * lotSize;
 }
 
 // Risk Calculation Functions (Using Processed History)
@@ -65,7 +69,7 @@ const calculateMaxDrawdown = (trades: TradeHistoryItem[], initialCapital: number
     let peakCapital = initialCapital;
     // Use the capital from the first record if available, otherwise initial
     let currentCapital = trades[0]?.capital ?? initialCapital;
-    peakCapital = Math.max(peakCapital, currentCapital); // Initialize peak correctly
+    peakCapital = Math.max(peakCapital, Number(currentCapital)); // Convert to number
 
     trades.forEach(trade => {
         // Update capital only if it's defined in the record
@@ -164,7 +168,7 @@ export default function MonthlyPortfolioPage() {
           const previousDayOriginal = sortedHistory.find((_, idx, arr) => arr[idx+1]?.date === currentDayData.date);
 
           if (previousDayOriginal && previousDayOriginal.exitPrice !== undefined) {
-            const potentialEntryPrice = previousDayOriginal.exitPrice;
+            const potentialEntryPrice = Number(previousDayOriginal.exitPrice); // Convert to number
             const referencePrice = getReferencePrice(previousDayOriginal, params.referencePrice);
             const entryThreshold = referencePrice * (1 + (params.entryPercentage / 100) * (params.operation === 'buy' ? 1 : -1));
             const shouldEnter = (params.operation === 'buy' && potentialEntryPrice >= entryThreshold) || (params.operation === 'sell' && potentialEntryPrice <= entryThreshold);
@@ -198,7 +202,7 @@ export default function MonthlyPortfolioPage() {
 
           if (stopHit) {
             exitPrice = stopPriceCalculated;
-            profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
+            profit = calculateProfit(Number(activeTradeEntry.actualPrice), exitPrice, params.operation, Number(activeTradeEntry.lotSize)); // Convert to numbers
             closeRecord = {
               ...currentDayData,
               trade: 'Close',
@@ -215,9 +219,9 @@ export default function MonthlyPortfolioPage() {
             capitalBeforeCurrentTrade += profit; // Update tracker for next potential trade
 
           } else if (isLastBusinessDayOfMonth(currentDate)) {
-            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : undefined;
-            if (exitPrice !== undefined) {
-              profit = calculateProfit(activeTradeEntry.actualPrice, exitPrice, params.operation, activeTradeEntry.lotSize);
+            exitPrice = typeof currentDayData.exitPrice === 'number' ? currentDayData.exitPrice : Number(currentDayData.exitPrice);
+            if (exitPrice !== undefined && !isNaN(exitPrice)) {
+              profit = calculateProfit(Number(activeTradeEntry.actualPrice), exitPrice, params.operation, Number(activeTradeEntry.lotSize)); // Convert to numbers
               closeRecord = {
                 ...currentDayData,
                 trade: 'Close',
@@ -408,7 +412,7 @@ export default function MonthlyPortfolioPage() {
       setAnalysisParams(paramsWithTable);
       
       // Update both the main results and the detailed result
-      const results = await api.analysis.runAnalysis(paramsWithTable);
+      const results = await api.analysis.runAnalysis(paramsWithTable, () => {});
       
       // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
       const today = new Date();

@@ -127,7 +127,7 @@ const googleLogin = async () => {
   }
 
   return {
-    user: data.user || {},
+    user: data.user || null,
     session: '',
   };
 };
