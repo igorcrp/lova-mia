@@ -30,6 +30,7 @@ interface TradeDetail {
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
+  planType?: 'free' | 'premium';
 }
 
 type SortField = 
@@ -50,7 +51,7 @@ interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
+export function ResultsTable({ results, onViewDetails, planType = 'free' }: ResultsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
@@ -78,7 +79,10 @@ const sortedResults = [...results].sort((a, b) => {
     page * rowsPerPage
   );
   
+  // Disable sorting for free plan
   const handleSort = (field: SortField) => {
+    if (planType === 'free') return; // Disable sorting for free users
+    
     setSortConfig({
       field,
       direction:
@@ -89,7 +93,7 @@ const sortedResults = [...results].sort((a, b) => {
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortConfig.field !== field) {
+    if (planType === 'free' || sortConfig.field !== field) {
       return null;
     }
     
@@ -193,7 +197,7 @@ const sortedResults = [...results].sort((a, b) => {
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className="w-20 cursor-pointer text-center"
+                  className={`w-20 text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
@@ -202,7 +206,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer text-center"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
@@ -211,7 +215,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
@@ -220,7 +224,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -229,7 +233,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
@@ -238,7 +242,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -247,7 +251,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
@@ -256,7 +260,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -265,7 +269,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
@@ -274,7 +278,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -283,7 +287,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${planType === 'premium' ? 'cursor-pointer' : 'cursor-default'}`}
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">
@@ -349,7 +353,7 @@ const sortedResults = [...results].sort((a, b) => {
         </div>
       </div>
       
-      {/* Pagination */}
+      {/* Pagination - only for premium users or limit for free users */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Rows per page:</span>
@@ -363,9 +367,13 @@ const sortedResults = [...results].sort((a, b) => {
             style={{ backgroundColor: "#0f1729" }}
           >
             <option value={10}>10</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={500}>500</option>
+            {planType === 'premium' && (
+              <>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={500}>500</option>
+              </>
+            )}
           </select>
         </div>
         

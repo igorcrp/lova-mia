@@ -1,5 +1,3 @@
-
-
 export interface User {
   id: string;
   email: string;
@@ -9,6 +7,7 @@ export interface User {
   status: 'active' | 'inactive' | 'pending';
   email_verified: boolean;
   account_type: 'free' | 'premium';
+  plan_type: 'free' | 'premium'; // Add plan_type field
   created_at: string;
   last_login?: string;
 }
@@ -112,4 +111,3 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
-
