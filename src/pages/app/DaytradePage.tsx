@@ -1,19 +1,15 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
-import { UpgradeMessage } from "@/components/UpgradeMessage";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
-import { useSubscription } from "@/hooks/useSubscription";
-import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
 
 export default function DaytradePage() {
-  const [user, setUser] = useState<User | null>(null);
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
@@ -22,57 +18,8 @@ export default function DaytradePage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
-  
-  const { planType, isLoading: subscriptionLoading } = useSubscription(user);
-
-  useEffect(() => {
-    // Get current user
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Check for success/cancel URL params
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
-      toast({
-        title: "Payment successful!",
-        description: "Welcome to Premium! Your subscription is now active.",
-      });
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (urlParams.get('canceled') === 'true') {
-      toast({
-        title: "Payment canceled",
-        description: "You can upgrade to Premium anytime.",
-      });
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
 
   const runAnalysis = async (params: StockAnalysisParams) => {
-    // Apply Free plan restrictions
-    if (planType === "free") {
-      // Limit period to 1 month for free users
-      if (params.period !== "1month") {
-        toast({
-          variant: "destructive",
-          title: "Free Plan Limitation",
-          description: "Free users can only analyze data for 1 month period. Please upgrade to Premium for full access.",
-        });
-        return;
-      }
-    }
-
     try {
       setIsLoading(true);
       setAnalysisResults([]);
@@ -123,14 +70,8 @@ export default function DaytradePage() {
         setProgress(20 + currentProgress * 0.7);
       });
       
-      // Apply Free plan restrictions to results
-      let finalResults = results;
-      if (planType === "free") {
-        finalResults = results.slice(0, 10); // Limit to 10 results for free users
-      }
-      
       // Usar diretamente os resultados do backend sem sobrescrever tradingDays
-      setAnalysisResults(finalResults);
+      setAnalysisResults(results);
       
       // Final processing
       setProgress(95);
@@ -244,14 +185,8 @@ export default function DaytradePage() {
       
       console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
       
-      // Apply Free plan restrictions to results
-      let finalResults = results;
-      if (planType === "free") {
-        finalResults = results.slice(0, 10); // Limit to 10 results for free users
-      }
-      
       // Usar diretamente os resultados do backend sem sobrescrever tradingDays
-      setAnalysisResults(finalResults);
+      setAnalysisResults(results);
       
       // Fetch detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
@@ -286,12 +221,7 @@ export default function DaytradePage() {
       
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
-          <StockSetupForm 
-            onSubmit={runAnalysis} 
-            isLoading={isLoading} 
-            planType={planType}
-            subscriptionLoading={subscriptionLoading}
-          />
+          <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
           
           {isLoading && (
             <div className="mt-6">
@@ -304,16 +234,10 @@ export default function DaytradePage() {
           )}
           
           {analysisResults.length > 0 && !isLoading && (
-            <>
-              <ResultsTable 
-                results={analysisResults} 
-                onViewDetails={viewDetails}
-                planType={planType}
-              />
-              {planType === "free" && user && (
-                <UpgradeMessage user={user} />
-              )}
-            </>
+            <ResultsTable 
+              results={analysisResults} 
+              onViewDetails={viewDetails} 
+            />
           )}
         </div>
       ) : (

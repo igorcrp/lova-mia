@@ -57,27 +57,6 @@ export function StockDetailsTable({
     };
   }, []);
 
-  // Function to calculate stop trigger
-  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
-    if (!item || !item.stopPrice || item.stopPrice === '-' || item.low === null || item.high === null) {
-        return "-";
-    }
-    const stopPrice = Number(item.stopPrice);
-    const low = Number(item.low);
-    const high = Number(item.high);
-    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
-        return "-";
-    }
-    const lowerCaseOperation = operation?.toLowerCase();
-    if (lowerCaseOperation === 'buy') {
-        return low < stopPrice ? "Executed" : "-";
-    } else if (lowerCaseOperation === 'sell') {
-        return high > stopPrice ? "Executed" : "-";
-    } else {
-        return "-";
-    }
-  }
-
   // Process and sort data
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
@@ -106,18 +85,46 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields - ensure both values are numbers
-      const numA = typeof valA === 'number' ? valA : Number(valA) || 0;
-      const numB = typeof valB === 'number' ? valB : Number(valB) || 0;
+      // Numeric comparison for other fields
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
 
+  // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
+  function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
+    if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
+        return "-";
+    }
+    const stopPrice = Number(item.stopPrice);
+    const low = Number(item.low);
+    const high = Number(item.high);
+    if (isNaN(stopPrice) || stopPrice <= 0 || isNaN(low) || isNaN(high)) {
+        return "-";
+    }
+    const lowerCaseOperation = operation?.toLowerCase();
+    if (lowerCaseOperation === 'buy') {
+        return low < stopPrice ? "Executed" : "-";
+    } else if (lowerCaseOperation === 'sell') {
+        return high > stopPrice ? "Executed" : "-";
+    } else {
+        return "-";
+    }
+  }
+
   // Função para formatar o valor do trade com cores
-  const formatTradeValue = (trade: string) => {
+  function formatTradeValue(trade: string) {
     if (typeof trade !== "string" || !trade) return <span>-</span>;
 
     if (trade.includes("/")) {
+      // Exemplo: "Buy/Closed" ou "Sell/Closed"
       const [firstPart, secondPart] = trade.split("/");
       return (
         <>
@@ -183,14 +190,11 @@ export function StockDetailsTable({
   };
 
   const handleUpdateResults = () => {
-    const entryPercentageValue = typeof entryPercentage === 'number' ? entryPercentage : Number(entryPercentage) || 0;
-    const stopPercentageValue = typeof stopPercentage === 'number' ? stopPercentage : Number(stopPercentage) || 0;
-    
     const cleanParams = {
       ...params,
       referencePrice: refPrice,
-      entryPercentage: Number(entryPercentageValue.toFixed(2)),
-      stopPercentage: Number(stopPercentageValue.toFixed(2)),
+      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
+      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
       initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
     };
     onUpdateParams(cleanParams);
@@ -546,6 +550,7 @@ export function StockDetailsTable({
   );
 }
 
+// Função auxiliar para lidar com a entrada de números decimais positivos
 function handleDecimalInputChange(value: string, onChange: (val: number | string | null) => void) {
   if (value === "") {
     onChange(null);
@@ -562,7 +567,7 @@ function handleDecimalInputChange(value: string, onChange: (val: number | string
       }
     }
   } else if (value === "-") {
-    // Don't do anything if trying to type "-"
+    // Não faz nada se tentar digitar "-"
   } else {
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue >= 0) {
@@ -573,6 +578,7 @@ function handleDecimalInputChange(value: string, onChange: (val: number | string
   }
 }
 
+// Função auxiliar para formatar no blur
 function handleBlurFormatting(value: number | string | null | undefined, onChange: (val: number | null) => void) {
   let numValue = 0;
   if (typeof value === "string") {
@@ -589,3 +595,4 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
+

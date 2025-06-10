@@ -1,3 +1,5 @@
+
+
 export interface User {
   id: string;
   email: string;
@@ -27,8 +29,6 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
-  created_at?: string; // Add created_at as optional property
-  updated_at?: string; // Add updated_at as optional property
 }
 
 export interface StockAnalysisParams {
@@ -68,7 +68,6 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
-  detailedHistory?: TradeHistoryItem[]; // Add detailedHistory for MonthlyPortfolioPage
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -85,7 +84,6 @@ export interface TradeHistoryItem {
   profitPercentage: number;
   trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
   stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
-  stopTrigger?: string; // Add stopTrigger property
   volume?: number;
   high?: number;
   low?: number;
@@ -114,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+

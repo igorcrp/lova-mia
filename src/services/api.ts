@@ -1,405 +1,1134 @@
+// This is a service layer to interact with Supabase and process data
 
-import { SupabaseClient } from '@supabase/supabase-js';
-import { Asset, MarketDataSource, StockAnalysisParams, DetailedResult, TradeHistoryItem, User } from '@/types';
+import { supabase, fromDynamic, MarketDataSource, StockRecord } from '@/integrations/supabase/client';
+import { AnalysisResult, Asset, DetailedResult, StockAnalysisParams, StockInfo, User, TradeHistoryItem } from '@/types'; // Added TradeHistoryItem
+import { formatDateToYYYYMMDD, getDateRangeForPeriod } from '@/utils/dateUtils';
 
-// Initialize Supabase client
-let supabase: SupabaseClient | null = null;
+/**
+ * Authentication API service
+ */
+export const auth = {
+  /**
+   * Login with email and password
+   */
+  async login(email: string, password: string): Promise<any> {
+    try {
+      console.log(`Attempting to login with email: ${email}`);
+      
+      // REMOVIDO: Bloco que chamava RPC inexistente 'check_user_by_email'
+      // A verificação de status agora é feita no AuthContext após o login do Supabase Auth
 
-export const setSupabaseClient = (client: SupabaseClient) => {
-  supabase = client;
-};
-
-export const api = {
-  auth: {
-    getCurrentSession: async () => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.getSession();
-    },
-
-    signUp: async (email: string, password: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+      // Autentica com Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    },
 
-    signIn: async (email: string, password: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
-    },
+      if (error) {
+        console.error("Login error:", error);
+        // Verifica se o erro é por email não confirmado
+        if (error.message.includes("Email not confirmed")) {
+          throw new Error("PENDING_CONFIRMATION"); // Lança erro específico para tratamento no AuthContext
+        }
+        throw error; // Lança outros erros de autenticação
+      }
 
-    signOut: async () => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signOut();
-    },
+      // REMOVIDO: Bloco que verificava status 'pending' após login bem-sucedido
+      // Essa lógica agora está no AuthContext
 
-    resetPassword: async (email: string) => {
-       if (!supabase) throw new Error('Supabase client not initialized');
-       return await supabase.auth.resetPasswordForEmail(email, {
-         redirectTo: `${window.location.origin}/auth/update-password`,
-       });
-    },
-
-    updatePassword: async (password: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.updateUser({ password: password });
-    },
-
-    getUser: async () => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
-
-    login: async (email: string, password: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signInWithPassword({ email, password });
-    },
-
-    register: async (email: string, password: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signUp({ email, password });
-    },
-
-    logout: async () => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signOut();
-    },
-
-    googleLogin: async () => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.signInWithOAuth({ provider: 'google' });
-    },
-
-    resendConfirmationEmail: async (email: string) => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      return await supabase.auth.resend({
-        type: 'signup',
-        email: email,
-      });
-    },
+      console.log("Supabase Auth Login successful:", data);
+      return {
+        user: data.user,
+        session: data.session,
+      };
+    } catch (error) {
+      console.error("Login failed:", error);
+      throw error;
+    }
   },
 
-  marketData: {
-    getDataSources: async (): Promise<MarketDataSource[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('market_data_sources')
-        .select('*');
+  /**
+   * Register a new user
+   */
+  async register(email: string, password: string, fullName: string): Promise<any> {
+    try {
+      console.log(`Attempting to register user with email: ${email}`);
+      
+      // Register user with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
+          data: {
+            full_name: fullName,
+          }
+        }
+      });
 
-      if (error) {
-        console.error('Error fetching market data sources:', error);
-        throw new Error('Failed to fetch market data sources');
+      if (authError) {
+        console.error("Registration auth error:", authError);
+        throw authError;
       }
 
-      return data || [];
-    },
+      console.log("Auth registration successful:", authData);
 
-    getDataTableName: async (country: string, stockMarket: string, assetClass: string): Promise<string | null> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      
-      const { data, error } = await supabase
-        .from('market_data_sources')
-        .select('stock_table')
-        .eq('country', country)
-        .eq('stock_market', stockMarket)
-        .eq('asset_class', assetClass)
-        .single();
-      
+      // Insert user data into public.users table with level_id=1 and status_user='pending'
+      if (authData.user) {
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: authData.user.id,
+              email: email,
+              name: fullName,
+              level_id: 1,
+              status_users: 'pending',
+              created_at: new Date().toISOString(),
+            }
+          ]);
+
+        if (userError) {
+          console.error("User data insertion error:", userError);
+          // Don't throw here, as the auth user is already created
+          // Just log the error and continue
+          console.warn("User created in auth but not in public.users table");
+        } else {
+          console.log("User registration successful in public.users table");
+        }
+      }
+
+      return {
+        user: authData.user,
+        session: authData.session,
+        success: true
+      };
+    } catch (error) {
+      console.error("Registration failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Send password reset email
+   */
+  async resetPassword(email: string): Promise<void> {
+    try {
+      console.log(`Sending password reset email to: ${email}`);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login?reset=true`,
+      });
+
       if (error) {
-        console.error('Error fetching data table name:', error);
-        return null;
+        console.error("Password reset error:", error);
+        throw error;
+      }
+
+      console.log("Password reset email sent successfully");
+    } catch (error) {
+      console.error("Password reset failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update user password
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    try {
+      console.log("Updating user password");
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        console.error("Password update error:", error);
+        throw error;
+      }
+
+      console.log("Password updated successfully");
+    } catch (error) {
+      console.error("Password update failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Resend confirmation email
+   */
+  async resendConfirmationEmail(email: string): Promise<void> {
+    try {
+      console.log(`Resending confirmation email to: ${email}`);
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login?confirmation=true`,
+        }
+      });
+
+      if (error) {
+        console.error("Resend confirmation email error:", error);
+        throw error;
+      }
+
+      console.log("Confirmation email resent successfully");
+    } catch (error) {
+      console.error("Resend confirmation email failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Login with Google
+   */
+  async googleLogin(): Promise<any> {
+    try {
+      console.log("Attempting to login with Google");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/login?provider=google`
+        }
+      });
+
+      if (error) {
+        console.error("Google login error:", error);
+        throw error;
+      }
+
+      console.log("Google login initiated:", data);
+      return data;
+    } catch (error) {
+      console.error("Google login failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Logout current user
+   */
+  async logout(): Promise<void> {
+    try {
+      console.log("Attempting to logout");
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("Logout error:", error);
+        throw error;
+      }
+
+      console.log("Logout successful");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get current user data from public.users table
+   */
+  async getUserData(userId: string): Promise<User | null> {
+    try {
+      console.log(`Getting user data for ID: ${userId}`);
+      
+      // Use a função check_user_by_email em vez de get_current_user
+      const { data, error } = await supabase.rpc('check_user_by_email', {
+        p_email: userId // Usando userId como email para compatibilidade
+      });
+
+      if (error) {
+        console.error("Get user data error:", error);
+        throw error;
+      }
+
+      console.log("User data retrieved:", data);
+      
+      // Converter o resultado para o tipo User
+      if (Array.isArray(data) && data.length > 0) {
+        const userData = data[0];
+        return {
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.name,
+          level_id: userData.level_id,
+          status: userData.status_users as any,
+          email_verified: userData.email_verified,
+          account_type: 'free', // Valor padrão
+          created_at: new Date().toISOString(),
+          last_login: null
+        } as User;
       }
       
-      return data ? data.stock_table : null;
-    },
+      return null;
+    } catch (error) {
+      console.error("Get user data failed:", error);
+      return null;
+    }
+  },
 
-    getCountries: async (): Promise<string[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('market_data_sources')
+  /**
+   * Update user status to active after email confirmation
+   */
+  async confirmUserEmail(userId: string): Promise<void> {
+    try {
+      console.log(`Confirming email for user ID: ${userId}`);
+      const { error } = await supabase
+        .from('users')
+        .update({ status_users: 'active' })
+        .eq('id', userId);
+
+      if (error) {
+        console.error("Email confirmation error:", error);
+        throw error;
+      }
+
+      console.log("Email confirmed successfully");
+    } catch (error) {
+      console.error("Email confirmation failed:", error);
+      throw error;
+    }
+  }
+};
+
+/**
+ * Market Data API service for fetching market data
+ */
+const marketData = {
+  /**
+   * Get available countries with market data
+   */
+  async getCountries(): Promise<string[]> {
+    try {
+      // Use fromDynamic to query the market_data_sources table
+      const { data, error } = await fromDynamic('market_data_sources')
         .select('country')
         .order('country');
 
-      if (error) {
-        console.error('Error fetching countries:', error);
-        throw new Error('Failed to fetch countries');
-      }
+      if (error) throw error;
 
-      // Get unique countries
-      const uniqueCountries = [...new Set(data?.map(item => item.country) || [])];
-      return uniqueCountries;
-    },
+      // Check if data exists before accessing properties
+      if (!data || !Array.isArray(data)) return [];
 
-    getStockMarkets: async (country: string): Promise<string[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('market_data_sources')
+      // Extract unique country names using a safer approach with type assertion
+      const countries = [...new Set(data.map(item => (item as any).country).filter(Boolean))];
+      return countries;
+    } catch (error) {
+      console.error('Failed to fetch countries:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get available stock markets for a given country
+   */
+  async getStockMarkets(country: string): Promise<string[]> {
+    try {
+      // Use fromDynamic to query the market_data_sources table
+      const { data, error } = await fromDynamic('market_data_sources')
         .select('stock_market')
         .eq('country', country)
         .order('stock_market');
 
-      if (error) {
-        console.error('Error fetching stock markets:', error);
-        throw new Error('Failed to fetch stock markets');
-      }
+      if (error) throw error;
 
-      // Get unique stock markets
-      const uniqueMarkets = [...new Set(data?.map(item => item.stock_market) || [])];
-      return uniqueMarkets;
-    },
+      // Check if data exists before accessing properties
+      if (!data || !Array.isArray(data)) return [];
 
-    getAssetClasses: async (country: string, stockMarket: string): Promise<string[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('market_data_sources')
+      // Extract unique stock markets using a safer approach with type assertion
+      const markets = [...new Set(data.map(item => (item as any).stock_market).filter(Boolean))];
+      return markets;
+    } catch (error) {
+      console.error('Failed to fetch stock markets:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get available asset classes for a given country and stock market
+   */
+  async getAssetClasses(country: string, stockMarket: string): Promise<string[]> {
+    try {
+      // Use fromDynamic to query the market_data_sources table
+      const { data, error } = await fromDynamic('market_data_sources')
         .select('asset_class')
         .eq('country', country)
         .eq('stock_market', stockMarket)
         .order('asset_class');
 
-      if (error) {
-        console.error('Error fetching asset classes:', error);
-        throw new Error('Failed to fetch asset classes');
-      }
+      if (error) throw error;
 
-      // Get unique asset classes
-      const uniqueAssetClasses = [...new Set(data?.map(item => item.asset_class) || [])];
-      return uniqueAssetClasses;
-    },
+      // Check if data exists before accessing properties
+      if (!data || !Array.isArray(data)) return [];
 
-    checkTableExists: async (tableName: string): Promise<boolean> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      try {
-        const { data, error } = await supabase.rpc('table_exists', {
-          p_table_name: tableName
-        });
-        
-        if (error) {
-          console.error('Error checking table existence:', error);
-          return false;
-        }
-        
-        return data === true;
-      } catch (error) {
-        console.error('Error in checkTableExists:', error);
-        return false;
-      }
-    },
+      // Extract unique asset classes using a safer approach with type assertion
+      const classes = [...new Set(data.map(item => (item as any).asset_class).filter(Boolean))];
+      return classes;
+    } catch (error) {
+      console.error('Failed to fetch asset classes:', error);
+      return [];
+    }
   },
 
-  assets: {
-    getAssets: async (): Promise<Asset[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*');
+  /**
+   * Get the data table name for a specific market data source
+   */
+  async getDataTableName(
+    country: string,
+    stockMarket: string,
+    assetClass: string
+  ): Promise<string | null> {
+    try {
+      // Use fromDynamic to query the market_data_sources table
+      const { data, error } = await fromDynamic('market_data_sources')
+        .select('stock_table')
+        .eq('country', country)
+        .eq('stock_market', stockMarket)
+        .eq('asset_class', assetClass)
+        .maybeSingle();
 
       if (error) {
-        console.error('Error fetching assets:', error);
-        throw new Error('Failed to fetch assets');
-      }
-
-      return data || [];
-    },
-
-    getAssetById: async (id: string): Promise<Asset | null> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching asset by ID:', error);
+        console.error('Error fetching data table name:', error);
         return null;
       }
 
-      return data || null;
-    },
-
-    createAsset: async (asset: Omit<Asset, 'id'>): Promise<Asset | null> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('assets')
-        .insert([asset])
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('Error creating asset:', error);
-        throw new Error('Failed to create asset');
-      }
-
-      return data || null;
-    },
-
-    updateAsset: async (id: string, updates: Partial<Asset>): Promise<Asset | null> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { data, error } = await supabase
-        .from('assets')
-        .update(updates)
-        .eq('id', id)
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('Error updating asset:', error);
-        throw new Error('Failed to update asset');
-      }
-
-      return data || null;
-    },
-
-    deleteAsset: async (id: string): Promise<boolean> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      const { error } = await supabase
-        .from('assets')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('Error deleting asset:', error);
-        return false;
-      }
-
-      return true;
-    },
+      // Return the table name using safer access with type assertion
+      return data ? (data as any).stock_table : null;
+    } catch (error) {
+      console.error('Failed to fetch data table name:', error);
+      return null;
+    }
   },
+  
+  /**
+   * Check if the given table exists in the database
+   */
+  async checkTableExists(tableName: string): Promise<boolean> {
+    try {
+      if (!tableName) return false;
+      
+      // Try to query the table with limit 1 to check if it exists
+      const { error } = await fromDynamic(tableName)
+        .select('*')
+        .limit(1);
+      
+      // If there's no error, the table exists
+      return !error;
+    } catch (error) {
+      console.error('Error checking table existence:', error);
+      return false;
+    }
+  },
+  
+  /**
+   * Get market status by ID
+   */
+  async getMarketStatus(marketId: string): Promise<any> {
+    try {
+      const { data, error } = await fromDynamic('market_status')
+        .select('*')
+        .eq('id', marketId)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching market status:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch market status:', error);
+      return null;
+    }
+  },
+  
+  /**
+   * Get all market data sources
+   */
+  async getAllMarketDataSources(): Promise<MarketDataSource[]> {
+    try {
+      const { data, error } = await fromDynamic('market_data_sources')
+        .select('*')
+        .order('country');
+        
+      if (error) {
+        console.error('Error fetching market data sources:', error);
+        return [];
+      }
 
-  analysis: {
-    runAnalysis: async (params: StockAnalysisParams, onProgress?: (progress: number) => void): Promise<any[]> => {
-      try {
-        console.info('Starting analysis...');
+      return (data || []) as any as MarketDataSource[];
+    } catch (error) {
+      console.error('Failed to fetch market data sources:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Get market data sources by country
+   */
+  async getMarketDataSourcesByCountry(country: string): Promise<MarketDataSource[]> {
+    try {
+      const { data, error } = await fromDynamic('market_data_sources')
+        .select('*')
+        .eq('country', country)
+        .order('stock_market');
         
-        if (!supabase) {
-          throw new Error('Supabase client not initialized');
-        }
+      if (error) {
+        console.error(`Error fetching market data sources for country ${country}:`, error);
+        return [];
+      }
+      
+      return (data || []) as any as MarketDataSource[];
+    } catch (error) {
+      console.error(`Failed to fetch market data sources for country ${country}:`, error);
+      return [];
+    }
+  },
+  
+  /**
+   * Get market data sources by country and stock market
+   */
+  async getMarketDataSourcesByCountryAndStockMarket(
+    country: string, 
+    stockMarket: string
+  ): Promise<MarketDataSource[]> {
+    try {
+      const { data, error } = await fromDynamic('market_data_sources')
+        .select('*')
+        .eq('country', country)
+        .eq('stock_market', stockMarket)
+        .order('asset_class');
         
-        if (!params.dataTableName) {
-          throw new Error("Data table name is required for analysis");
-        }
-        
-        // Simulate progress
-        onProgress?.(5);
-        
-        // Call the Supabase function
-        const { data, error } = await supabase.rpc('run_stock_analysis', {
-          p_country: params.country,
-          p_stock_market: params.stockMarket,
-          p_asset_class: params.assetClass,
-          p_operation: params.operation,
-          p_reference_price: params.referencePrice,
-          p_entry_percentage: params.entryPercentage,
-          p_stop_percentage: params.stopPercentage,
-          p_initial_capital: params.initialCapital,
-          p_table_name: params.dataTableName,
-          p_period: params.period,
-          p_comparison_stocks: params.comparisonStocks || []
-        });
-        
-        if (error) {
-          console.error('Error during analysis:', error);
-          throw new Error('Analysis failed');
-        }
-        
-        // Simulate progress
-        onProgress?.(90);
-        
-        console.info('Analysis completed successfully.');
-        return data || [];
-      } catch (error) {
-        console.error('Error in runAnalysis:', error);
+      if (error) {
+        console.error(`Error fetching market data sources for country ${country} and stock market ${stockMarket}:`, error);
+        return [];
+      }
+      
+      return (data || []) as any as MarketDataSource[];
+    } catch (error) {
+      console.error(`Failed to fetch market data sources for country ${country} and stock market ${stockMarket}:`, error);
+      return [];
+    }
+  }
+};
+
+/**
+ * Stock Analysis API service
+ */
+const analysis = {
+  /**
+   * Get a list of available stocks for a specific data table
+   */
+  async getAvailableStocks(tableName: string): Promise<StockInfo[]> {
+    try {
+      if (!tableName) {
+        throw new Error('Table name is required');
+      }
+      
+      console.log(`Getting available stocks from table: ${tableName}`);
+      
+      // Use database function to get unique stock codes - this ensures we get ALL stocks
+      const { data, error } = await supabase.rpc('get_unique_stock_codes', {
+        p_table_name: tableName
+      });
+
+      if (error) {
+        console.error('Error getting unique stock codes:', error);
+        // Fallback to direct table query if the function fails
+        return await this.getAvailableStocksDirect(tableName);
+      }
+
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.warn('No stock codes returned from function, trying direct query');
+        return await this.getAvailableStocksDirect(tableName);
+      }
+      
+      console.log(`Found ${data.length} unique stock codes`);
+      
+      // Transform the data into StockInfo objects
+      // Corrected to handle potential object return from RPC
+      const stocks: StockInfo[] = data.map(item => {
+        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                          ? String(item.stock_code) 
+                          : String(item); // Fallback if it's just a string
+        return {
+          code: stockCode,
+          name: stockCode, // Use code as name if no name is available
+        };
+      });
+      
+      return stocks;
+    } catch (error) {
+      console.error('Failed to get available stocks:', error);
+      // Ensure fallback is called even if the initial try block fails
+      return await this.getAvailableStocksDirect(tableName);
+    }
+  },
+  
+  /**
+   * Fallback method to get stocks directly from the table
+   */
+  async getAvailableStocksDirect(tableName: string): Promise<StockInfo[]> {
+    try {
+      console.log(`Trying direct query to get stock codes from ${tableName}`);
+      
+      // Implementação alternativa sem usar groupBy
+      const { data, error } = await fromDynamic(tableName)
+        .select('stock_code')
+        .limit(1000); // Limitar para evitar problemas de performance
+      
+      if (error) {
+        console.error('Error in direct stock code query:', error);
+        // Throw the error to be caught by the outer catch block
         throw error;
       }
-    },
 
-    getDetailedAnalysis: async (assetCode: string, params: StockAnalysisParams): Promise<DetailedResult | null> => {
-      try {
-        console.info(`Getting detailed analysis for asset: ${assetCode}`);
+      if (!data) {
+        console.warn(`No stock codes found in table ${tableName}`);
+        return [];
+      }
+      
+      // Extract stock codes with proper type safety and remove duplicates
+      const uniqueCodes = new Set<string>();
+      (data as any[])
+        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+        .forEach(item => uniqueCodes.add(String(item.stock_code)));
+      
+      const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
+        code: code,
+        name: code // Use stock_code as name since 'name' column doesn't exist
+      }));
+      
+      console.log(`Direct query found ${stocks.length} stock codes`);
+      return stocks;
+    } catch (error) {
+      console.error(`Failed in direct stock query for ${tableName}:`, error);
+      // Return empty array on failure
+      return [];
+    }
+  },
+  
+  /**
+   * Get stock data from a specific table and stock code
+   */
+  async getStockData(tableName: string, stockCode: string, period: string | undefined = undefined, limit: number = 300): Promise<any[]> {
+    try {
+      if (!tableName || !stockCode) {
+        throw new Error('Table name and stock code are required');
+      }
+      
+      // Get date range based on period
+      if (period) {
+        const dateRange = getDateRangeForPeriod(period);
+        console.info(`Getting stock data for ${stockCode} from ${tableName} with period ${period}`);
+        console.info(`Date range: ${dateRange.startDate} to ${dateRange.endDate}`);
         
-        if (!params.dataTableName) {
-          throw new Error("Data table name is required for detailed analysis");
+        // Use the period-filtered method
+        return await this.getStockDataDirectWithPeriod(tableName, stockCode, dateRange.startDate, dateRange.endDate);
+      } else {
+        console.info(`Getting stock data for ${stockCode} from ${tableName} without period filtering (using limit: ${limit})`);
+        // If no period, use the limit-based method
+        return await this.getStockDataDirect(tableName, stockCode, limit);
+      }
+    } catch (error) {
+      console.error('Failed to get stock data:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Fallback method to get stock data directly from the table (limit based)
+   */
+  async getStockDataDirect(tableName: string, stockCode: string, limit: number = 300): Promise<any[]> {
+    try {
+      console.log(`Trying direct query to get stock data for ${stockCode} from ${tableName} with limit ${limit}`);
+      
+      const { data, error } = await fromDynamic(tableName)
+        .select('*')
+        .eq('stock_code', stockCode)
+        .order('date', { ascending: false }) // Get latest data first
+        .limit(limit);
+
+      if (error) {
+        console.error('Error in direct stock data query (limit):', error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        console.warn(`No data found for ${stockCode} in table ${tableName}`);
+        return [];
+      }
+      // Reverse the data to have it in ascending order for processing
+      return (data as any[]).reverse(); 
+    } catch (error) {
+      console.error(`Failed in direct stock data query (limit) for ${stockCode}:`, error);
+      return [];
+    }
+  },
+  
+  /**
+   * Get stock data with period filtering
+   */
+  async getStockDataDirectWithPeriod(
+    tableName: string, 
+    stockCode: string, 
+    startDate: string, 
+    endDate: string
+  ): Promise<any[]> {
+    try {
+      console.info(`Fetching stock data for ${stockCode} from ${tableName} between ${startDate} and ${endDate}`);
+      
+      const { data, error } = await fromDynamic(tableName)
+        .select('*')
+        .eq('stock_code', stockCode)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true }); // Ascending order for chronological processing
+      
+      if (error) {
+        console.error('Error in period-filtered stock data query:', error);
+        throw error;
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        console.warn(`No data found for ${stockCode} in table ${tableName} for the specified period`);
+        return [];
+      }
+      
+      console.info(`Found ${data.length} records for ${stockCode} in the specified period`);
+      return data as any[];
+
+    } catch (error) {
+      console.error(`Failed to fetch period-filtered data for ${stockCode}:`, error);
+      return [];
+    }
+  },
+
+  // --- Start: Functions copied from api-18.ts ---
+
+  /**
+   * Run stock analysis with given parameters
+   */
+  async runAnalysis(
+    params: StockAnalysisParams,
+    progressCallback?: (progress: number) => void
+  ): Promise<AnalysisResult[]> {
+    try {
+      console.info('Running analysis with parameters:', params);
+      
+      // Set up progress tracking
+      let progress = 0;
+      const updateProgress = (increment: number) => {
+        progress += increment;
+        if (progressCallback) {
+          progressCallback(Math.min(progress, 100));
         }
+      };
 
-        // Get stock data with proper null check
-        const { data: stockDataArray, error: stockError } = await supabase.rpc('get_stock_data', {
-          p_table_name: params.dataTableName,
-          p_stock_code_param: assetCode,
-          p_limit_rows: 1000
-        });
-
-        if (stockError) {
-          console.error('Error fetching stock data:', stockError);
-          throw new Error('Failed to fetch stock data');
+      if (!params.dataTableName) {
+        const tableName = await marketData.getDataTableName(
+          params.country,
+          params.stockMarket,
+          params.assetClass
+        );
+        if (!tableName) {
+          throw new Error('Could not determine data table name');
         }
+        params.dataTableName = tableName;
+      }
 
-        if (!stockDataArray || stockDataArray.length === 0) {
-          console.warn(`No stock data found for ${assetCode}`);
-          return null;
-        }
-
-        console.info(`Found ${stockDataArray.length} records for ${assetCode}`);
-
-        // Convert to trade history format with proper null safety
-        const tradeHistory: TradeHistoryItem[] = stockDataArray.map((item: any) => {
-          // Ensure item is not null before accessing properties
-          if (!item) {
-            return {
-              date: '',
-              entryPrice: 0,
-              exitPrice: 0,
-              profitLoss: 0,
-              profitPercentage: 0,
-              trade: '-',
-              stop: '-',
-              volume: 0,
-              high: 0,
-              low: 0,
-              suggestedEntryPrice: 0,
-              actualPrice: 0,
-              lotSize: 0,
-              stopPrice: 0,
-              capital: 0,
-              currentCapital: 0,
-              stopTrigger: '-'
-            };
+      // Get all available stocks for the given asset class
+      updateProgress(10);
+      const stocks = await this.getAvailableStocks(params.dataTableName);
+      
+      console.info(`Found ${stocks.length} stocks for analysis`);
+      
+      if (!stocks || stocks.length === 0) {
+        // Changed from throw to return empty array to avoid breaking the UI
+        console.warn('No stocks found for the selected criteria');
+        return []; 
+      }
+      
+      updateProgress(10);
+      
+      // Process each stock based on the selection criteria
+      const results: AnalysisResult[] = [];
+      
+      // Process each stock sequentially to avoid overloading the database
+      const stocksToProcess = params.comparisonStocks && params.comparisonStocks.length > 0
+        ? stocks.filter(s => params.comparisonStocks!.includes(s.code))
+        : stocks;
+        
+      for (let i = 0; i < stocksToProcess.length; i++) {
+        const stock = stocksToProcess[i];
+        console.info(`Processing stock ${i+1}/${stocksToProcess.length}: ${stock.code}`);
+        
+        try {
+          // Get the stock's historical data with period filtering
+          const stockData = await this.getStockData(
+            params.dataTableName, 
+            stock.code,
+            params.period
+          );
+          
+          if (!stockData || stockData.length === 0) {
+            console.warn(`No data found for stock ${stock.code}, skipping`);
+            continue;
           }
+          
+          console.info(`Retrieved ${stockData.length} data points for ${stock.code}`);
+          
+          // Generate trade history for the stock
+          const tradeHistory = await this.generateTradeHistory(stockData, params);
+          
+          if (!tradeHistory || tradeHistory.length === 0) {
+            console.warn(`No trade history generated for ${stock.code}, skipping`);
+            continue;
+          }
+          
+          // Calculate capital evolution based on the trade history
+          const capitalEvolution = this.calculateCapitalEvolution(tradeHistory, params.initialCapital);
 
-          return {
-            date: item.date || '',
-            entryPrice: Number(item.open) || 0,
-            exitPrice: Number(item.close) || 0,
-            profitLoss: 0,
-            profitPercentage: 0,
-            trade: '-',
-            stop: '-',
-            volume: Number(item.volume) || 0,
-            high: Number(item.high) || 0,
-            low: Number(item.low) || 0,
-            suggestedEntryPrice: 0,
-            actualPrice: 0,
-            lotSize: 0,
-            stopPrice: 0,
-            capital: 0,
-            currentCapital: 0,
-            stopTrigger: '-'
-          };
+          // Calculate detailed metrics for the stock
+          const metrics = this.calculateDetailedMetrics(stockData, tradeHistory, capitalEvolution, params);
+          
+          // Add the result to the list
+          results.push({
+            assetCode: stock.code,
+            assetName: stock.name || stock.code,
+            lastCurrentCapital: capitalEvolution.length > 0 
+              ? capitalEvolution[capitalEvolution.length - 1].capital 
+              : params.initialCapital,
+            ...metrics
+          });
+          
+          // Update progress based on how many stocks we've processed
+          const progressIncrement = 70 / stocksToProcess.length;
+          updateProgress(progressIncrement);
+          
+        } catch (e) {
+          console.error(`Error analyzing stock ${stock.code}:`, e);
+          // Continue with other stocks
+        }
+      }
+      
+      // Sort results by profit percentage (descending)
+      results.sort((a, b) => b.profitPercentage - a.profitPercentage);
+      
+      updateProgress(10); // Final progress update
+      return results;
+    } catch (error) {
+      console.error('Failed to run analysis:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Generate trade history for a stock using the updated formulas
+   */
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
+    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+    let capital = params.initialCapital;
+    
+    // Ensure data is sorted by date in ascending order
+    const sortedData = [...stockData].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    console.info(`Generating trade history for ${sortedData.length} days of stock data`);
+    
+    for (let i = 0; i < sortedData.length; i++) {
+      const currentData = sortedData[i];
+      // Use previous day's data for calculations when available
+      const previousData = i > 0 ? sortedData[i - 1] : null;
+      
+      // Get previous day capital (or initial capital if first day)
+      const previousCapital = i > 0 
+        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital) // Use currentCapital from previous entry
+        : params.initialCapital;
+      
+      // Calculate suggested entry price based on previous day's reference price
+      // Use current day's reference price if previous day is not available
+      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+      let suggestedEntryPrice: number;
+      
+      if (params.operation === 'buy') {
+        // Buy: Previous day's reference price - (Previous day's reference price * entry percentage)
+        suggestedEntryPrice = referencePrice - (referencePrice * params.entryPercentage / 100);
+      } else {
+        // Sell: Previous day's reference price + (Previous day's reference price * entry percentage)
+        suggestedEntryPrice = referencePrice + (referencePrice * params.entryPercentage / 100);
+      }
+      
+      // Determine actual price based on conditional logic:
+      let actualPrice: number | string;
+      if (currentData.open <= suggestedEntryPrice) {
+        actualPrice = currentData.open;
+      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+        actualPrice = suggestedEntryPrice;
+      } else {
+        actualPrice = '-';
+      }
+      
+      // Calculate lot size from previous day's capital and actual price
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
+        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+        : 0;
+      
+      // Determine if trade is executed
+      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      if (params.operation === 'buy') {
+        // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
+        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+      } else {
+        // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
+        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+      }
+      
+      // Calculate stop price
+      const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
+        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
+        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+      
+      // Determine if stop is triggered based on the CURRENT day's low/high
+      let stopTrigger: string = '-'; // Type corrected
+      if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
+        if (params.operation === 'buy') {
+          // Buy: If CURRENT Low <= Stop Price → "Executed"
+          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
+        } else {
+          // Sell: If CURRENT High >= Stop Price → "Executed"
+          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
+        }
+      }
+      
+      // Calculate profit/loss
+      let profitLoss = 0;
+      if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
+        if (stopTrigger === "Executed" && stopPrice !== '-') {
+          // If stop is triggered on the SAME day, use stop price
+          profitLoss = params.operation === 'buy'
+            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+        } else {
+          // Otherwise, use the close price of the CURRENT day
+          profitLoss = params.operation === 'buy'
+            ? (currentData.close - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - currentData.close) * lotSize;
+        }
+      }
+      
+      // Update capital: Previous day's capital + current day's profit/loss
+      // Ensure capital doesn't go below zero (optional, based on requirements)
+      capital = Math.max(0, previousCapital + profitLoss);
+      
+      // Create trade history item
+      tradeHistory.push({
+        date: currentData.date,
+        entryPrice: currentData.open, // Using open as entryPrice for consistency?
+        exitPrice: currentData.close, // Using close as exitPrice
+        high: currentData.high,
+        low: currentData.low,
+        volume: currentData.volume,
+        suggestedEntryPrice,
+        actualPrice,
+        trade,
+        lotSize,
+        stopPrice,
+        stopTrigger, // Changed from 'stop'
+        profitLoss, // Changed from 'profit'
+        currentCapital: capital // Changed from 'capital'
         });
+    }
+    
+    console.info(`Generated ${tradeHistory.length} trade history entries`);
+    return tradeHistory;
+  },
+  
+  /**
+   * Calculate capital evolution based on trade history
+   */
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+    if (!tradeHistory || tradeHistory.length === 0) {
+      return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
+    }
 
-        // Simulate analysis results for now
-        const analysisResult: DetailedResult = {
-          assetCode,
-          assetName: assetCode,
-          tradingDays: tradeHistory.length,
+    const capitalEvolution: { date: string; capital: number }[] = [];
+    
+    // Add initial capital point if the first trade isn't the very first day possible
+    // This might need adjustment based on how the date range is handled
+    capitalEvolution.push({ date: tradeHistory[0].date, capital: initialCapital }); 
+
+    for (const trade of tradeHistory) {
+      // Only add points where capital changes (i.e., a trade happened or stop triggered)
+      if (trade.profitLoss !== 0) { 
+        capitalEvolution.push({
+          date: trade.date,
+          // Use currentCapital which reflects the capital AFTER the day's P/L
+          capital: trade.currentCapital ?? initialCapital 
+        });
+      }
+    }
+    
+    // Ensure the last day's capital is included if no trade happened
+    const lastTrade = tradeHistory[tradeHistory.length - 1];
+    if (capitalEvolution[capitalEvolution.length - 1]?.date !== lastTrade.date) {
+         capitalEvolution.push({ date: lastTrade.date, capital: lastTrade.currentCapital ?? initialCapital });
+    }
+
+    // Remove duplicates based on date, keeping the last entry for that date
+    const uniqueCapitalEvolution = Array.from(new Map(capitalEvolution.map(item => [item.date, item])).values());
+
+    return uniqueCapitalEvolution;
+  },
+  
+  /**
+   * Calculate detailed metrics based on trade history
+   */
+  calculateDetailedMetrics(stockData: any[], tradeHistory: TradeHistoryItem[], capitalEvolution: any[], params: StockAnalysisParams) {
+    // Count the exact number of unique days in the Stock Details table
+    const tradingDays = new Set(stockData.map(item => item.date)).size;
+    
+    // Filter for days where a trade was initiated (Buy or Sell)
+    const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
+    const trades = executedTrades.length;
+    
+    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
+    const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
+    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
+    
+    // Sum the profit/loss values
+    let totalProfit = 0;
+    let totalLoss = 0;
+    
+    // Calculate total profits and losses from executed trades
+    for (const trade of executedTrades) {
+      if (trade.profitLoss > 0) {
+        totalProfit += trade.profitLoss;
+      } else if (trade.profitLoss < 0) {
+        // Accumulate all negative P/L as total loss
+        totalLoss += trade.profitLoss; 
+      }
+    }
+      
+    // Calculate percentages with safety checks to avoid division by zero
+    const tradePercentage = tradingDays > 0 ? (trades / tradingDays) * 100 : 0;
+    // Note: Profit/Loss/Stop percentages are based on the number of TRADES, not trading days
+    const profitRate = trades > 0 ? (profits / trades) * 100 : 0; // Renamed from profitPercentage
+    const lossRate = trades > 0 ? (losses / trades) * 100 : 0; // Renamed from lossPercentage
+    const stopRate = trades > 0 ? (stops / trades) * 100 : 0; // Renamed from stopPercentage
+    
+    // Calculate final capital and profit from capital evolution
+    const finalCapital = capitalEvolution.length > 0 
+      ? capitalEvolution[capitalEvolution.length - 1].capital 
+      : params.initialCapital;
+      
+    const profit = finalCapital - params.initialCapital;
+    const overallProfitPercentage = params.initialCapital > 0 ? (profit / params.initialCapital) * 100 : 0;
+    
+    // Calculate average gain and loss
+    const averageGain = profits > 0 
+      ? totalProfit / profits 
+      : 0;
+      
+    // Use absolute value for average loss calculation
+    const averageLoss = (losses + stops) > 0 // Consider stops as losses for avg loss calculation
+      ? Math.abs(executedTrades.filter(t => t.profitLoss < 0).reduce((sum, t) => sum + t.profitLoss, 0)) / (losses + stops) 
+      : 0;
+    
+    // Calculate max drawdown from capital evolution
+    let maxDrawdown = 0;
+    let peak = params.initialCapital;
+    
+    for (const point of capitalEvolution) {
+      // Ensure capital is treated as a number
+      const currentCapitalPoint = Number(point.capital);
+      if (isNaN(currentCapitalPoint)) continue; // Skip if capital is not a number
+
+      if (currentCapitalPoint > peak) {
+        peak = currentCapitalPoint;
+      }
+      
+      // Calculate drawdown relative to the peak
+      const drawdown = peak > 0 ? (peak - currentCapitalPoint) / peak : 0;
+      
+      if (drawdown > maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    }
+    maxDrawdown = maxDrawdown * 100; // Express as percentage
+      
+    // --- Ratios Calculation (Simplified Example) ---
+    // Proper calculation requires more details (e.g., risk-free rate, time period)
+    const sharpeRatio = 0; // Placeholder
+    const sortinoRatio = 0; // Placeholder
+    const recoveryFactor = maxDrawdown > 0 ? Math.abs(profit / (maxDrawdown / 100 * params.initialCapital)) : 0; // Profit / Max Drawdown Value
+    
+    // Calculate success rate (Profits / Total Trades)
+    const successRate = trades > 0 ? (profits / trades) * 100 : 0;
+    
+    return {
+      tradingDays,
+      trades,
+      tradePercentage,
+      profits,
+      profitPercentage: profitRate, // Use the calculated rate
+      losses,
+      lossPercentage: lossRate, // Use the calculated rate
+      stops,
+      stopPercentage: stopRate, // Use the calculated rate
+      finalCapital,
+      profit,
+      averageGain,
+      averageLoss,
+      maxDrawdown,
+      sharpeRatio, // Placeholder
+      sortinoRatio, // Placeholder
+      recoveryFactor,
+      successRate
+    };
+  },
+
+  /**
+   * Get detailed analysis for a specific stock
+   */
+  async getDetailedAnalysis(
+    stockCode: string,
+    params: StockAnalysisParams
+  ): Promise<DetailedResult> {
+    try {
+      console.info(`Getting detailed analysis for ${stockCode} with params:`, params);
+      
+      if (!params.dataTableName) {
+        const tableName = await marketData.getDataTableName(
+          params.country, 
+          params.stockMarket, 
+          params.assetClass
+        );
+        if (!tableName) {
+          throw new Error('Could not determine data table name');
+        }
+        params.dataTableName = tableName;
+      }
+      
+      // Get the stock data from the database with period filtering
+      const stockData = await this.getStockData(
+        params.dataTableName, 
+        stockCode,
+        params.period // Pass the period parameter to filter by date
+      );
+      
+      if (!stockData || stockData.length === 0) {
+        // Return a default structure instead of throwing error to allow UI to handle it
+        console.warn(`No data found for stock ${stockCode} in table ${params.dataTableName} for the selected period`);
+        return {
+          assetCode: stockCode,
+          assetName: stockCode,
+          tradeHistory: [],
+          capitalEvolution: [{ date: new Date().toISOString().split('T')[0], capital: params.initialCapital }],
+          tradingDays: 0,
           trades: 0,
           tradePercentage: 0,
           profits: 0,
@@ -416,99 +1145,44 @@ export const api = {
           sharpeRatio: 0,
           sortinoRatio: 0,
           recoveryFactor: 0,
-          successRate: 0,
-          tradeHistory,
-          capitalEvolution: [{ date: tradeHistory[0]?.date || '', capital: params.initialCapital }]
+          successRate: 0
         };
+      }
+      
+      console.info(`Retrieved ${stockData.length} data points for ${stockCode} in the selected period`);
+      
+      // Generate trade history
+      const tradeHistory = await this.generateTradeHistory(stockData, params);
+      
+      // Calculate capital evolution
+      const capitalEvolution = this.calculateCapitalEvolution(tradeHistory, params.initialCapital);
+      
+      // Calculate metrics
+      const metrics = this.calculateDetailedMetrics(stockData, tradeHistory, capitalEvolution, params);
+      
+      // Return detailed result
+      return {
+        assetCode: stockCode,
+        assetName: stockCode, // Use code as name if name is not available
+        tradeHistory,
+        capitalEvolution,
+        ...metrics
+      };
+    } catch (error) {
+      console.error(`Failed to get detailed analysis for ${stockCode}:`, error);
+      // Re-throw the error to be caught by the calling function
+      throw error; 
+    }
+  },
 
-        return analysisResult;
-      } catch (error) {
-        console.error('Error in getDetailedAnalysis:', error);
-        throw error;
-      }
-    },
+  // --- End: Functions copied from api-18.ts ---
 
-    getAvailableStocks: async (tableName: string): Promise<any[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      try {
-        const { data, error } = await supabase.rpc('get_unique_stock_codes', {
-          p_table_name: tableName
-        });
-        
-        if (error) {
-          console.error('Error fetching available stocks:', error);
-          throw new Error('Failed to fetch available stocks');
-        }
-        
-        // Convert to expected format
-        return (data || []).map((code: string) => ({
-          code,
-          name: code,
-          fullName: code
-        }));
-      } catch (error) {
-        console.error('Error in getAvailableStocks:', error);
-        throw error;
-      }
-    },
-
-    getUsers: async (): Promise<User[]> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      try {
-        const { data: users, error } = await supabase
-          .from('users')
-          .select('*');
-    
-        if (error) {
-          console.error('Error fetching users:', error);
-          throw new Error('Failed to fetch users');
-        }
-    
-        return users || [];
-      } catch (error) {
-        console.error('Error in getUsers:', error);
-        throw error;
-      }
-    },
-    
-    updateUserAccountType: async (userId: string, accountType: 'free' | 'premium'): Promise<void> => {
-      if (!supabase) throw new Error('Supabase client not initialized');
-      try {
-        const { error } = await supabase
-          .from('users')
-          .update({ account_type: accountType })
-          .eq('id', userId);
-    
-        if (error) {
-          console.error('Error updating user account type:', error);
-          throw new Error('Failed to update user account type');
-        }
-      } catch (error) {
-        console.error('Error in updateUserAccountType:', error);
-        throw error;
-      }
-    },
-  }
 };
 
-// Helper function for stop loss calculation with proper type handling
-function calculateStopLoss(currentPrice: string | number, params: StockAnalysisParams): number {
-  const price = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
-  if (isNaN(price)) return 0;
-  
-  const stopPercentage = params.stopPercentage / 100;
-  return params.operation === 'buy' 
-    ? price * (1 - stopPercentage)
-    : price * (1 + stopPercentage);
-}
+// Export the API services
+export const api = {
+  auth,
+  marketData,
+  analysis
+};
 
-// Helper function for entry price calculation with proper type handling
-function calculateEntryPrice(currentPrice: string | number, params: StockAnalysisParams): number {
-  const price = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
-  if (isNaN(price)) return 0;
-  
-  const entryPercentage = params.entryPercentage / 100;
-  return params.operation === 'buy'
-    ? price * (1 + entryPercentage)
-    : price * (1 - entryPercentage);
-}
