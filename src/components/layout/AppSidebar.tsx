@@ -25,44 +25,40 @@ export function AppSidebar() {
       <div className="p-6 border-b border-white/10">
         <h1 className="text-xl font-bold text-white">Alpha Quant</h1>
       </div>
-
+      
       <nav className="flex-1 py-6">
         <ul className="space-y-1">
           <li>
-            <NavLink
-              to="/app"
+            <NavLink 
+              to="/app" 
               end
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-                  isActive && "bg-white/10 font-medium"
-                )
-              }
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
+                isActive && "bg-white/10 font-medium"
+              )}
             >
               <Home size={18} />
               <span>Home</span>
             </NavLink>
           </li>
-
+          
           <li className="px-6 py-2 mt-4">
             <h3 className="text-xs uppercase text-sidebar-foreground/70 font-medium">INTERVALS</h3>
           </li>
-
+          
           <li>
-            <NavLink
-              to="/app/daytrade"
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-                  isActive && "bg-white/10 font-medium"
-                )
-              }
+            <NavLink 
+              to="/app/daytrade" 
+              className={({ isActive }) => cn(
+                "flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
+                isActive && "bg-white/10 font-medium"
+              )}
             >
               <span>Daytrade</span>
             </NavLink>
           </li>
           <li>
-            <div
+            <div 
               className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
               onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
               onMouseLeave={handleMouseLeave}
@@ -71,7 +67,16 @@ export function AppSidebar() {
             </div>
           </li>
           <li>
-            <div
+            <div 
+              className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
+              onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <span>Monthly Portfolio</span>
+            </div>
+          </li>
+          <li>
+            <div 
               className="flex items-center gap-3 px-6 py-3 text-sm text-sidebar-foreground/50 cursor-not-allowed opacity-70"
               onMouseEnter={(e) => handleMouseEnter("Coming soon!", e)}
               onMouseLeave={handleMouseLeave}
@@ -81,23 +86,21 @@ export function AppSidebar() {
           </li>
         </ul>
       </nav>
-
+      
       <div className="mt-auto border-t border-white/10">
-        <NavLink
-          to="/app/profile"
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-3 px-6 py-4 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
-              isActive && "bg-white/10 font-medium"
-            )
-          }
+        <NavLink 
+          to="/app/profile" 
+          className={({ isActive }) => cn(
+            "flex items-center gap-3 px-6 py-4 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors",
+            isActive && "bg-white/10 font-medium"
+          )}
         >
           <User size={18} />
           <span>My Profile</span>
         </NavLink>
-
-        <button
-          onClick={() => logout()}
+        
+        <button 
+          onClick={() => logout()} 
           className="flex items-center gap-3 w-full px-6 py-4 text-sm text-sidebar-foreground hover:bg-white/10 transition-colors"
         >
           <LogOut size={18} />
@@ -106,12 +109,12 @@ export function AppSidebar() {
       </div>
 
       {tooltipVisible && (
-        <div
+        <div 
           className="fixed bg-black text-white px-3 py-2 rounded text-xs z-50"
-          style={{
-            left: `${tooltipPosition.x + 10}px`,
+          style={{ 
+            left: `${tooltipPosition.x + 10}px`, 
             top: `${tooltipPosition.y - 30}px`,
-            pointerEvents: "none",
+            pointerEvents: 'none'
           }}
         >
           {tooltipText}
@@ -120,3 +123,4 @@ export function AppSidebar() {
     </aside>
   );
 }
+

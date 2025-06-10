@@ -12,22 +12,10 @@ import { User } from "@/types";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,7 +24,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "pending" | "inactive">("all");
-
+  
   const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [newUser, setNewUser] = useState({
     full_name: "",
@@ -44,9 +32,9 @@ export default function AdminUsersPage() {
     level_id: 1,
     status: "active" as "active" | "inactive" | "pending",
     email_verified: false,
-    account_type: "free" as "free" | "premium",
+    account_type: "free" as "free" | "premium"
   });
-
+  
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -62,7 +50,7 @@ export default function AdminUsersPage() {
             email_verified: true,
             account_type: "premium",
             created_at: "2023-01-01T00:00:00Z",
-            last_login: "2023-05-01T12:30:00Z",
+            last_login: "2023-05-01T12:30:00Z"
           },
           {
             id: "2",
@@ -73,7 +61,7 @@ export default function AdminUsersPage() {
             email_verified: true,
             account_type: "free",
             created_at: "2023-02-15T00:00:00Z",
-            last_login: "2023-05-05T08:45:00Z",
+            last_login: "2023-05-05T08:45:00Z"
           },
           {
             id: "3",
@@ -84,7 +72,7 @@ export default function AdminUsersPage() {
             email_verified: false,
             account_type: "free",
             created_at: "2023-04-20T00:00:00Z",
-            last_login: null,
+            last_login: null
           },
           {
             id: "4",
@@ -95,23 +83,21 @@ export default function AdminUsersPage() {
             email_verified: true,
             account_type: "free",
             created_at: "2023-03-10T00:00:00Z",
-            last_login: "2023-03-15T14:20:00Z",
-          },
+            last_login: "2023-03-15T14:20:00Z"
+          }
         ];
-
+        
         // Ensure users have the correct status type
-        const typedUsers: User[] = data.map((user) => ({
+        const typedUsers: User[] = data.map(user => ({
           ...user,
-          status:
-            user.status === "active" || user.status === "pending" || user.status === "inactive"
-              ? user.status
-              : ("active" as "active" | "pending" | "inactive"),
-          account_type:
-            user.account_type === "free" || user.account_type === "premium"
-              ? user.account_type
-              : ("free" as "free" | "premium"),
+          status: (user.status === 'active' || user.status === 'pending' || user.status === 'inactive') 
+            ? user.status 
+            : 'active' as 'active' | 'pending' | 'inactive',
+          account_type: (user.account_type === 'free' || user.account_type === 'premium') 
+            ? user.account_type 
+            : 'free' as 'free' | 'premium'
         }));
-
+        
         setUsers(typedUsers);
       } catch (error) {
         console.error("Failed to fetch users", error);
@@ -120,15 +106,15 @@ export default function AdminUsersPage() {
         setIsLoading(false);
       }
     };
-
+    
     fetchUsers();
   }, []);
-
+  
   const filteredUsers = users.filter((user) => {
     if (activeTab === "all") return true;
     return user.status === activeTab;
   });
-
+  
   const handleAddUser = async () => {
     try {
       setIsLoading(true);
@@ -142,13 +128,13 @@ export default function AdminUsersPage() {
         email_verified: newUser.email_verified,
         account_type: newUser.account_type,
         created_at: new Date().toISOString(),
-        last_login: null,
+        last_login: null
       };
-
+      
       setUsers([createdUser, ...users]);
       setShowNewUserDialog(false);
       toast.success("User added successfully");
-
+      
       // Reset form
       setNewUser({
         full_name: "",
@@ -156,7 +142,7 @@ export default function AdminUsersPage() {
         level_id: 1,
         status: "active",
         email_verified: false,
-        account_type: "free",
+        account_type: "free"
       });
     } catch (error) {
       console.error("Failed to add user", error);
@@ -170,13 +156,13 @@ export default function AdminUsersPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">User Management</h1>
-
+        
         <Button onClick={() => setShowNewUserDialog(true)}>
           <UserPlus className="mr-2 h-4 w-4" />
           Add New User
         </Button>
       </div>
-
+      
       <div className="flex space-x-4 mb-6">
         <Button
           variant={activeTab === "all" ? "default" : "outline"}
@@ -184,9 +170,7 @@ export default function AdminUsersPage() {
           className="relative"
         >
           All Users
-          <Badge variant="secondary" className="ml-2 bg-secondary">
-            {users.length}
-          </Badge>
+          <Badge variant="secondary" className="ml-2 bg-secondary">{users.length}</Badge>
         </Button>
         <Button
           variant={activeTab === "pending" ? "default" : "outline"}
@@ -195,7 +179,7 @@ export default function AdminUsersPage() {
         >
           Pending Verification
           <Badge variant="secondary" className="ml-2 bg-secondary">
-            {users.filter((user) => user.status === "pending").length}
+            {users.filter(user => user.status === "pending").length}
           </Badge>
         </Button>
         <Button
@@ -205,7 +189,7 @@ export default function AdminUsersPage() {
         >
           Active
           <Badge variant="secondary" className="ml-2 bg-secondary">
-            {users.filter((user) => user.status === "active").length}
+            {users.filter(user => user.status === "active").length}
           </Badge>
         </Button>
         <Button
@@ -215,11 +199,11 @@ export default function AdminUsersPage() {
         >
           Inactive
           <Badge variant="secondary" className="ml-2 bg-secondary">
-            {users.filter((user) => user.status === "inactive").length}
+            {users.filter(user => user.status === "inactive").length}
           </Badge>
         </Button>
       </div>
-
+      
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -262,12 +246,7 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="w-8 h-8 rounded-full bg-alphaquant-600 flex items-center justify-center text-white text-sm font-medium">
-                      {user.avatar_url ||
-                        user.full_name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()}
+                      {user.avatar_url || user.full_name.split(" ").map(n => n[0]).join("").toUpperCase()}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -275,31 +254,24 @@ export default function AdminUsersPage() {
                     <div className="text-sm text-muted-foreground">{user.email}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge
+                    <Badge 
                       variant="outline"
                       className={cn(
-                        user.status === "active" &&
-                          "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20",
-                        user.status === "pending" &&
-                          "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20",
-                        user.status === "inactive" &&
-                          "text-red-600 border-red-600 bg-red-50 dark:bg-red-950/20"
+                        user.status === "active" && "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20",
+                        user.status === "pending" && "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20",
+                        user.status === "inactive" && "text-red-600 border-red-600 bg-red-50 dark:bg-red-950/20",
                       )}
                     >
-                      {user.status === "active"
-                        ? "Active"
-                        : user.status === "pending"
-                          ? "Pending"
-                          : "Inactive"}
+                      {user.status === "active" ? "Active" : 
+                       user.status === "pending" ? "Pending" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge
+                    <Badge 
                       variant="outline"
-                      className={
-                        user.email_verified
-                          ? "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20"
-                          : "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20"
+                      className={user.email_verified
+                        ? "text-green-600 border-green-600 bg-green-50 dark:bg-green-950/20"
+                        : "text-amber-600 border-amber-600 bg-amber-50 dark:bg-amber-950/20"
                       }
                     >
                       {user.email_verified ? "Verified" : "Ativo sem verificação"}
@@ -310,8 +282,12 @@ export default function AdminUsersPage() {
                       {user.account_type === "premium" ? "Premium" : "Free"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{user.level_id === 2 ? "Admin" : "Investidor"}</TableCell>
-                  <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {user.level_id === 2 ? "Admin" : "Investidor"}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(user.created_at).toLocaleDateString()}
+                  </TableCell>
                   <TableCell>
                     {user.last_login ? new Date(user.last_login).toLocaleDateString() : "-"}
                   </TableCell>
@@ -340,7 +316,7 @@ export default function AdminUsersPage() {
           </TableBody>
         </Table>
       </div>
-
+      
       {/* Add User Dialog */}
       <Dialog open={showNewUserDialog} onOpenChange={setShowNewUserDialog}>
         <DialogContent className="sm:max-w-md">
@@ -384,7 +360,7 @@ export default function AdminUsersPage() {
               <Label htmlFor="status">Status</Label>
               <Select
                 value={newUser.status}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setNewUser({ ...newUser, status: value as "active" | "inactive" | "pending" })
                 }
               >
@@ -402,7 +378,7 @@ export default function AdminUsersPage() {
               <Label htmlFor="account_type">Account Type</Label>
               <Select
                 value={newUser.account_type}
-                onValueChange={(value) =>
+                onValueChange={(value) => 
                   setNewUser({ ...newUser, account_type: value as "free" | "premium" })
                 }
               >
@@ -416,10 +392,10 @@ export default function AdminUsersPage() {
               </Select>
             </div>
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="email_verified"
+              <Checkbox 
+                id="email_verified" 
                 checked={newUser.email_verified}
-                onCheckedChange={(checked) =>
+                onCheckedChange={(checked) => 
                   setNewUser({ ...newUser, email_verified: checked as boolean })
                 }
               />
@@ -427,12 +403,15 @@ export default function AdminUsersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewUserDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowNewUserDialog(false)}
+            >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              onClick={handleAddUser}
+            <Button 
+              type="submit" 
+              onClick={handleAddUser} 
               disabled={!newUser.full_name || !newUser.email}
             >
               Add User
@@ -443,3 +422,4 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+

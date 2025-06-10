@@ -14,21 +14,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Download, Upload, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export default function AdminAssetsPage() {
@@ -36,57 +24,37 @@ export default function AdminAssetsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewAssetDialog, setShowNewAssetDialog] = useState(false);
-
+  
   const [countries, setCountries] = useState<string[]>([]);
   const [stockMarkets, setStockMarkets] = useState<string[]>([]);
   const [assetClasses, setAssetClasses] = useState<string[]>([]);
-
+  
   const [newAsset, setNewAsset] = useState<Partial<Asset>>({
     code: "",
     name: "",
     country: "",
     stock_market: "",
     asset_class: "",
-    status: "active",
+    status: "active"
   });
-
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
         // Mock data for assets as api.assets does not exist
         const assetsData: Asset[] = [
-          {
-            id: "1",
-            code: "AAPL",
-            name: "Apple Inc.",
-            country: "USA",
-            stock_market: "NASDAQ",
-            asset_class: "Stock",
-            status: "active",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: "2",
-            code: "MSFT",
-            name: "Microsoft Corp.",
-            country: "USA",
-            stock_market: "NASDAQ",
-            asset_class: "Stock",
-            status: "active",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
+          { id: "1", code: "AAPL", name: "Apple Inc.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: "2", code: "MSFT", name: "Microsoft Corp.", country: "USA", stock_market: "NASDAQ", asset_class: "Stock", status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         ];
         const countriesData = await api.marketData.getCountries();
-
+        
         // Ensure assets have the right status type
-        const typedAssets: Asset[] = assetsData.map((asset) => ({
+        const typedAssets: Asset[] = assetsData.map(asset => ({
           ...asset,
-          status: asset.status === "active" ? "active" : "inactive",
+          status: asset.status === 'active' ? 'active' : 'inactive'
         }));
-
+        
         setAssets(typedAssets);
         setCountries(countriesData);
       } catch (error) {
@@ -96,77 +64,77 @@ export default function AdminAssetsPage() {
         setIsLoading(false);
       }
     };
-
+    
     fetchData();
   }, []);
-
+  
   useEffect(() => {
     const fetchStockMarkets = async () => {
       if (!newAsset.country) {
         setStockMarkets([]);
         return;
       }
-
+      
       try {
         const marketsData = await api.marketData.getStockMarkets(newAsset.country);
         setStockMarkets(marketsData);
-
+        
         // Reset stock market and asset class when country changes
-        setNewAsset((prev) => ({
+        setNewAsset(prev => ({
           ...prev,
           stock_market: "",
-          asset_class: "",
+          asset_class: ""
         }));
       } catch (error) {
         console.error("Failed to fetch stock markets", error);
       }
     };
-
+    
     fetchStockMarkets();
   }, [newAsset.country]);
-
+  
   useEffect(() => {
     const fetchAssetClasses = async () => {
       if (!newAsset.country || !newAsset.stock_market) {
         setAssetClasses([]);
         return;
       }
-
+      
       try {
         const classesData = await api.marketData.getAssetClasses(
           newAsset.country,
           newAsset.stock_market
         );
         setAssetClasses(classesData);
-
+        
         // Reset asset class when stock market changes
-        setNewAsset((prev) => ({
+        setNewAsset(prev => ({
           ...prev,
-          asset_class: "",
+          asset_class: ""
         }));
       } catch (error) {
         console.error("Failed to fetch asset classes", error);
       }
     };
-
+    
     fetchAssetClasses();
   }, [newAsset.country, newAsset.stock_market]);
-
+  
   const handleAddAsset = async () => {
     try {
       // Mocking asset creation as api.assets.create does not exist
       const createdAsset: Asset = {
         id: String(assets.length + 1),
         ...newAsset,
-        status: newAsset.status === "active" ? "active" : "inactive",
+        status: newAsset.status === 'active' ? 'active' : 'inactive',
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       } as Asset;
-
+      
       setAssets([...assets, createdAsset]);
       setShowNewAssetDialog(false);
       toast.success("Asset added successfully");
-
+      
       // Reset form
       setNewAsset({
         code: "",
@@ -174,28 +142,28 @@ export default function AdminAssetsPage() {
         country: "",
         stock_market: "",
         asset_class: "",
-        status: "active",
+        status: "active"
       });
     } catch (error) {
       console.error("Failed to add asset", error);
       toast.error("Failed to add asset");
     }
   };
-
+  
   const downloadTemplate = () => {
     // In a real app, this would generate and download a CSV template
     toast("Template CSV download initiated");
   };
-
+  
   const handleImportCSV = () => {
     // In a real app, this would open a file picker and handle CSV import
     toast("CSV import functionality would be implemented here");
   };
-
+  
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Gestão de Ativos</h1>
-
+      
       <div className="flex justify-between items-center mb-6">
         <div className="relative w-full max-w-sm">
           <Input
@@ -221,7 +189,7 @@ export default function AdminAssetsPage() {
             </svg>
           </div>
         </div>
-
+        
         <div className="flex gap-2">
           <Button variant="default" onClick={() => setShowNewAssetDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -237,7 +205,7 @@ export default function AdminAssetsPage() {
           </Button>
         </div>
       </div>
-
+      
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -279,40 +247,35 @@ export default function AdminAssetsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              assets
-                .filter(
-                  (asset) =>
-                    asset.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    asset.stock_market.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell>
-                      <input type="checkbox" className="h-4 w-4" />
-                    </TableCell>
-                    <TableCell>{asset.code}</TableCell>
-                    <TableCell>{asset.name}</TableCell>
-                    <TableCell>{asset.country}</TableCell>
-                    <TableCell>{asset.stock_market}</TableCell>
-                    <TableCell>{asset.asset_class}</TableCell>
-                    <TableCell>
-                      <Badge variant={asset.status === "active" ? "default" : "outline"}>
-                        {asset.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        ...
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+              assets.filter(asset => 
+                asset.code.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                asset.stock_market.toLowerCase().includes(searchQuery.toLowerCase())
+              ).map(asset => (
+                <TableRow key={asset.id}>
+                  <TableCell>
+                    <input type="checkbox" className="h-4 w-4" />
+                  </TableCell>
+                  <TableCell>{asset.code}</TableCell>
+                  <TableCell>{asset.name}</TableCell>
+                  <TableCell>{asset.country}</TableCell>
+                  <TableCell>{asset.stock_market}</TableCell>
+                  <TableCell>{asset.asset_class}</TableCell>
+                  <TableCell>
+                    <Badge variant={asset.status === "active" ? "default" : "outline"}>
+                      {asset.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm">...</Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
-
+      
       {/* Add Asset Dialog */}
       <Dialog open={showNewAssetDialog} onOpenChange={setShowNewAssetDialog}>
         <DialogContent className="sm:max-w-md">
@@ -346,7 +309,7 @@ export default function AdminAssetsPage() {
                   <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
-                  {countries.map((country) => (
+                  {countries.map(country => (
                     <SelectItem key={country} value={country}>
                       {country}
                     </SelectItem>
@@ -365,7 +328,7 @@ export default function AdminAssetsPage() {
                   <SelectValue placeholder="Select stock market" />
                 </SelectTrigger>
                 <SelectContent>
-                  {stockMarkets.map((market) => (
+                  {stockMarkets.map(market => (
                     <SelectItem key={market} value={market}>
                       {market}
                     </SelectItem>
@@ -384,7 +347,7 @@ export default function AdminAssetsPage() {
                   <SelectValue placeholder="Select asset class" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assetClasses.map((assetClass) => (
+                  {assetClasses.map(assetClass => (
                     <SelectItem key={assetClass} value={assetClass}>
                       {assetClass}
                     </SelectItem>
@@ -396,7 +359,7 @@ export default function AdminAssetsPage() {
               <Label htmlFor="status">Status</Label>
               <Select
                 value={newAsset.status}
-                onValueChange={(value: "active" | "inactive") =>
+                onValueChange={(value: "active" | "inactive") => 
                   setNewAsset({ ...newAsset, status: value })
                 }
               >
@@ -411,19 +374,17 @@ export default function AdminAssetsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewAssetDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowNewAssetDialog(false)}
+            >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              onClick={handleAddAsset}
-              disabled={
-                !newAsset.code ||
-                !newAsset.name ||
-                !newAsset.country ||
-                !newAsset.stock_market ||
-                !newAsset.asset_class
-              }
+            <Button 
+              type="submit" 
+              onClick={handleAddAsset} 
+              disabled={!newAsset.code || !newAsset.name || !newAsset.country || 
+                      !newAsset.stock_market || !newAsset.asset_class}
             >
               Add Asset
             </Button>
@@ -433,3 +394,4 @@ export default function AdminAssetsPage() {
     </div>
   );
 }
+

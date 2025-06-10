@@ -1,12 +1,14 @@
+
+
 export interface User {
   id: string;
   email: string;
   full_name: string;
   avatar_url?: string;
   level_id: number; // 1 = Investor, 2 = Admin
-  status: "active" | "inactive" | "pending";
+  status: 'active' | 'inactive' | 'pending';
   email_verified: boolean;
-  account_type: "free" | "premium";
+  account_type: 'free' | 'premium';
   created_at: string;
   last_login?: string;
 }
@@ -26,7 +28,7 @@ export interface Asset {
   country: string;
   stock_market: string;
   asset_class: string;
-  status: "active" | "inactive";
+  status: 'active' | 'inactive';
 }
 
 export interface StockAnalysisParams {
@@ -80,8 +82,8 @@ export interface TradeHistoryItem {
   profit?: number;
   profitLoss?: number; // Add profitLoss property
   profitPercentage: number;
-  trade: "Executed" | "Not Executed" | "Buy" | "Sell" | "Close" | "-"; // Expand trade types
-  stop?: "Executed" | "Close" | "-"; // Updated to include 'Close'
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
+  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
   volume?: number;
   high?: number;
   low?: number;
@@ -110,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+

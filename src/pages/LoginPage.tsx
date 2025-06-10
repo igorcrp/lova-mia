@@ -17,14 +17,14 @@ export default function LoginPage() {
   const [isResetPassword, setIsResetPassword] = useState(false);
   const { login, googleLogin, user, register, resetPassword, resendConfirmationEmail } = useAuth();
   const location = useLocation();
-
+  
   // Check for URL parameters
   const params = new URLSearchParams(location.search);
-  const confirmation = params.get("confirmation");
-
+  const confirmation = params.get('confirmation');
+  
   // If already logged in, redirect to appropriate dashboard
   if (user) {
-    if (user.status === "active") {
+    if (user.status === 'active') {
       return <Navigate to={user.level_id === 2 ? "/admin" : "/app"} replace />;
     }
   }
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setName("");
     setConfirmPassword("");
   };
-
+  
   const toggleResetPassword = () => {
     setIsResetPassword(!isResetPassword);
     setIsSignUp(false);
@@ -51,12 +51,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!email) {
       toast.error("Por favor, digite seu email.");
       return;
     }
-
+    
     // Handle password reset request
     if (isResetPassword) {
       try {
@@ -77,68 +77,62 @@ export default function LoginPage() {
         toast.error("Por favor, digite seu nome.");
         return;
       }
-
+      
       if (!password) {
         toast.error("Por favor, digite uma senha.");
         return;
       }
-
+      
       if (password !== confirmPassword) {
         toast.error("As senhas não coincidem.");
         return;
       }
-
+      
       // Password validation
       if (password.length < 6) {
         toast.error("A senha deve ter pelo menos 6 caracteres.");
         return;
       }
-
+      
       try {
         setIsSubmitting(true);
         const result = await register(email, password, name);
-
+        
         // Even if we get an error from the database insertion, the auth user might have been created
         // So we show a success message anyway, as the trigger will handle the default values
         if (result && result.success) {
           toast.success("Cadastro realizado com sucesso!");
-          toast.info(
-            "Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro."
-          );
+          toast.info("Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
         }
       } catch (error) {
         console.error("Registration error:", error);
         // Show success message even if there was an error with the database insertion
         // This is because the auth user might have been created successfully
         toast.success("Cadastro realizado com sucesso!");
-        toast.info(
-          "Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro."
-        );
+        toast.info("Um email de confirmação foi enviado para você. Por favor, verifique sua caixa de entrada e confirme seu cadastro.");
       } finally {
         setIsSubmitting(false);
       }
       return;
     }
-
+    
     // Login validation
     if (!password) {
       toast.error("Por favor, digite sua senha.");
       return;
     }
-
+    
     try {
       setIsSubmitting(true);
       console.log("Submitting login for:", email);
       await login(email, password);
     } catch (error: any) {
       console.error("Login submission error:", error);
-
+      
       // Check if error is due to pending confirmation
       if (error.message === "PENDING_CONFIRMATION") {
-        toast.warning(
-          "Sua conta ainda não foi confirmada. Um novo email de confirmação será enviado."
-        );
-
+        toast.warning("Sua conta ainda não foi confirmada. Um novo email de confirmação será enviado.");
+        
         try {
           await resendConfirmationEmail(email);
           toast.info("Email de confirmação enviado. Por favor, verifique sua caixa de entrada.");
@@ -148,20 +142,16 @@ export default function LoginPage() {
       } else {
         // Check if user exists but is pending
         try {
-          const { data } = await supabase.rpc("check_user_by_email", {
-            p_email: email,
+          const { data } = await supabase.rpc('check_user_by_email', {
+            p_email: email
           });
-
-          if (data && data.length > 0 && data[0].status_users === "pending") {
-            toast.warning(
-              "Sua conta ainda não foi confirmada. Um novo email de confirmação será enviado."
-            );
-
+          
+          if (data && data.length > 0 && data[0].status_users === 'pending') {
+            toast.warning("Sua conta ainda não foi confirmada. Um novo email de confirmação será enviado.");
+            
             try {
               await resendConfirmationEmail(email);
-              toast.info(
-                "Email de confirmação enviado. Por favor, verifique sua caixa de entrada."
-              );
+              toast.info("Email de confirmação enviado. Por favor, verifique sua caixa de entrada.");
             } catch (resendError) {
               console.error("Resend confirmation error:", resendError);
             }
@@ -177,7 +167,7 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
-
+  
   const handleGoogleLogin = async () => {
     try {
       setIsSubmitting(true);
@@ -190,7 +180,7 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-md p-8 bg-card rounded-lg shadow-lg border">
@@ -198,16 +188,16 @@ export default function LoginPage() {
           {isResetPassword ? "Recuperar Senha" : isSignUp ? "Criar conta" : "Entrar"}
         </h1>
         <p className="text-muted-foreground mb-6 text-center">
-          {isResetPassword
+          {isResetPassword 
             ? "Digite seu email para receber instruções de recuperação de senha"
-            : isSignUp
+            : isSignUp 
               ? "Preencha seus dados para criar uma nova conta"
               : "Entre com seu email e senha para acessar sua conta"}
         </p>
-
+        
         {!isResetPassword && (
-          <Button
-            variant="outline"
+          <Button 
+            variant="outline" 
             className="w-full mb-6 flex items-center gap-2"
             onClick={handleGoogleLogin}
             disabled={isSubmitting}
@@ -236,23 +226,25 @@ export default function LoginPage() {
             <span>Continuar com Google</span>
           </Button>
         )}
-
+        
         {!isResetPassword && (
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-muted" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">OU CONTINUE COM EMAIL</span>
+              <span className="bg-card px-2 text-muted-foreground">
+                OU CONTINUE COM EMAIL
+              </span>
             </div>
           </div>
         )}
-
+        
         <form onSubmit={handleSubmit}>
           {isSignUp && (
             <div className="mb-4">
               <Label htmlFor="name">Nome completo</Label>
-              <Input
+              <Input 
                 id="name"
                 type="text"
                 value={name}
@@ -263,10 +255,10 @@ export default function LoginPage() {
               />
             </div>
           )}
-
+          
           <div className="mb-4">
             <Label htmlFor="email">Email</Label>
-            <Input
+            <Input 
               id="email"
               type="email"
               value={email}
@@ -276,11 +268,11 @@ export default function LoginPage() {
               required
             />
           </div>
-
+          
           {!isResetPassword && (
             <div className="mb-4">
               <Label htmlFor="password">Senha</Label>
-              <Input
+              <Input 
                 id="password"
                 type="password"
                 value={password}
@@ -295,7 +287,7 @@ export default function LoginPage() {
           {isSignUp && (
             <div className="mb-6">
               <Label htmlFor="confirmPassword">Confirmar senha</Label>
-              <Input
+              <Input 
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
@@ -306,44 +298,56 @@ export default function LoginPage() {
               />
             </div>
           )}
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isSubmitting}
+          >
             {isSubmitting ? (
               <>
                 <div className="loading-circle mr-2" />
                 <span>
-                  {isResetPassword ? "Enviando..." : isSignUp ? "Registrando..." : "Entrando..."}
+                  {isResetPassword 
+                    ? "Enviando..." 
+                    : isSignUp 
+                      ? "Registrando..." 
+                      : "Entrando..."}
                 </span>
               </>
-            ) : isResetPassword ? (
-              "Enviar instruções"
-            ) : isSignUp ? (
-              "Registrar"
-            ) : (
-              "Entrar"
-            )}
+            ) : isResetPassword 
+                ? "Enviar instruções" 
+                : isSignUp 
+                  ? "Registrar" 
+                  : "Entrar"}
           </Button>
         </form>
-
+        
         <div className="mt-6 text-center">
           {isResetPassword ? (
             <p className="text-sm">
               Lembrou sua senha?{" "}
-              <button onClick={toggleResetPassword} className="text-primary hover:underline">
+              <button 
+                onClick={toggleResetPassword}
+                className="text-primary hover:underline"
+              >
                 Voltar para o login
               </button>
             </p>
           ) : (
             <p className="text-sm">
               {isSignUp ? "Já possui uma conta? " : "Não possui uma conta? "}
-              <button onClick={toggleAuthMode} className="text-primary hover:underline">
+              <button 
+                onClick={toggleAuthMode}
+                className="text-primary hover:underline"
+              >
                 {isSignUp ? "Entrar" : "Registre-se"}
               </button>
             </p>
           )}
-
+          
           {!isSignUp && !isResetPassword && (
-            <button
+            <button 
               onClick={toggleResetPassword}
               className="text-sm text-primary hover:underline block mt-2"
             >
@@ -351,9 +355,9 @@ export default function LoginPage() {
             </button>
           )}
         </div>
-
+        
         {/* Confirmation message */}
-        {confirmation === "true" && (
+        {confirmation === 'true' && (
           <div className="mt-6 p-4 bg-green-100 text-green-800 rounded-md">
             <p className="text-center">
               Seu email foi confirmado com sucesso! Agora você pode fazer login.

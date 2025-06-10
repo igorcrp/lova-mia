@@ -2,13 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/services/api";
 import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UserStats {
   total: number;
@@ -60,7 +54,7 @@ export default function AdminDashboardPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-
+        
         // Mock data since api.users and api.assets don't exist
         const usersData: UserStats = {
           total: 125,
@@ -68,11 +62,11 @@ export default function AdminDashboardPage() {
           pending: 15,
           inactive: 12,
           premium: 45,
-          new: 8,
+          new: 8
         };
-
+        
         const assetsTotal = 250;
-
+        
         // Create a complete UserStats object with all required properties
         // Making sure we provide default values for all required fields
         const completeUserStats: UserStats = {
@@ -81,9 +75,9 @@ export default function AdminDashboardPage() {
           pending: usersData.pending || 0, // Default to 0 if not provided
           inactive: usersData.inactive || 0, // Default to 0 if not provided
           premium: usersData.premium,
-          new: usersData.new,
+          new: usersData.new
         };
-
+        
         setUserStats(completeUserStats);
         setAssetCount({ total: assetsTotal });
       } catch (error) {
@@ -92,7 +86,7 @@ export default function AdminDashboardPage() {
         setIsLoading(false);
       }
     };
-
+    
     fetchData();
   }, []);
 
@@ -108,31 +102,38 @@ export default function AdminDashboardPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
-
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Users</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{userStats?.total ?? 0}</div>
+            <div className="text-3xl font-bold">
+              {userStats?.total ?? 0}
+            </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">Assets</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{assetCount?.total ?? 0}</div>
+            <div className="text-3xl font-bold">
+              {assetCount?.total ?? 0}
+            </div>
           </CardContent>
         </Card>
       </div>
-
+      
       <Card className="mb-8">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg">Usuários Registrados</CardTitle>
-          <Select defaultValue={timeRange} onValueChange={(value) => setTimeRange(value)}>
+          <Select 
+            defaultValue={timeRange} 
+            onValueChange={(value) => setTimeRange(value)}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select a range" />
             </SelectTrigger>
@@ -159,12 +160,14 @@ export default function AdminDashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.2} />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(value) => [value, "Registros"]} />
-                <Bar
-                  dataKey="registrations"
-                  name="Registros"
-                  fill="#818cf8"
-                  radius={[4, 4, 0, 0]}
+                <Tooltip 
+                  formatter={(value) => [value, "Registros"]}
+                />
+                <Bar 
+                  dataKey="registrations" 
+                  name="Registros" 
+                  fill="#818cf8" 
+                  radius={[4, 4, 0, 0]} 
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -174,3 +177,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+

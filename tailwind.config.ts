@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -91,7 +92,7 @@ export default {
       },
       backgroundColor: {
         "dark-blue": "#0F172A",
-      },
+      }
     },
   },
   plugins: [require("tailwindcss-animate")],

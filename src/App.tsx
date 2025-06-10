@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,14 +34,14 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
-
+            
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
-
+              
               {/* Redirect from root to login */}
               <Route path="/" element={<Navigate to="/login" replace />} />
-
+              
               {/* Protected admin routes */}
               <Route element={<ProtectedRoute requireLevel={2} />}>
                 <Route element={<AdminLayout />}>
@@ -49,7 +50,7 @@ const App = () => (
                   <Route path="/admin/assets" element={<AdminAssetsPage />} />
                 </Route>
               </Route>
-
+              
               {/* Protected app routes */}
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
@@ -58,7 +59,7 @@ const App = () => (
                   <Route path="/app/profile" element={<ProfilePage />} />
                 </Route>
               </Route>
-
+              
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />
             </Routes>

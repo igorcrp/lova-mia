@@ -1,3 +1,4 @@
+
 import React from "react";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
@@ -5,7 +6,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 export function AppLayout() {
   const isMobile = useIsMobile();
-
+  
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />

@@ -20,9 +20,9 @@ export function StockTicker() {
           { symbol: "MSFT", price: 417.88, change: -0.32 },
           { symbol: "GOOGL", price: 175.09, change: 1.24 },
           { symbol: "AMZN", price: 186.45, change: 0.89 },
-          { symbol: "META", price: 478.22, change: -0.45 },
+          { symbol: "META", price: 478.22, change: -0.45 }
         ];
-
+        
         setQuotes(mockData);
       } catch (error) {
         console.error("Failed to fetch quotes", error);
@@ -54,9 +54,10 @@ export function StockTicker() {
           <div key={quote.symbol} className="flex items-center mr-6">
             <span className="font-medium">{quote.symbol}</span>
             <span className="ml-2">${quote.price.toFixed(2)}</span>
-            <span className={`ml-2 ${quote.change >= 0 ? "text-green-500" : "text-red-500"}`}>
-              {quote.change >= 0 ? "+" : ""}
-              {quote.change.toFixed(2)}%
+            <span 
+              className={`ml-2 ${quote.change >= 0 ? 'text-green-500' : 'text-red-500'}`}
+            >
+              {quote.change >= 0 ? '+' : ''}{quote.change.toFixed(2)}%
             </span>
           </div>
         ))}
@@ -64,3 +65,4 @@ export function StockTicker() {
     </div>
   );
 }
+

@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ export default function ProfilePage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">My Profile</h1>
-
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
           <Card>
@@ -33,7 +34,7 @@ export default function ProfilePage() {
                   <Input id="email" type="email" defaultValue={user?.email || ""} readOnly />
                 </div>
               </div>
-
+              
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
@@ -44,11 +45,11 @@ export default function ProfilePage() {
                   <Input id="confirmPassword" type="password" defaultValue="********" />
                 </div>
               </div>
-
+              
               <Button>Save Changes</Button>
             </CardContent>
           </Card>
-
+          
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="text-lg">API Keys</CardTitle>
@@ -57,7 +58,7 @@ export default function ProfilePage() {
               <p className="text-muted-foreground">
                 Configure API keys to enable integration with external services.
               </p>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="alphaVantageKey">Alpha Vantage API Key</Label>
                 <div className="flex gap-2">
@@ -68,7 +69,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </div>
-
+        
         <div>
           <Card>
             <CardHeader>
@@ -80,11 +81,11 @@ export default function ProfilePage() {
                   <div>
                     <p className="font-medium">Account Type</p>
                     <p className="text-sm text-muted-foreground">
-                      {user?.account_type === "premium" ? "Premium" : "Free"}
+                      {user?.account_type === 'premium' ? 'Premium' : 'Free'}
                     </p>
                   </div>
-
-                  {user?.account_type === "premium" ? (
+                  
+                  {user?.account_type === 'premium' ? (
                     <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                       Active
                     </Badge>
@@ -92,13 +93,13 @@ export default function ProfilePage() {
                     <Button size="sm">Upgrade</Button>
                   )}
                 </div>
-
+                
                 <div className="border-t pt-4">
                   <p className="font-medium">Email Verification</p>
                   <p className="text-sm text-muted-foreground">
-                    {user?.email_verified ? "Verified" : "Not verified"}
+                    {user?.email_verified ? 'Verified' : 'Not verified'}
                   </p>
-
+                  
                   {!user?.email_verified && (
                     <Button variant="outline" size="sm" className="mt-2">
                       Verify Email
@@ -108,7 +109,7 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
-
+          
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="text-lg">Preferences</CardTitle>
@@ -118,10 +119,16 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-base">Theme</Label>
-                    <p className="text-sm text-muted-foreground">Change the application theme</p>
+                    <p className="text-sm text-muted-foreground">
+                      Change the application theme
+                    </p>
                   </div>
-                  <Button variant="outline" size="icon" onClick={toggleTheme}>
-                    {theme === "dark" ? (
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={toggleTheme}
+                  >
+                    {theme === 'dark' ? (
                       <Sun className="h-[1.2rem] w-[1.2rem]" />
                     ) : (
                       <Moon className="h-[1.2rem] w-[1.2rem]" />
@@ -129,11 +136,13 @@ export default function ProfilePage() {
                     <span className="sr-only">Toggle theme</span>
                   </Button>
                 </div>
-
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-base">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Receive email updates</p>
+                    <p className="text-sm text-muted-foreground">
+                      Receive email updates
+                    </p>
                   </div>
                   <Switch defaultChecked />
                 </div>

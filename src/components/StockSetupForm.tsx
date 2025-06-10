@@ -1,511 +1,395 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Loader2, X } from "lucide-react"; // X icon for badges
+import { Loader2 } from "lucide-react";
 import { StockAnalysisParams, StockInfo } from "@/types";
 import { api } from "@/services/api";
-import { toast } from "@/components/ui/use-toast"; // Assuming this is sonner via shadcn
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { useForm, Controller } from "react-hook-form"; // Controller for custom components
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { toast } from "@/components/ui/use-toast";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/**
- * Props for the StockSetupForm component.
- */
 interface StockSetupFormProps {
-  /**
-   * Callback function executed when the form is submitted with valid data.
-   * @param params The stock analysis parameters gathered from the form.
-   */
   onSubmit: (params: StockAnalysisParams) => void;
-  /**
-   * Optional flag to indicate if the form submission is currently in progress.
-   * Defaults to `false`.
-   */
   isLoading?: boolean;
 }
 
-/**
- * StockSetupForm component allows users to configure parameters for stock analysis.
- * It fetches market data dynamically based on user selections (country, stock market, asset class),
- * populates dropdowns, and handles form submission.
- *
- * @param {StockSetupFormProps} props The component props.
- */
 export function StockSetupForm({
   onSubmit,
-  isLoading = false, // Prop to indicate submission loading state from parent
+  isLoading = false
 }: StockSetupFormProps) {
-  // State for options loaded from API
+  // State for options loaded from Supabase
   const [countries, setCountries] = useState<string[]>([]);
   const [stockMarkets, setStockMarkets] = useState<string[]>([]);
   const [assetClasses, setAssetClasses] = useState<string[]>([]);
   const [availableAssets, setAvailableAssets] = useState<StockInfo[]>([]);
-
-  // State for the resolved data table name and its validity
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [dataTableName, setDataTableName] = useState<string | null>(null);
-  const [isTableValid, setIsTableValid] = useState<boolean | null>(null); // null = not checked, false = invalid, true = valid
-
-  // Granular loading states for each dropdown/data fetching step
-  const [loadingStates, setLoadingStates] = useState<{
+  const [isTableValid, setIsTableValid] = useState<boolean | null>(null);
+  const [loadingState, setLoadingState] = useState<{
     countries: boolean;
     stockMarkets: boolean;
     assetClasses: boolean;
-    assets: boolean; // For loading stock codes/assets
+    assets: boolean;
   }>({
     countries: false,
     stockMarkets: false,
     assetClasses: false,
-    assets: false,
+    assets: false
   });
 
-  // State for the comparison stocks autocomplete input
+  // Estados para o autocomplete
   const [comparisonStockInput, setComparisonStockInput] = useState("");
-  const [selectedStocks, setSelectedStocks] = useState<string[]>([]); // Tracks codes of selected stocks for comparison
-  const [showSuggestions, setShowSuggestions] = useState(false); // Controls visibility of stock suggestions dropdown
-
-  // State to manage focus for number inputs to allow better UX with formatting
+  const [selectedStocks, setSelectedStocks] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [isEntryPriceFocused, setIsEntryPriceFocused] = useState(false);
   const [isStopPriceFocused, setIsStopPriceFocused] = useState(false);
-  const [isInitialCapitalFocused, setIsInitialCapitalFocused] = useState(false);
 
+  // Form setup with react-hook-form
   const form = useForm<StockAnalysisParams>({
-    // TODO: Consider adding a Zod resolver here for schema-based validation
-    // resolver: zodResolver(stockAnalysisSchema),
     defaultValues: {
       operation: "buy",
       country: "",
       stockMarket: "",
       assetClass: "",
       referencePrice: "close",
-      period: "1m", // Default period
-      entryPercentage: 1.0,
-      stopPercentage: 1.0,
-      initialCapital: 10000.0,
-      comparisonStocks: [], // Initialize as empty array
-    },
+      period: "1m",
+      entryPercentage: 1.00, // Default com 2 casas decimais
+      stopPercentage: 1.00,  // Default com 2 casas decimais
+      initialCapital: 10000.00,
+      comparisonStocks: []
+    }
   });
 
-  const watchedCountry = form.watch("country");
-  const watchedStockMarket = form.watch("stockMarket");
-  const watchedAssetClass = form.watch("assetClass");
-
-  // Effect to load countries from API on component mount
+  // Load countries from API on component mount
   useEffect(() => {
     async function loadCountries() {
-      setLoadingStates((prev) => ({ ...prev, countries: true }));
+      setLoadingState(prev => ({ ...prev, countries: true }));
       try {
         const fetchedCountries = await api.marketData.getCountries();
         if (fetchedCountries && fetchedCountries.length > 0) {
           setCountries(fetchedCountries);
+          console.log("Loaded countries:", fetchedCountries);
         } else {
-          // console.error("No countries returned from API"); // Replaced by toast
+          console.error("No countries returned from API");
           toast({
             variant: "destructive",
             title: "Failed to load countries",
-            description: "No countries found. Please check data sources.",
+            description: "No countries found in the database."
           });
         }
-      } catch (error: any) {
-        console.error("Error loading countries:", error.message);
+      } catch (error) {
+        console.error("Error loading countries:", error);
         toast({
           variant: "destructive",
           title: "Failed to load countries",
-          description: error.message || "An unexpected error occurred.",
+          description: "There was an error loading the available countries."
         });
       } finally {
-        setLoadingStates((prev) => ({ ...prev, countries: false }));
+        setLoadingState(prev => ({ ...prev, countries: false }));
       }
     }
     loadCountries();
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  // Effect to load stock markets when country changes
+  // Load stock markets when country changes
   useEffect(() => {
-    if (!watchedCountry) {
+    const country = form.watch("country");
+    if (!country) {
       setStockMarkets([]);
-      setAssetClasses([]); // Clear dependent dropdowns
-      setAvailableAssets([]);
-      form.resetField("stockMarket"); // Reset form value
-      form.resetField("assetClass");
-      form.resetField("comparisonStocks");
-      setDataTableName(null);
-      setIsTableValid(null);
       return;
     }
-
+    
     async function loadStockMarkets() {
-      setLoadingStates((prev) => ({ ...prev, stockMarkets: true }));
-      // Reset downstream fields before loading new ones
-      setAssetClasses([]);
-      setAvailableAssets([]);
-      form.resetField("assetClass");
-      form.resetField("comparisonStocks");
-      setDataTableName(null);
-      setIsTableValid(null);
-
+      setLoadingState(prev => ({ ...prev, stockMarkets: true }));
       try {
-        const fetchedMarkets = await api.marketData.getStockMarkets(watchedCountry);
+        const fetchedMarkets = await api.marketData.getStockMarkets(country);
+        
         if (fetchedMarkets && fetchedMarkets.length > 0) {
           setStockMarkets(fetchedMarkets);
+          console.log("Loaded stock markets:", fetchedMarkets);
         } else {
-          setStockMarkets([]); // Ensure it's an empty array if none found
+          console.error("No stock markets returned for country:", country);
           toast({
-            variant: "default", // Using default as it's informational
+            variant: "destructive",
             title: "No stock markets found",
-            description: `No stock markets available for ${watchedCountry}.`,
+            description: `No stock markets found for ${country}.`
           });
         }
-      } catch (error: any) {
-        console.error(`Error loading stock markets for ${watchedCountry}:`, error.message);
+
+        // Reset dependent fields
+        form.setValue("stockMarket", "");
+        form.setValue("assetClass", "");
+        setDataTableName(null);
+        setIsTableValid(null);
+        setAssetClasses([]);
+        setAvailableAssets([]);
+      } catch (error) {
+        console.error("Error loading stock markets:", error);
         toast({
           variant: "destructive",
           title: "Failed to load stock markets",
-          description: error.message || "An unexpected error occurred.",
+          description: "There was an error loading the available stock markets."
         });
-        setStockMarkets([]); // Ensure empty on error
       } finally {
-        setLoadingStates((prev) => ({ ...prev, stockMarkets: false }));
-        // Resetting form.setValue("stockMarket", "") here would fight with user selection if they re-select same country
+        setLoadingState(prev => ({ ...prev, stockMarkets: false }));
       }
     }
     loadStockMarkets();
-  }, [watchedCountry, form]); // form added for form.resetField
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("country")]);
 
-  // Effect to load asset classes when stock market changes
+  // Load asset classes when stock market changes
   useEffect(() => {
-    if (!watchedCountry || !watchedStockMarket) {
+    const country = form.watch("country");
+    const stockMarket = form.watch("stockMarket");
+    if (!country || !stockMarket) {
       setAssetClasses([]);
-      setAvailableAssets([]);
-      form.resetField("assetClass");
-      form.resetField("comparisonStocks");
-      setDataTableName(null);
-      setIsTableValid(null);
       return;
     }
-
+    
     async function loadAssetClasses() {
-      setLoadingStates((prev) => ({ ...prev, assetClasses: true }));
-      setAvailableAssets([]); // Reset assets
-      form.resetField("comparisonStocks");
-      setDataTableName(null);
-      setIsTableValid(null);
-
+      setLoadingState(prev => ({ ...prev, assetClasses: true }));
       try {
-        const fetchedAssetClasses = await api.marketData.getAssetClasses(
-          watchedCountry,
-          watchedStockMarket
-        );
+        const fetchedAssetClasses = await api.marketData.getAssetClasses(country, stockMarket);
+        
         if (fetchedAssetClasses && fetchedAssetClasses.length > 0) {
           setAssetClasses(fetchedAssetClasses);
+          console.log("Loaded asset classes:", fetchedAssetClasses);
         } else {
-          setAssetClasses([]);
+          console.error("No asset classes returned for:", country, stockMarket);
           toast({
-            variant: "default",
+            variant: "destructive",
             title: "No asset classes found",
-            description: `No asset classes for ${watchedStockMarket} in ${watchedCountry}.`,
+            description: `No asset classes found for ${stockMarket} in ${country}.`
           });
         }
-      } catch (error: any) {
-        console.error(
-          `Error loading asset classes for ${watchedCountry} - ${watchedStockMarket}:`,
-          error.message
-        );
+
+        // Reset asset class
+        form.setValue("assetClass", "");
+        setDataTableName(null);
+        setIsTableValid(null);
+        setAvailableAssets([]);
+      } catch (error) {
+        console.error("Error loading asset classes:", error);
         toast({
           variant: "destructive",
           title: "Failed to load asset classes",
-          description: error.message || "An unexpected error occurred.",
+          description: "There was an error loading the available asset classes."
         });
-        setAssetClasses([]);
       } finally {
-        setLoadingStates((prev) => ({ ...prev, assetClasses: false }));
+        setLoadingState(prev => ({ ...prev, assetClasses: false }));
       }
     }
     loadAssetClasses();
-  }, [watchedCountry, watchedStockMarket, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("country"), form.watch("stockMarket")]);
 
-  // Effect to load available assets (stock codes) when asset class changes
+  // Load assets when asset class changes
   useEffect(() => {
-    if (!watchedCountry || !watchedStockMarket || !watchedAssetClass) {
+    const country = form.watch("country");
+    const stockMarket = form.watch("stockMarket");
+    const assetClass = form.watch("assetClass");
+    if (!country || !stockMarket || !assetClass) {
       setAvailableAssets([]);
-      setDataTableName(null);
-      setIsTableValid(null);
-      form.resetField("comparisonStocks");
       return;
     }
-
+    
     async function loadAssets() {
-      setLoadingStates((prev) => ({ ...prev, assets: true }));
-      setDataTableName(null); // Reset table name while fetching new one
-      setIsTableValid(null); // Reset table validity
-      form.resetField("comparisonStocks"); // Reset selected comparison stocks
-
+      setLoadingState(prev => ({ ...prev, assets: true }));
       try {
-        const tableName = await api.marketData.getDataTableName(
-          watchedCountry,
-          watchedStockMarket,
-          watchedAssetClass
-        );
+        // Get the data table name
+        const tableName = await api.marketData.getDataTableName(country, stockMarket, assetClass);
+        
         if (!tableName) {
+          console.error("No data table found for the selected criteria");
           toast({
             variant: "destructive",
-            title: "Data source configuration error",
-            description: "Could not determine the data table for the selected criteria.",
+            title: "Data source not found",
+            description: "No data source found for the selected criteria."
           });
           setDataTableName(null);
           setIsTableValid(false);
           setAvailableAssets([]);
-          return; // Exit if no table name
+          return;
         }
-
-        setDataTableName(tableName); // Store the resolved table name
-
+        
+        // Save table name for later use
+        setDataTableName(tableName);
+        console.log(`Found data table: ${tableName}`);
+        
+        // Check if the table exists before trying to access it
         const tableExists = await api.marketData.checkTableExists(tableName);
+        
         if (!tableExists) {
+          console.error(`The table ${tableName} does not exist`);
           toast({
             variant: "destructive",
-            title: "Data table not found",
-            description: `The table '${tableName}' does not exist or is inaccessible.`,
+            title: "Table not found",
+            description: `The data table ${tableName} does not exist in the database.`
           });
           setIsTableValid(false);
           setAvailableAssets([]);
-          return; // Exit if table doesn't exist
+          return;
         }
-
-        // If table exists, mark as valid and try to fetch stocks
-        setIsTableValid(true);
-        const stocksData = await api.analysis.getAvailableStocks(tableName);
-        if (stocksData && stocksData.length > 0) {
+        
+        try {
+          // Fetch assets directly from the dynamic table
+          const stocksData = await api.analysis.getAvailableStocks(tableName);
           setAvailableAssets(stocksData);
-        } else {
-          setAvailableAssets([]);
+          setIsTableValid(true);
+        } catch (stockError) {
+          console.error(`Error accessing table ${tableName}:`, stockError);
           toast({
-            variant: "default",
-            title: "No stocks found",
-            description: `No stocks available in table '${tableName}'.`,
+            variant: "destructive",
+            title: "Data access error",
+            description: `Could not access ${tableName} data. Please contact support.`
           });
+          setIsTableValid(false);
+          setAvailableAssets([]);
         }
-      } catch (error: any) {
-        console.error("Error during asset loading process:", error.message);
+      } catch (error) {
+        console.error("Error in asset loading process:", error);
         toast({
           variant: "destructive",
-          title: "Failed to load stock list",
-          description: error.message || "An unexpected error occurred.",
+          title: "Failed to load assets",
+          description: "There was an error loading the available assets."
         });
         setAvailableAssets([]);
-        setIsTableValid(false); // Mark as invalid on error
+        setIsTableValid(false);
       } finally {
-        setLoadingStates((prev) => ({ ...prev, assets: false }));
+        setLoadingState(prev => ({ ...prev, assets: false }));
       }
     }
     loadAssets();
-  }, [watchedCountry, watchedStockMarket, watchedAssetClass, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("country"), form.watch("stockMarket"), form.watch("assetClass")]);
 
-  /**
-   * Handles the form submission process.
-   * It ensures all parameters are correctly formatted and then calls the parent's onSubmit.
-   * @param {StockAnalysisParams} data The form data.
-   */
-  const handleFormSubmit = async (data: StockAnalysisParams) => {
-    // Ensure dataTableName is current before submission
-    let currentDataTableName = dataTableName;
-    if (!currentDataTableName) {
-      // Attempt to fetch it if somehow not set (should be prevented by disabled button logic)
-      if (data.country && data.stockMarket && data.assetClass) {
-        currentDataTableName = await api.marketData.getDataTableName(
+  // Handle form submission
+  const handleSubmit = form.handleSubmit(data => {
+    if (dataTableName) {
+      data.dataTableName = dataTableName;
+      // Garante que os valores percentuais sejam números antes de enviar
+      data.entryPercentage = Number(data.entryPercentage) || 0;
+      data.stopPercentage = Number(data.stopPercentage) || 0;
+      data.initialCapital = Number(data.initialCapital) || 0;
+      onSubmit(data);
+    } else {
+      // If we don't have the table name, try to get it again
+      (async () => {
+        const tableName = await api.marketData.getDataTableName(
           data.country,
           data.stockMarket,
           data.assetClass
         );
-      }
+        
+        if (tableName) {
+          data.dataTableName = tableName;
+          // Garante que os valores percentuais sejam números antes de enviar
+          data.entryPercentage = Number(data.entryPercentage) || 0;
+          data.stopPercentage = Number(data.stopPercentage) || 0;
+          data.initialCapital = Number(data.initialCapital) || 0;
+          onSubmit(data);
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Missing data source",
+            description: "Could not determine the data source. Please try again."
+          });
+        }
+      })();
     }
+  });
 
-    if (currentDataTableName) {
-      const paramsToSubmit: StockAnalysisParams = {
-        ...data,
-        dataTableName: currentDataTableName,
-        // Ensure numeric fields are indeed numbers, with fallbacks.
-        entryPercentage: parseFloat(String(data.entryPercentage)) || 0,
-        stopPercentage: parseFloat(String(data.stopPercentage)) || 0,
-        initialCapital: parseFloat(String(data.initialCapital)) || 0,
-        // Use the state variable `selectedStocks` which is the source of truth for comparisonStocks
-        comparisonStocks: selectedStocks,
-      };
-      onSubmit(paramsToSubmit);
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Data Source Error",
-        description:
-          "Could not determine the data source table. Please re-check selections or wait for options to load.",
-      });
-    }
+  // Format stock name display
+  const formatStockDisplay = (stock: StockInfo) => {
+    return stock.fullName ? `${stock.code} - ${stock.fullName}` : stock.code;
   };
 
-  /**
-   * Formats the display of a stock item, showing code and name if available.
-   * Uses `stock.name` which might be the same as `stock.code` or a more descriptive name.
-   * @param {StockInfo} stock The stock information object.
-   * @returns {string} A formatted string for display (e.g., "AAPL (Apple Inc.)" or "PETR4").
-   */
-  const formatStockDisplay = (stock: StockInfo): string => {
-    // Check if name is present and different from code to avoid "CODE (CODE)"
-    return stock.name && stock.name !== stock.code ? `${stock.code} (${stock.name})` : stock.code;
-  };
-
-  /**
-   * Adds a stock to the list of comparison stocks.
-   * Updates both local component state (`selectedStocks`) and the react-hook-form state.
-   * @param {string} stockCode The code of the stock to add.
-   */
-  const addComparisonStock = useCallback(
-    (stockCode: string) => {
-      if (!selectedStocks.includes(stockCode) && selectedStocks.length < 10) {
-        // Example limit
-        const newSelectedStocks = [...selectedStocks, stockCode];
-        setSelectedStocks(newSelectedStocks);
-        form.setValue("comparisonStocks", newSelectedStocks, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-        setComparisonStockInput("");
-        setShowSuggestions(false);
-      } else if (selectedStocks.length >= 10) {
-        toast({
-          title: "Selection Limit",
-          description: "You can select up to 10 stocks for comparison.",
-          variant: "default",
-        });
-      }
-    },
-    [selectedStocks, form]
-  );
-
-  /**
-   * Removes a stock from the list of comparison stocks.
-   * Updates both local component state (`selectedStocks`) and the react-hook-form state.
-   * @param {string} stockCode The code of the stock to remove.
-   */
-  const removeComparisonStock = useCallback(
-    (stockCode: string) => {
-      const newSelectedStocks = selectedStocks.filter((code) => code !== stockCode);
+  // Adicionar um stock ao estado de comparação
+  const addComparisonStock = (stockCode: string) => {
+    if (!selectedStocks.includes(stockCode)) {
+      const newSelectedStocks = [...selectedStocks, stockCode];
       setSelectedStocks(newSelectedStocks);
-      form.setValue("comparisonStocks", newSelectedStocks, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-    },
-    [selectedStocks, form]
-  );
-
-  // Memoized list of filtered stocks for the autocomplete dropdown.
-  // Filters `availableAssets` based on `comparisonStockInput`.
-  const filteredStocks = React.useMemo(() => {
-    if (comparisonStockInput.trim() === "") return [];
-    return availableAssets.filter(
-      (stock) =>
-        stock.code.toLowerCase().includes(comparisonStockInput.toLowerCase()) ||
-        (stock.name && stock.name.toLowerCase().includes(comparisonStockInput.toLowerCase()))
-    );
-  }, [comparisonStockInput, availableAssets]);
-
-  // Effect to synchronize `selectedStocks` state if `form.watch("comparisonStocks")` changes externally.
-  // This ensures consistency if the form value is manipulated from outside this component's direct user interactions.
-  useEffect(() => {
-    const formWatchedStocks = form.watch("comparisonStocks");
-    if (formWatchedStocks && Array.isArray(formWatchedStocks)) {
-      // Avoid unnecessary updates if the arrays are identical in content and order.
-      if (JSON.stringify(formWatchedStocks) !== JSON.stringify(selectedStocks)) {
-        setSelectedStocks(formWatchedStocks);
-      }
-    }
-  }, [form.watch("comparisonStocks"), selectedStocks]);
-
-  // Derived state to determine if any dropdown options are currently being loaded.
-  const isAnyDropdownLoading =
-    loadingStates.countries ||
-    loadingStates.stockMarkets ||
-    loadingStates.assetClasses ||
-    loadingStates.assets;
-
-  /**
-   * Handles changes to decimal input fields, allowing only valid positive decimal numbers up to two decimal places.
-   * Updates the react-hook-form field with the raw string value if valid, or null if empty,
-   * allowing react-hook-form to manage the actual state that will be coerced/validated on blur/submit.
-   * @param {string} value The input value from the event.
-   * @param {(val: string | null) => void} rhfOnChange The onChange callback from react-hook-form's `field`.
-   */
-  const handleDecimalInputChange = (value: string, rhfOnChange: (val: string | null) => void) => {
-    if (value === "") {
-      rhfOnChange(null);
-      return;
-    }
-    if (value.startsWith("-")) {
-      return;
-    }
-    const regex = /^\d*(\.\d{0,2})?$/;
-    if (regex.test(value)) {
-      rhfOnChange(value);
+      form.setValue("comparisonStocks", newSelectedStocks);
+      setComparisonStockInput("");
+      setShowSuggestions(false);
     }
   };
 
-  /**
-   * Formats the value of a decimal input field on blur.
-   * Converts the string input (or existing number) to a number, ensures it's positive,
-   * formats to two decimal places, and updates the react-hook-form field state.
-   * @param {string | number | null | undefined} value The current value of the input field (can be string from input, or number from state).
-   * @param {keyof StockAnalysisParams} fieldName The name of the form field to update using `form.setValue`.
-   */
-  const handleBlurFormatting = (
-    value: string | number | null | undefined,
-    fieldName: keyof StockAnalysisParams
-  ) => {
-    let numValue = 0; // Default to 0 if parsing fails or input is empty/invalid
-    if (typeof value === "string") {
-      if (value.trim() === "" || value === ".") {
-        // Handle cases like empty or just a decimal point
-        numValue = 0;
-      } else {
-        numValue = parseFloat(value);
-        if (isNaN(numValue)) numValue = 0;
-      }
-    } else if (typeof value === "number") {
+  // Remover um stock da comparação
+  const removeComparisonStock = (stockCode: string) => {
+    const newSelectedStocks = selectedStocks.filter(code => code !== stockCode);
+    setSelectedStocks(newSelectedStocks);
+    form.setValue("comparisonStocks", newSelectedStocks);
+  };
+
+  // Filtrar stocks disponíveis com base no input
+  const filteredStocks = comparisonStockInput === ""
+    ? []
+    : availableAssets.filter((stock) =>
+        stock.code.toLowerCase().includes(comparisonStockInput.toLowerCase()) ||
+        (stock.fullName && stock.fullName.toLowerCase().includes(comparisonStockInput.toLowerCase()))
+      );
+
+  // Atualizar os stocks selecionados quando os comparisonStocks mudarem no form
+  useEffect(() => {
+    const stocks = form.watch("comparisonStocks");
+    if (stocks && Array.isArray(stocks)) {
+      setSelectedStocks(stocks);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch("comparisonStocks")]);
+  
+  // Check if any options are loading
+  const isOptionsLoading = loadingState.countries || 
+                           loadingState.stockMarkets || 
+                           loadingState.assetClasses || 
+                           loadingState.assets;
+
+   // Função auxiliar para lidar com a entrada de números decimais positivos (atualizada)
+  const handleDecimalInputChange = (value: string, onChange: (val: string | null) => void) => {
+    if (value === "") {
+      onChange(null); // Permite campo vazio
+      return;
+    }
+
+    // Impede números negativos
+    if (value.startsWith('-')) {
+      return; // Não atualiza, impede digitação do '-'
+    }
+
+    // Regex para permitir números positivos (incluindo 0) com até 2 casas decimais.
+    // Permite: 1, 1., 1.0, 1.05, 0, 0., 0.0, 0.05, .5, .05
+    const regex = /^\d*(\.\d{0,2})?$/;
+
+    if (regex.test(value)) {
+      // Passa o valor como string para permitir digitação (ex: "1.", ".0")
+      onChange(value);
+    }
+    // Se não passar no regex (ex: "1.055", "abc"), não chama onChange,
+    // impedindo a atualização do input com valor inválido.
+  };
+
+  // Função auxiliar para formatar no blur
+  const handleBlurFormatting = (value: number | string | null | undefined, onChange: (val: number) => void) => {
+    let numValue = 0;
+    if (typeof value === 'string') {
+      numValue = parseFloat(value) || 0;
+    } else if (typeof value === 'number') {
       numValue = value;
     }
-    // Ensure the value is non-negative and then format to two decimal places.
-    // Update the form state with the processed number.
-    form.setValue(fieldName, Math.max(0, parseFloat(numValue.toFixed(2))), {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+    // Garante que seja positivo e formata
+    onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
   };
-
+  
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* First row - Operation, Country, Stock Market, Asset Class */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <FormField
@@ -514,8 +398,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Operation</FormLabel>
-                <Select
-                  disabled={isLoading || isOptionsLoading}
+                <Select 
+                  disabled={isLoading || isOptionsLoading} 
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
@@ -540,8 +424,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Country</FormLabel>
-                <Select
-                  disabled={isLoading || loadingState.countries || countries.length === 0}
+                <Select 
+                  disabled={isLoading || loadingState.countries || countries.length === 0} 
                   onValueChange={field.onChange}
                   value={field.value}
                 >
@@ -558,7 +442,7 @@ export function StockSetupForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {countries.map((country) => (
+                    {countries.map(country => (
                       <SelectItem key={country} value={country}>
                         {country}
                       </SelectItem>
@@ -576,13 +460,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Stock Market</FormLabel>
-                <Select
-                  disabled={
-                    isLoading ||
-                    loadingState.stockMarkets ||
-                    stockMarkets.length === 0 ||
-                    !form.watch("country")
-                  }
+                <Select 
+                  disabled={isLoading || loadingState.stockMarkets || stockMarkets.length === 0 || !form.watch("country")} 
                   onValueChange={field.onChange}
                   value={field.value}
                 >
@@ -599,7 +478,7 @@ export function StockSetupForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {stockMarkets.map((market) => (
+                    {stockMarkets.map(market => (
                       <SelectItem key={market} value={market}>
                         {market}
                       </SelectItem>
@@ -617,13 +496,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Asset Class</FormLabel>
-                <Select
-                  disabled={
-                    isLoading ||
-                    loadingState.assetClasses ||
-                    assetClasses.length === 0 ||
-                    !form.watch("stockMarket")
-                  }
+                <Select 
+                  disabled={isLoading || loadingState.assetClasses || assetClasses.length === 0 || !form.watch("stockMarket")} 
                   onValueChange={field.onChange}
                   value={field.value}
                 >
@@ -640,7 +514,7 @@ export function StockSetupForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {assetClasses.map((assetClass) => (
+                    {assetClasses.map(assetClass => (
                       <SelectItem key={assetClass} value={assetClass}>
                         {assetClass}
                       </SelectItem>
@@ -661,8 +535,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Reference Price</FormLabel>
-                <Select
-                  disabled={isLoading || isOptionsLoading}
+                <Select 
+                  disabled={isLoading || isOptionsLoading} 
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
@@ -689,8 +563,8 @@ export function StockSetupForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Period</FormLabel>
-                <Select
-                  disabled={isLoading || isOptionsLoading}
+                <Select 
+                  disabled={isLoading || isOptionsLoading} 
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
@@ -722,20 +596,14 @@ export function StockSetupForm({
                 <FormLabel>% Entry Price</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                    <Input
+                    <Input 
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
                       // VALUE: Show formatted value only when NOT focused
-                      value={
-                        isEntryPriceFocused
-                          ? field.value === null || field.value === undefined
-                            ? ""
-                            : String(field.value)
-                          : typeof field.value === "number"
-                            ? field.value.toFixed(2)
-                            : ""
-                      }
+                      value={isEntryPriceFocused 
+                             ? (field.value === null || field.value === undefined ? '' : String(field.value)) 
+                             : (typeof field.value === 'number' ? field.value.toFixed(2) : '')}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
                       onFocus={() => setIsEntryPriceFocused(true)}
                       onBlur={() => {
@@ -762,20 +630,14 @@ export function StockSetupForm({
                 <FormLabel>% Stop</FormLabel>
                 <FormControl>
                   <div className="flex items-center">
-                    <Input
+                    <Input 
                       type="text" // Usar text para controle manual
                       inputMode="decimal" // Ajuda teclados mobile
                       disabled={isLoading || isOptionsLoading}
                       // VALUE: Show formatted value only when NOT focused
-                      value={
-                        isStopPriceFocused
-                          ? field.value === null || field.value === undefined
-                            ? ""
-                            : String(field.value)
-                          : typeof field.value === "number"
-                            ? field.value.toFixed(2)
-                            : ""
-                      }
+                      value={isStopPriceFocused 
+                             ? (field.value === null || field.value === undefined ? '' : String(field.value)) 
+                             : (typeof field.value === 'number' ? field.value.toFixed(2) : '')}
                       onChange={(e) => handleDecimalInputChange(e.target.value, field.onChange)}
                       onFocus={() => setIsStopPriceFocused(true)}
                       onBlur={() => {
@@ -828,11 +690,11 @@ export function StockSetupForm({
                 <div className="relative">
                   <FormControl>
                     <div className="flex flex-wrap gap-1 p-2 border rounded-md min-h-10 bg-background items-center">
-                      {selectedStocks.map((stock) => (
+                      {selectedStocks.map(stock => (
                         <Badge key={stock} variant="secondary" className="flex items-center gap-1">
                           {stock}
-                          <button
-                            type="button"
+                          <button 
+                            type="button" 
                             className="rounded-full hover:bg-muted p-0.5"
                             onClick={() => removeComparisonStock(stock)}
                             aria-label={`Remove ${stock}`}
@@ -861,7 +723,7 @@ export function StockSetupForm({
                       />
                     </div>
                   </FormControl>
-
+                  
                   {showSuggestions && filteredStocks.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-popover border rounded-md shadow-lg">
                       <Command>
@@ -893,15 +755,15 @@ export function StockSetupForm({
         </div>
 
         {/* Submit button with updated text and improved validation */}
-        <Button
-          type="submit"
+        <Button 
+          type="submit" 
           className="w-full"
           disabled={
-            isLoading ||
-            isOptionsLoading ||
-            !form.watch("country") ||
-            !form.watch("stockMarket") ||
-            !form.watch("assetClass") ||
+            isLoading || 
+            isOptionsLoading || 
+            !form.watch("country") || 
+            !form.watch("stockMarket") || 
+            !form.watch("assetClass") || 
             isTableValid === false
           }
         >
@@ -910,15 +772,12 @@ export function StockSetupForm({
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               <span>Processing...</span>
             </>
-          ) : (
-            "Show Results"
-          )}
+          ) : "Show Results"}
         </Button>
-
+        
         {isTableValid === false && (
           <div className="text-sm text-destructive">
-            The selected data source could not be accessed. Please select a different combination or
-            contact support.
+            The selected data source could not be accessed. Please select a different combination or contact support.
           </div>
         )}
       </form>
