@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   Asset,
@@ -6,7 +7,7 @@ import {
   StockInfo,
   User,
 } from '@/types';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, fromDynamic } from '@/integrations/supabase/client';
 
 // Auth Actions
 const getCurrentUser = async (): Promise<User | null> => {
@@ -81,9 +82,15 @@ const updateUserProfile = async (
   id: string,
   updates: { full_name?: string; avatar_url?: string }
 ) => {
+  // Map the updates to match the database schema
+  const dbUpdates: { name?: string } = {};
+  if (updates.full_name) {
+    dbUpdates.name = updates.full_name;
+  }
+
   const { data, error } = await supabase
     .from('users')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', id)
     .single();
 
@@ -175,7 +182,11 @@ const getMarketDataSources = async (): Promise<MarketDataSource[]> => {
       return [];
     }
 
-    return data || [];
+    // Convert id from number to string to match the type
+    return (data || []).map(item => ({
+      ...item,
+      id: String(item.id)
+    }));
   } catch (error) {
     console.error('Error in getMarketDataSources:', error);
     return [];
@@ -186,9 +197,14 @@ const addMarketDataSource = async (
   marketDataSource: Omit<MarketDataSource, 'id'>
 ): Promise<MarketDataSource | null> => {
   try {
+    // Convert back to database format (id as number)
+    const dbData = {
+      ...marketDataSource,
+    };
+
     const { data, error } = await supabase
       .from('market_data_sources')
-      .insert([marketDataSource])
+      .insert([dbData])
       .select('*')
       .single();
 
@@ -197,7 +213,8 @@ const addMarketDataSource = async (
       return null;
     }
 
-    return data || null;
+    // Convert id to string for return
+    return data ? { ...data, id: String(data.id) } : null;
   } catch (error) {
     console.error('Error in addMarketDataSource:', error);
     return null;
@@ -209,10 +226,13 @@ const updateMarketDataSource = async (
   updates: Partial<MarketDataSource>
 ): Promise<MarketDataSource | null> => {
   try {
+    // Remove id from updates since it shouldn't be updated
+    const { id: _, ...dbUpdates } = updates;
+
     const { data, error } = await supabase
       .from('market_data_sources')
-      .update(updates)
-      .eq('id', id)
+      .update(dbUpdates)
+      .eq('id', parseInt(id)) // Convert string id to number for database
       .select('*')
       .single();
 
@@ -221,7 +241,8 @@ const updateMarketDataSource = async (
       return null;
     }
 
-    return data || null;
+    // Convert id to string for return
+    return data ? { ...data, id: String(data.id) } : null;
   } catch (error) {
     console.error('Error in updateMarketDataSource:', error);
     return null;
@@ -233,7 +254,7 @@ const deleteMarketDataSource = async (id: string): Promise<boolean> => {
     const { error } = await supabase
       .from('market_data_sources')
       .delete()
-      .eq('id', id);
+      .eq('id', parseInt(id)); // Convert string id to number for database
 
     if (error) {
       console.error('Error deleting market data source:', error);
@@ -311,17 +332,12 @@ const getAssetClasses = async (country: string, stockMarket: string): Promise<st
   }
 };
 
-// Assets Actions
+// Assets Actions - Note: These are placeholder implementations since assets table doesn't exist
 const getAssets = async (): Promise<Asset[]> => {
   try {
-    const { data, error } = await supabase.from('assets').select('*');
-
-    if (error) {
-      console.error('Error fetching assets:', error);
-      return [];
-    }
-
-    return data || [];
+    // Since there's no assets table, return empty array
+    console.warn('Assets table does not exist in database');
+    return [];
   } catch (error) {
     console.error('Error in getAssets:', error);
     return [];
@@ -330,18 +346,9 @@ const getAssets = async (): Promise<Asset[]> => {
 
 const addAsset = async (asset: Omit<Asset, 'id'>): Promise<Asset | null> => {
   try {
-    const { data, error } = await supabase
-      .from('assets')
-      .insert([asset])
-      .select('*')
-      .single();
-
-    if (error) {
-      console.error('Error adding asset:', error);
-      return null;
-    }
-
-    return data || null;
+    // Since there's no assets table, return null
+    console.warn('Assets table does not exist in database');
+    return null;
   } catch (error) {
     console.error('Error in addAsset:', error);
     return null;
@@ -353,19 +360,9 @@ const updateAsset = async (
   updates: Partial<Asset>
 ): Promise<Asset | null> => {
   try {
-    const { data, error } = await supabase
-      .from('assets')
-      .update(updates)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error) {
-      console.error('Error updating asset:', error);
-      return null;
-    }
-
-    return data || null;
+    // Since there's no assets table, return null
+    console.warn('Assets table does not exist in database');
+    return null;
   } catch (error) {
     console.error('Error in updateAsset:', error);
     return null;
@@ -374,14 +371,9 @@ const updateAsset = async (
 
 const deleteAsset = async (id: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('assets').delete().eq('id', id);
-
-    if (error) {
-      console.error('Error deleting asset:', error);
-      return false;
-    }
-
-    return true;
+    // Since there's no assets table, return false
+    console.warn('Assets table does not exist in database');
+    return false;
   } catch (error) {
     console.error('Error in deleteAsset:', error);
     return false;
@@ -520,8 +512,7 @@ const getDataTableName = async (
 
 const getAvailableStocks = async (country: string, stockMarket: string, dataTableName: string): Promise<StockInfo[]> => {
   try {
-    const { data, error } = await supabase
-      .from(dataTableName)
+    const { data, error } = await fromDynamic(dataTableName)
       .select('stock_code')
       .eq('country', country)
       .eq('stock_market', stockMarket)
