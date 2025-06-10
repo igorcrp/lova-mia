@@ -1,5 +1,4 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '@/integrations/supabase/database.types';
 import { Asset, MarketDataSource, StockAnalysisParams, DetailedResult, TradeHistoryItem, User } from '@/types';
 
 // Initialize Supabase client
@@ -57,6 +56,34 @@ export const api = {
       const { data: { user } } = await supabase.auth.getUser();
       return user;
     },
+
+    login: async (email: string, password: string) => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      return await supabase.auth.signInWithPassword({ email, password });
+    },
+
+    register: async (email: string, password: string) => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      return await supabase.auth.signUp({ email, password });
+    },
+
+    logout: async () => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      return await supabase.auth.signOut();
+    },
+
+    googleLogin: async () => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      return await supabase.auth.signInWithOAuth({ provider: 'google' });
+    },
+
+    resendConfirmationEmail: async (email: string) => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      return await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+    },
   },
 
   marketData: {
@@ -91,6 +118,79 @@ export const api = {
       }
       
       return data ? data.stock_table : null;
+    },
+
+    getCountries: async (): Promise<string[]> => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('country')
+        .order('country');
+
+      if (error) {
+        console.error('Error fetching countries:', error);
+        throw new Error('Failed to fetch countries');
+      }
+
+      // Get unique countries
+      const uniqueCountries = [...new Set(data?.map(item => item.country) || [])];
+      return uniqueCountries;
+    },
+
+    getStockMarkets: async (country: string): Promise<string[]> => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('stock_market')
+        .eq('country', country)
+        .order('stock_market');
+
+      if (error) {
+        console.error('Error fetching stock markets:', error);
+        throw new Error('Failed to fetch stock markets');
+      }
+
+      // Get unique stock markets
+      const uniqueMarkets = [...new Set(data?.map(item => item.stock_market) || [])];
+      return uniqueMarkets;
+    },
+
+    getAssetClasses: async (country: string, stockMarket: string): Promise<string[]> => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      const { data, error } = await supabase
+        .from('market_data_sources')
+        .select('asset_class')
+        .eq('country', country)
+        .eq('stock_market', stockMarket)
+        .order('asset_class');
+
+      if (error) {
+        console.error('Error fetching asset classes:', error);
+        throw new Error('Failed to fetch asset classes');
+      }
+
+      // Get unique asset classes
+      const uniqueAssetClasses = [...new Set(data?.map(item => item.asset_class) || [])];
+      return uniqueAssetClasses;
+    },
+
+    checkTableExists: async (tableName: string): Promise<boolean> => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      try {
+        const { data, error } = await supabase.rpc('table_exists', {
+          p_table_name: tableName
+        });
+        
+        if (error) {
+          console.error('Error checking table existence:', error);
+          return false;
+        }
+        
+        return data === true;
+      } catch (error) {
+        console.error('Error in checkTableExists:', error);
+        return false;
+      }
     },
   },
 
@@ -268,7 +368,8 @@ export const api = {
               lotSize: 0,
               stopPrice: 0,
               capital: 0,
-              currentCapital: 0
+              currentCapital: 0,
+              stopTrigger: '-'
             };
           }
 
@@ -288,7 +389,8 @@ export const api = {
             lotSize: 0,
             stopPrice: 0,
             capital: 0,
-            currentCapital: 0
+            currentCapital: 0,
+            stopTrigger: '-'
           };
         });
 
@@ -321,6 +423,30 @@ export const api = {
         return analysisResult;
       } catch (error) {
         console.error('Error in getDetailedAnalysis:', error);
+        throw error;
+      }
+    },
+
+    getAvailableStocks: async (tableName: string): Promise<any[]> => {
+      if (!supabase) throw new Error('Supabase client not initialized');
+      try {
+        const { data, error } = await supabase.rpc('get_unique_stock_codes', {
+          p_table_name: tableName
+        });
+        
+        if (error) {
+          console.error('Error fetching available stocks:', error);
+          throw new Error('Failed to fetch available stocks');
+        }
+        
+        // Convert to expected format
+        return (data || []).map((code: string) => ({
+          code,
+          name: code,
+          fullName: code
+        }));
+      } catch (error) {
+        console.error('Error in getAvailableStocks:', error);
         throw error;
       }
     },

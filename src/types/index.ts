@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   email: string;
@@ -29,6 +28,7 @@ export interface Asset {
   asset_class: string;
   status: 'active' | 'inactive';
   created_at?: string; // Add created_at as optional property
+  updated_at?: string; // Add updated_at as optional property
 }
 
 export interface StockAnalysisParams {
