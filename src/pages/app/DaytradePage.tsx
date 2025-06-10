@@ -3,11 +3,13 @@ import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 export default function DaytradePage() {
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
@@ -18,6 +20,9 @@ export default function DaytradePage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
+  
+  const { subscribed, subscriptionTier } = useSubscription();
+  const isPremium = subscribed && subscriptionTier === 'premium';
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
@@ -219,9 +224,15 @@ export default function DaytradePage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">Daytrade Portfolio</h1>
       
+      <SubscriptionBanner />
+      
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
-          <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
+          <StockSetupForm 
+            onSubmit={runAnalysis} 
+            isLoading={isLoading} 
+            isPremium={isPremium}
+          />
           
           {isLoading && (
             <div className="mt-6">
@@ -233,10 +244,20 @@ export default function DaytradePage() {
             </div>
           )}
           
+          {!isPremium && !isLoading && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Free Plan:</strong> Limited to 1 month period, 10 results, and basic features. 
+                Upgrade to Premium for unlimited access to all features and periods.
+              </p>
+            </div>
+          )}
+          
           {analysisResults.length > 0 && !isLoading && (
             <ResultsTable 
               results={analysisResults} 
               onViewDetails={viewDetails} 
+              isPremium={isPremium}
             />
           )}
         </div>
