@@ -1,6 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { Asset, AnalysisResult, DetailedResult, StockAnalysisParams, MarketDataSource } from "@/types";
+import { Asset, AnalysisResult, DetailedResult, StockAnalysisParams, MarketDataSource, StockInfo } from "@/types";
 
 const getProfile = async () => {
   try {
@@ -157,10 +156,15 @@ export const api = {
         return {
           user: data.user,
           session: data.session,
+          error: null
         };
       } catch (error) {
         console.error("Login failed:", error);
-        throw error;
+        return {
+          user: null,
+          session: null,
+          error
+        };
       }
     },
 
@@ -175,10 +179,15 @@ export const api = {
         return {
           user: data,
           session: data,
+          error: null
         };
       } catch (error) {
         console.error("Google login failed:", error);
-        throw error;
+        return {
+          user: null,
+          session: null,
+          error
+        };
       }
     },
 
@@ -196,10 +205,10 @@ export const api = {
 
         if (error) throw error;
 
-        return data;
+        return { data, error: null };
       } catch (error) {
         console.error("Registration failed:", error);
-        throw error;
+        return { data: null, error };
       }
     },
 
@@ -207,9 +216,10 @@ export const api = {
       try {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
+        return { error: null };
       } catch (error) {
         console.error("Logout failed:", error);
-        throw error;
+        return { error };
       }
     },
 
@@ -217,9 +227,10 @@ export const api = {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(email);
         if (error) throw error;
+        return { error: null };
       } catch (error) {
         console.error("Password reset failed:", error);
-        throw error;
+        return { error };
       }
     },
 
@@ -230,89 +241,100 @@ export const api = {
           email,
         });
         if (error) throw error;
+        return { error: null };
       } catch (error) {
         console.error("Resend confirmation failed:", error);
-        throw error;
+        return { error };
       }
     },
   },
 
   // Assets methods
-  getAssets: async (page = 1, search = "", country = "", stockMarket = "", assetClass = "") => {
-    try {
-      let query = supabase.from("market_data_sources").select("*");
-      
-      if (search) {
-        query = query.or(`country.ilike.%${search}%,stock_market.ilike.%${search}%,asset_class.ilike.%${search}%`);
-      }
-      
-      if (country) {
-        query = query.eq("country", country);
-      }
-      
-      if (stockMarket) {
-        query = query.eq("stock_market", stockMarket);
-      }
-      
-      if (assetClass) {
-        query = query.eq("asset_class", assetClass);
-      }
+  assets: {
+    getAssets: async (page = 1, search = "", country = "", stockMarket = "", assetClass = "") => {
+      try {
+        let query = supabase.from("market_data_sources").select("*");
+        
+        if (search) {
+          query = query.or(`country.ilike.%${search}%,stock_market.ilike.%${search}%,asset_class.ilike.%${search}%`);
+        }
+        
+        if (country) {
+          query = query.eq("country", country);
+        }
+        
+        if (stockMarket) {
+          query = query.eq("stock_market", stockMarket);
+        }
+        
+        if (assetClass) {
+          query = query.eq("asset_class", assetClass);
+        }
 
-      const pageSize = 10;
-      const offset = (page - 1) * pageSize;
-      
-      const { data, error, count } = await query
-        .range(offset, offset + pageSize - 1)
-        .order("id");
+        const pageSize = 10;
+        const offset = (page - 1) * pageSize;
+        
+        const { data, error, count } = await query
+          .range(offset, offset + pageSize - 1)
+          .order("id");
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Transform market data sources to assets format
-      const assets: Asset[] = (data || []).map(item => ({
-        id: item.id.toString(), // Convert number to string
-        code: `${item.country}-${item.stock_market}-${item.asset_class}`,
-        name: `${item.country} ${item.stock_market} ${item.asset_class}`,
-        country: item.country,
-        stock_market: item.stock_market,
-        asset_class: item.asset_class,
-        status: 'active' as const
-      }));
+        // Transform market data sources to assets format
+        const assets: Asset[] = (data || []).map(item => ({
+          id: item.id.toString(),
+          code: `${item.country}-${item.stock_market}-${item.asset_class}`,
+          name: `${item.country} ${item.stock_market} ${item.asset_class}`,
+          country: item.country,
+          stock_market: item.stock_market,
+          asset_class: item.asset_class,
+          status: 'active' as const
+        }));
 
-      return {
-        data: assets,
-        total: count || 0
-      };
-    } catch (error) {
-      console.error("Error fetching assets:", error);
-      return { data: [], total: 0 };
+        return {
+          data: assets,
+          total: count || 0
+        };
+      } catch (error) {
+        console.error("Error fetching assets:", error);
+        return { data: [], total: 0 };
+      }
+    },
+
+    getAllAssets: async () => {
+      try {
+        const { data, error } = await supabase
+          .from("market_data_sources")
+          .select("*")
+          .order("id");
+
+        if (error) throw error;
+
+        // Transform market data sources to assets format
+        const assets: Asset[] = (data || []).map(item => ({
+          id: item.id.toString(),
+          code: `${item.country}-${item.stock_market}-${item.asset_class}`,
+          name: `${item.country} ${item.stock_market} ${item.asset_class}`,
+          country: item.country,
+          stock_market: item.stock_market,
+          asset_class: item.asset_class,
+          status: 'active' as const
+        }));
+
+        return assets;
+      } catch (error) {
+        console.error("Error fetching all assets:", error);
+        return [];
+      }
     }
   },
 
+  getAssets: async (page = 1, search = "", country = "", stockMarket = "", assetClass = "") => {
+    return api.assets.getAssets(page, search, country, stockMarket, assetClass);
+  },
+
   getAllAssets: async () => {
-    try {
-      const { data, error } = await supabase
-        .from("market_data_sources")
-        .select("*")
-        .order("id");
-
-      if (error) throw error;
-
-      // Transform market data sources to assets format
-      const assets: Asset[] = (data || []).map(item => ({
-        id: item.id.toString(), // Convert number to string
-        code: `${item.country}-${item.stock_market}-${item.asset_class}`,
-        name: `${item.country} ${item.stock_market} ${item.asset_class}`,
-        country: item.country,
-        stock_market: item.stock_market,
-        asset_class: item.asset_class,
-        status: 'active' as const
-      }));
-
-      return assets;
-    } catch (error) {
-      console.error("Error fetching all assets:", error);
-      return [];
-    }
+    return api.assets.getAllAssets();
   },
 
   // Market data methods
@@ -525,10 +547,16 @@ export const api = {
       }
     },
 
-    getAvailableStocks: async (dataTableName: string) => {
+    getAvailableStocks: async (dataTableName: string): Promise<StockInfo[]> => {
       try {
-        // Mock implementation - return some sample stock codes
-        const mockStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'];
+        // Mock implementation - return some sample stock info objects
+        const mockStocks: StockInfo[] = [
+          { code: 'AAPL', name: 'Apple Inc.', fullName: 'Apple Inc.' },
+          { code: 'MSFT', name: 'Microsoft Corporation', fullName: 'Microsoft Corporation' },
+          { code: 'GOOGL', name: 'Alphabet Inc.', fullName: 'Alphabet Inc. Class A' },
+          { code: 'AMZN', name: 'Amazon.com Inc.', fullName: 'Amazon.com Inc.' },
+          { code: 'TSLA', name: 'Tesla Inc.', fullName: 'Tesla Inc.' }
+        ];
         return mockStocks;
       } catch (error) {
         console.error("Error fetching available stocks:", error);

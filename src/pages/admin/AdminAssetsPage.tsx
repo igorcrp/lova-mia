@@ -53,6 +53,10 @@ export default function AdminAssetsPage() {
   const [assetClasses, setAssetClasses] = useState<string[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string>('');
   const [selectedStockMarket, setSelectedStockMarket] = useState<string>('');
+  const [selectedAssetClass, setSelectedAssetClass] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [totalAssets, setTotalAssets] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof assetFormSchema>>({
@@ -132,6 +136,28 @@ export default function AdminAssetsPage() {
 
     loadAssetClasses();
   }, [selectedCountry, selectedStockMarket]);
+
+  useEffect(() => {
+    const loadAssets = async () => {
+      setIsLoading(true);
+      try {
+        const result = await api.assets.getAssets(currentPage, searchTerm, selectedCountry, selectedStockMarket, selectedAssetClass);
+        setAssets(result.data);
+        setTotalAssets(result.total);
+      } catch (error) {
+        console.error("Error loading assets:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load assets. Please try again."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAssets();
+  }, [currentPage, searchTerm, selectedCountry, selectedStockMarket, selectedAssetClass]);
 
   return (
     <div>
