@@ -56,7 +56,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const manageSubscription = async () => {
     try {
-      const { url } = await api.subscription.getCustomerPortal();
+      const { url } = await api.subscription.createCustomerPortal();
       window.location.href = url;
     } catch (error) {
       console.error('Failed to open customer portal:', error);

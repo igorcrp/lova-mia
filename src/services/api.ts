@@ -1,15 +1,10 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Asset, AnalysisResult, DetailedResult, StockAnalysisParams, MarketDataSource } from "@/types";
 
-const createClient = () => {
-  const client = supabase;
-  return client;
-};
-
 const getProfile = async () => {
   try {
-    const client = createClient();
-    const { data, error } = await client.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error) {
       console.error("Error getting session:", error);
@@ -17,21 +12,19 @@ const getProfile = async () => {
     }
 
     const session = data.session;
-
     if (!session) {
       console.warn("No session found.");
       return null;
     }
 
     const user = session.user;
-
     if (!user) {
       console.warn("No user found in session.");
       return null;
     }
 
-    const { data: profile, error: profileError } = await client
-      .from("profiles")
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
       .select("*")
       .eq("id", user.id)
       .single();
@@ -50,8 +43,7 @@ const getProfile = async () => {
 
 const updateProfile = async (updates: { full_name?: string; avatar_url?: string }) => {
   try {
-    const client = createClient();
-    const { data, error } = await client.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error) {
       console.error("Error getting session:", error);
@@ -59,22 +51,23 @@ const updateProfile = async (updates: { full_name?: string; avatar_url?: string 
     }
 
     const session = data.session;
-
     if (!session) {
       console.warn("No session found.");
       return null;
     }
 
     const user = session.user;
-
     if (!user) {
       console.warn("No user found in session.");
       return null;
     }
 
-    const { error: profileError } = await client
-      .from("profiles")
-      .update(updates)
+    const { error: profileError } = await supabase
+      .from("users")
+      .update({
+        name: updates.full_name,
+        // Add other fields as needed
+      })
       .eq("id", user.id);
 
     if (profileError) {
@@ -97,7 +90,6 @@ interface SubscriptionData {
 }
 
 const simulateAnalysisStep = async (stepNumber: number, totalSteps: number, onProgress?: (progress: number) => void) => {
-  // Simulate processing time
   await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
   
   if (onProgress) {
@@ -114,8 +106,7 @@ const generateMockTradeHistory = (assetCode: string, params: StockAnalysisParams
     const date = new Date();
     date.setDate(date.getDate() - (tradingDays - i));
     
-    // Random trade simulation
-    const hasTradeToday = Math.random() < 0.3; // 30% chance of trade
+    const hasTradeToday = Math.random() < 0.3;
     
     if (hasTradeToday) {
       const entryPrice = 100 + Math.random() * 50;
@@ -152,6 +143,100 @@ const generateMockTradeHistory = (assetCode: string, params: StockAnalysisParams
 };
 
 export const api = {
+  // Auth methods
+  auth: {
+    login: async (email: string, password: string) => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        return {
+          user: data.user,
+          session: data.session,
+        };
+      } catch (error) {
+        console.error("Login failed:", error);
+        throw error;
+      }
+    },
+
+    googleLogin: async () => {
+      try {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+        });
+
+        if (error) throw error;
+
+        return {
+          user: data,
+          session: data,
+        };
+      } catch (error) {
+        console.error("Google login failed:", error);
+        throw error;
+      }
+    },
+
+    register: async (email: string, password: string, fullName: string) => {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        return data;
+      } catch (error) {
+        console.error("Registration failed:", error);
+        throw error;
+      }
+    },
+
+    logout: async () => {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      } catch (error) {
+        console.error("Logout failed:", error);
+        throw error;
+      }
+    },
+
+    resetPassword: async (email: string) => {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) throw error;
+      } catch (error) {
+        console.error("Password reset failed:", error);
+        throw error;
+      }
+    },
+
+    resendConfirmationEmail: async (email: string) => {
+      try {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email,
+        });
+        if (error) throw error;
+      } catch (error) {
+        console.error("Resend confirmation failed:", error);
+        throw error;
+      }
+    },
+  },
+
   // Assets methods
   getAssets: async (page = 1, search = "", country = "", stockMarket = "", assetClass = "") => {
     try {
@@ -184,7 +269,7 @@ export const api = {
 
       // Transform market data sources to assets format
       const assets: Asset[] = (data || []).map(item => ({
-        id: item.id,
+        id: item.id.toString(), // Convert number to string
         code: `${item.country}-${item.stock_market}-${item.asset_class}`,
         name: `${item.country} ${item.stock_market} ${item.asset_class}`,
         country: item.country,
@@ -214,7 +299,7 @@ export const api = {
 
       // Transform market data sources to assets format
       const assets: Asset[] = (data || []).map(item => ({
-        id: item.id,
+        id: item.id.toString(), // Convert number to string
         code: `${item.country}-${item.stock_market}-${item.asset_class}`,
         name: `${item.country} ${item.stock_market} ${item.asset_class}`,
         country: item.country,
@@ -317,6 +402,12 @@ export const api = {
         console.error("Error fetching data table name:", error);
         return null;
       }
+    },
+
+    checkTableExists: async (tableName: string) => {
+      // Mock implementation - returns true for known tables
+      const knownTables = ['br_b3_stocks', 'us_nasdaq_stocks', 'us_nyse_etfs'];
+      return knownTables.includes(tableName);
     }
   },
 
@@ -326,10 +417,8 @@ export const api = {
       try {
         console.info('Starting analysis with params:', params);
         
-        // Simulate multi-step analysis
         await simulateAnalysisStep(1, 5, onProgress);
         
-        // Get assets from the specified market
         const sources = await api.marketData.getSources();
         const filteredSources = sources.filter(source => 
           source.country === params.country &&
@@ -339,7 +428,6 @@ export const api = {
 
         await simulateAnalysisStep(2, 5, onProgress);
 
-        // Generate mock results for each source
         const results: AnalysisResult[] = filteredSources.slice(0, 10).map((source, index) => {
           const tradingDays = 252;
           const trades = Math.floor(Math.random() * 50) + 10;
@@ -389,7 +477,6 @@ export const api = {
       try {
         console.info('Getting detailed analysis for:', assetCode);
         
-        // Simulate getting detailed data
         const tradingDays = 252;
         const trades = Math.floor(Math.random() * 50) + 10;
         const profits = Math.floor(trades * (0.4 + Math.random() * 0.3));
@@ -399,10 +486,8 @@ export const api = {
         const finalCapital = params.initialCapital + (Math.random() - 0.3) * params.initialCapital * 0.5;
         const profit = finalCapital - params.initialCapital;
         
-        // Generate trade history
         const tradeHistory = generateMockTradeHistory(assetCode, params, tradingDays);
         
-        // Generate capital evolution
         const capitalEvolution = tradeHistory.map(trade => ({
           date: trade.date,
           capital: trade.currentCapital || params.initialCapital
@@ -437,6 +522,17 @@ export const api = {
       } catch (error) {
         console.error("Failed to get detailed analysis:", error);
         throw new Error("Failed to get detailed analysis");
+      }
+    },
+
+    getAvailableStocks: async (dataTableName: string) => {
+      try {
+        // Mock implementation - return some sample stock codes
+        const mockStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA'];
+        return mockStocks;
+      } catch (error) {
+        console.error("Error fetching available stocks:", error);
+        return [];
       }
     }
   },
