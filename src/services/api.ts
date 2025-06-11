@@ -656,8 +656,12 @@ const analysis = {
       // Extract stock codes with proper type safety and remove duplicates
       const uniqueCodes = new Set<string>();
       (data as any[])
-        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
-        .forEach(item => uniqueCodes.add(String(item.stock_code)));
+        .filter(item => item != null && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+        .forEach(item => {
+          if (item && item.stock_code) {
+            uniqueCodes.add(String(item.stock_code));
+          }
+        });
       
       const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
         code: code,
@@ -912,7 +916,7 @@ const analysis = {
       
       // Calculate suggested entry price based on previous day's reference price
       // Use current day's reference price if previous day is not available
-      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+      const referencePrice = previousData ? Number(previousData[params.referencePrice]) : Number(currentData[params.referencePrice]);
       let suggestedEntryPrice: number;
       
       if (params.operation === 'buy') {
@@ -925,9 +929,12 @@ const analysis = {
       
       // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      if (Number(currentData.open) <= suggestedEntryPrice) {
-        actualPrice = Number(currentData.open);
-      } else if (Number(currentData.open) > suggestedEntryPrice && suggestedEntryPrice >= Number(currentData.low)) {
+      const openPrice = Number(currentData.open);
+      const lowPrice = Number(currentData.low);
+      
+      if (openPrice <= suggestedEntryPrice) {
+        actualPrice = openPrice;
+      } else if (openPrice > suggestedEntryPrice && suggestedEntryPrice >= lowPrice) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
@@ -942,10 +949,11 @@ const analysis = {
       let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || Number(currentData.low) <= suggestedEntryPrice)) ? "Buy" : "-";
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || lowPrice <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || Number(currentData.high) >= suggestedEntryPrice)) ? "Sell" : "-";
+        const highPrice = Number(currentData.high);
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || highPrice >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
@@ -958,16 +966,18 @@ const analysis = {
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
+          stopTrigger = lowPrice <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
+          const highPrice = Number(currentData.high);
+          stopTrigger = highPrice >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
       // Calculate profit/loss
       let profitLoss = 0;
       if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
+        const closePrice = Number(currentData.close);
         if (stopTrigger === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
@@ -976,8 +986,8 @@ const analysis = {
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (Number(currentData.close) - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - Number(currentData.close)) * lotSize;
+            ? (closePrice - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - closePrice) * lotSize;
         }
       }
       
@@ -988,10 +998,10 @@ const analysis = {
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: Number(currentData.open), // Using open as entryPrice for consistency
+        entryPrice: openPrice, // Using open as entryPrice for consistency
         exitPrice: Number(currentData.close), // Using close as exitPrice
         high: Number(currentData.high),
-        low: Number(currentData.low),
+        low: lowPrice,
         volume: Number(currentData.volume),
         suggestedEntryPrice,
         actualPrice,
