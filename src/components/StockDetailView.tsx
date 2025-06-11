@@ -1,9 +1,10 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DetailedResult, StockAnalysisParams } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { StockDetailsTable } from "@/components/StockDetailsTable";
+import StockDetailsTable from "@/components/StockDetailsTable";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface StockDetailViewProps {
@@ -207,10 +208,7 @@ export function StockDetailView({
                 
                 <TabsContent value="details" className="mt-0">
                   <StockDetailsTable 
-                    result={result}
-                    params={params}
-                    onUpdateParams={onUpdateParams}
-                    isLoading={isLoading}
+                    data={result.tradeHistory}
                   />
                 </TabsContent>
               </>
