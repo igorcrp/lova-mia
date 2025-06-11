@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -86,9 +85,9 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields with proper type conversion
-      const numA = typeof valA === 'number' ? valA : Number(valA) || 0;
-      const numB = typeof valB === 'number' ? valB : Number(valB) || 0;
+      // Numeric comparison for other fields
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
@@ -456,7 +455,7 @@ export function StockDetailsTable({
                         } else if (column.id === "profitLoss" || column.id === "currentCapital") {
                           formattedValue = formatCurrency(value as number);
                         } else if (column.id === "volume" || column.id === "lotSize") {
-                          formattedValue = Number(value).toLocaleString();
+                          formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {
@@ -596,3 +595,4 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
+

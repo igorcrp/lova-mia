@@ -1,3 +1,5 @@
+
+
 export interface User {
   id: string;
   email: string;
@@ -27,8 +29,6 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
-  created_at: string;
-  updated_at: string; // Added missing property
 }
 
 export interface StockAnalysisParams {
@@ -112,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+

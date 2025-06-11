@@ -232,12 +232,10 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Query the users table directly instead of using the RPC
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use a função check_user_by_email em vez de get_current_user
+      const { data, error } = await supabase.rpc('check_user_by_email', {
+        p_email: userId // Usando userId como email para compatibilidade
+      });
 
       if (error) {
         console.error("Get user data error:", error);
@@ -246,17 +244,18 @@ export const auth = {
 
       console.log("User data retrieved:", data);
       
-      // Convert the result to the User type
-      if (data) {
+      // Converter o resultado para o tipo User
+      if (Array.isArray(data) && data.length > 0) {
+        const userData = data[0];
         return {
-          id: data.id,
-          email: data.email,
-          full_name: data.name || '',
-          level_id: data.level_id || 1,
-          status: data.status_users as any || 'pending',
-          email_verified: data.email_verified || false,
-          account_type: data.plan_type === 'premium' ? 'premium' : 'free',
-          created_at: data.created_at || new Date().toISOString(),
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.name,
+          level_id: userData.level_id,
+          status: userData.status_users as any,
+          email_verified: userData.email_verified,
+          account_type: 'free', // Valor padrão
+          created_at: new Date().toISOString(),
           last_login: null
         } as User;
       }
@@ -290,68 +289,6 @@ export const auth = {
       throw error;
     }
   }
-};
-
-/**
- * Subscription API service
- */
-const subscription = {
-  /**
-   * Check current subscription status
-   */
-  async checkSubscription(): Promise<{subscribed: boolean; subscription_tier: string; plan_type: string}> {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      
-      if (error) {
-        console.error('Subscription check error:', error);
-        return { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
-      }
-      
-      return data || { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
-    } catch (error) {
-      console.error('Failed to check subscription:', error);
-      return { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
-    }
-  },
-
-  /**
-   * Create Stripe checkout session for premium subscription
-   */
-  async createCheckoutSession(): Promise<{url?: string; error?: string}> {
-    try {
-      const { data, error } = await supabase.functions.invoke('create-checkout');
-      
-      if (error) {
-        console.error('Checkout session error:', error);
-        return { error: error.message };
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Failed to create checkout session:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  },
-
-  /**
-   * Create customer portal session for subscription management
-   */
-  async createCustomerPortal(): Promise<{url?: string; error?: string}> {
-    try {
-      const { data, error } = await supabase.functions.invoke('customer-portal');
-      
-      if (error) {
-        console.error('Customer portal error:', error);
-        return { error: error.message };
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Failed to create customer portal:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  },
 };
 
 /**
@@ -608,19 +545,18 @@ const analysis = {
       
       console.log(`Found ${data.length} unique stock codes`);
       
-      // Transform the data into StockInfo objects with proper null checks
-      const stocks: StockInfo[] = data
-        .filter(item => item != null) // Filter out null items
-        .map(item => {
-          // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
-          const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
-                            ? String(item.stock_code) 
-                            : String(item); // Fallback if it's just a string
-          return {
-            code: stockCode,
-            name: stockCode, // Use code as name if no name is available
-          };
-        });
+      // Transform the data into StockInfo objects
+      // Corrected to handle potential object return from RPC
+      const stocks: StockInfo[] = data.map(item => {
+        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                          ? String(item.stock_code) 
+                          : String(item); // Fallback if it's just a string
+        return {
+          code: stockCode,
+          name: stockCode, // Use code as name if no name is available
+        };
+      });
       
       return stocks;
     } catch (error) {
@@ -656,12 +592,8 @@ const analysis = {
       // Extract stock codes with proper type safety and remove duplicates
       const uniqueCodes = new Set<string>();
       (data as any[])
-        .filter(item => item != null && typeof item === 'object' && 'stock_code' in item && item.stock_code != null)
-        .forEach(item => {
-          if (item && item.stock_code != null) {
-            uniqueCodes.add(String(item.stock_code));
-          }
-        });
+        .filter(item => item && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+        .forEach(item => uniqueCodes.add(String(item.stock_code)));
       
       const stocks: StockInfo[] = Array.from(uniqueCodes).map(code => ({
         code: code,
@@ -772,6 +704,8 @@ const analysis = {
       return [];
     }
   },
+
+  // --- Start: Functions copied from api-18.ts ---
 
   /**
    * Run stock analysis with given parameters
@@ -893,8 +827,8 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
-    const tradeHistory: TradeHistoryItem[] = [];
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
+    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
     let capital = params.initialCapital;
     
     // Ensure data is sorted by date in ascending order
@@ -916,7 +850,7 @@ const analysis = {
       
       // Calculate suggested entry price based on previous day's reference price
       // Use current day's reference price if previous day is not available
-      const referencePrice = previousData ? Number(previousData[params.referencePrice]) : Number(currentData[params.referencePrice]);
+      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
       let suggestedEntryPrice: number;
       
       if (params.operation === 'buy') {
@@ -929,65 +863,59 @@ const analysis = {
       
       // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      const openPrice = Number(currentData.open);
-      const lowPrice = Number(currentData.low);
-      
-      if (openPrice <= suggestedEntryPrice) {
-        actualPrice = openPrice;
-      } else if (openPrice > suggestedEntryPrice && suggestedEntryPrice >= lowPrice) {
+      if (currentData.open <= suggestedEntryPrice) {
+        actualPrice = currentData.open;
+      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
       }
       
       // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
-        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
+        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
         : 0;
       
       // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-";
+      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || lowPrice <= suggestedEntryPrice)) ? "Buy" : "-";
+        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        const highPrice = Number(currentData.high);
-        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || highPrice >= suggestedEntryPrice)) ? "Sell" : "-";
+        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
       }
       
       // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
-        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
+        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
+        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: string = '-';
+      let stopTrigger: string = '-'; // Type corrected
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = lowPrice <= Number(stopPrice) ? "Executed" : "-";
+          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
         } else {
           // Sell: If CURRENT High >= Stop Price → "Executed"
-          const highPrice = Number(currentData.high);
-          stopTrigger = highPrice >= Number(stopPrice) ? "Executed" : "-";
+          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
       // Calculate profit/loss
       let profitLoss = 0;
       if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
-        const closePrice = Number(currentData.close);
         if (stopTrigger === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
+            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (closePrice - Number(actualPrice)) * lotSize
-            : (Number(actualPrice) - closePrice) * lotSize;
+            ? (currentData.close - (actualPrice as number)) * lotSize
+            : ((actualPrice as number) - currentData.close) * lotSize;
         }
       }
       
@@ -995,23 +923,23 @@ const analysis = {
       // Ensure capital doesn't go below zero (optional, based on requirements)
       capital = Math.max(0, previousCapital + profitLoss);
       
-      // Create trade history item with proper type conversion
+      // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: openPrice, // Using open as entryPrice for consistency
-        exitPrice: Number(currentData.close), // Using close as exitPrice
-        high: Number(currentData.high),
-        low: lowPrice,
-        volume: Number(currentData.volume),
+        entryPrice: currentData.open, // Using open as entryPrice for consistency?
+        exitPrice: currentData.close, // Using close as exitPrice
+        high: currentData.high,
+        low: currentData.low,
+        volume: currentData.volume,
         suggestedEntryPrice,
-        actualPrice: typeof actualPrice === 'number' ? actualPrice : actualPrice,
+        actualPrice,
         trade,
         lotSize,
-        stopPrice: typeof stopPrice === 'number' ? stopPrice : stopPrice,
-        stop: stopTrigger as 'Executed' | 'Close' | '-', // Proper type casting
+        stopPrice,
+        stopTrigger, // Changed from 'stop'
         profitLoss, // Changed from 'profit'
         currentCapital: capital // Changed from 'capital'
-      });
+        });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
@@ -1021,7 +949,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -1068,8 +996,8 @@ const analysis = {
     
     // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
     const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
-    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stop !== 'Executed').length;
-    const stops = executedTrades.filter(trade => trade.stop === 'Executed').length; // Stop is triggered regardless of P/L sign
+    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
     
     // Sum the profit/loss values
     let totalProfit = 0;
@@ -1246,25 +1174,15 @@ const analysis = {
       throw error; 
     }
   },
+
+  // --- End: Functions copied from api-18.ts ---
+
 };
 
 // Export the API services
 export const api = {
   auth,
   marketData,
-  analysis,
-  subscription,
-  assets: {
-    getAssets: async (page = 1, search = '', country = '', stockMarket = '', assetClass = '') => {
-      // Mock implementation for assets
-      return { data: [], total: 0 };
-    },
-    getAllAssets: async () => {
-      return [];
-    },
-    createAsset: async (asset: Partial<Asset>) => {
-      // Mock implementation
-      return { id: '1', ...asset } as Asset;
-    }
-  }
+  analysis
 };
+

@@ -30,7 +30,6 @@ interface TradeDetail {
 interface ResultsTableProps {
   results: AnalysisResult[];
   onViewDetails: (assetCode: string) => void;
-  isFreePlan?: boolean; // Add the missing prop
 }
 
 type SortField = 
@@ -51,7 +50,7 @@ interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export function ResultsTable({ results, onViewDetails, isFreePlan }: ResultsTableProps) {
+export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
