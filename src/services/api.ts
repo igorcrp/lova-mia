@@ -326,6 +326,39 @@ export const api = {
         console.error("Error fetching all assets:", error);
         return [];
       }
+    },
+
+    createAsset: async (assetData: Omit<Asset, 'id'>) => {
+      try {
+        const { data, error } = await supabase
+          .from("market_data_sources")
+          .insert({
+            country: assetData.country,
+            stock_market: assetData.stock_market,
+            asset_class: assetData.asset_class,
+            stock_table: `${assetData.country.toLowerCase()}_${assetData.stock_market.toLowerCase()}_${assetData.asset_class.toLowerCase()}`
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Transform the response back to Asset format
+        const asset: Asset = {
+          id: data.id.toString(),
+          code: `${data.country}-${data.stock_market}-${data.asset_class}`,
+          name: `${data.country} ${data.stock_market} ${data.asset_class}`,
+          country: data.country,
+          stock_market: data.stock_market,
+          asset_class: data.asset_class,
+          status: 'active' as const
+        };
+
+        return asset;
+      } catch (error) {
+        console.error("Error creating asset:", error);
+        throw new Error("Failed to create asset");
+      }
     }
   },
 
