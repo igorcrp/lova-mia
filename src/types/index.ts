@@ -1,15 +1,15 @@
 
+
 export interface User {
   id: string;
   email: string;
-  full_name?: string;
+  full_name: string;
   avatar_url?: string;
-  level_id?: number; // 1 = Investor, 2 = Admin
-  status?: 'active' | 'inactive' | 'pending';
-  email_verified?: boolean;
-  account_type?: 'free' | 'premium';
-  plan_type?: 'free' | 'premium'; // Add plan_type field
-  created_at?: string;
+  level_id: number; // 1 = Investor, 2 = Admin
+  status: 'active' | 'inactive' | 'pending';
+  email_verified: boolean;
+  account_type: 'free' | 'premium';
+  created_at: string;
   last_login?: string;
 }
 
@@ -29,8 +29,6 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
-  created_at?: string;
-  updated_at?: string; // Add missing updated_at property
 }
 
 export interface StockAnalysisParams {
@@ -70,7 +68,6 @@ export interface AnalysisResult {
   successRate: number;
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
-  detailedHistory?: TradeHistoryItem[]; // Add detailedHistory property
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -96,7 +93,6 @@ export interface TradeHistoryItem {
   stopPrice?: number;
   capital?: number; // Current capital after this trade
   currentCapital?: number; // Add currentCapital property
-  stopTrigger?: string; // Add stopTrigger property
 }
 
 export interface CapitalPoint {
@@ -116,3 +112,4 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
+

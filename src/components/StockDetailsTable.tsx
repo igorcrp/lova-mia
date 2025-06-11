@@ -85,14 +85,20 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields - ensure both values are converted to numbers
-      const numA = typeof valA === 'number' ? valA : (typeof valA === 'string' ? parseFloat(valA) || 0 : 0);
-      const numB = typeof valB === 'number' ? valB : (typeof valB === 'string' ? parseFloat(valB) || 0 : 0);
+      // Numeric comparison for other fields
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
+  interface TradeItemForStopTrigger {
+    stopPrice: string | number | null;
+    low: number | string | null;
+    high: number | string | null;
+  }
+
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
@@ -589,3 +595,4 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
+

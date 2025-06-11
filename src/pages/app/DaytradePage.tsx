@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
@@ -7,14 +7,9 @@ import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Crown, Check } from "lucide-react";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
-import { useAuth } from "@/contexts/AuthContext";
 
 export default function DaytradePage() {
-  const { planType, subscriptionLoading, createCheckout, openCustomerPortal, user } = useAuth();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
@@ -23,27 +18,6 @@ export default function DaytradePage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
-
-  // Check for success/cancel URL parameters
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'true') {
-      toast({
-        title: "Payment successful!",
-        description: "Your subscription has been activated.",
-      });
-      // Clear URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (urlParams.get('canceled') === 'true') {
-      toast({
-        variant: "destructive",
-        title: "Payment canceled",
-        description: "Your subscription was not activated.",
-      });
-      // Clear URL parameters
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
@@ -54,12 +28,6 @@ export default function DaytradePage() {
       setShowDetailView(false);
       
       console.info('Running analysis with params:', params);
-      
-      // Apply Free plan restrictions
-      if (planType === 'free') {
-        // Force period to 1 month for free users
-        params = { ...params, period: '1 month' };
-      }
       
       // Simulating the initial data loading
       setProgress(10);
@@ -102,14 +70,8 @@ export default function DaytradePage() {
         setProgress(20 + currentProgress * 0.7);
       });
       
-      // Apply Free plan result limitation
-      let finalResults = results;
-      if (planType === 'free' && results.length > 10) {
-        finalResults = results.slice(0, 10);
-      }
-      
       // Usar diretamente os resultados do backend sem sobrescrever tradingDays
-      setAnalysisResults(finalResults);
+      setAnalysisResults(results);
       
       // Final processing
       setProgress(95);
@@ -195,11 +157,6 @@ export default function DaytradePage() {
     try {
       setIsLoadingDetails(true);
       
-      // Apply Free plan restrictions
-      if (planType === 'free') {
-        params = { ...params, period: '1 month' };
-      }
-      
       // Ensure we have the data table name
       const dataTableName = params.dataTableName || await api.marketData.getDataTableName(
         params.country,
@@ -221,12 +178,6 @@ export default function DaytradePage() {
       // Update both the main results and the detailed result
       const results = await api.analysis.runAnalysis(paramsWithTable);
       
-      // Apply Free plan result limitation
-      let finalResults = results;
-      if (planType === 'free' && results.length > 10) {
-        finalResults = results.slice(0, 10);
-      }
-      
       // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
       const today = new Date();
       const startDate = getStartDateForPeriod(paramsWithTable.period);
@@ -235,7 +186,7 @@ export default function DaytradePage() {
       console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
       
       // Usar diretamente os resultados do backend sem sobrescrever tradingDays
-      setAnalysisResults(finalResults);
+      setAnalysisResults(results);
       
       // Fetch detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
@@ -270,12 +221,7 @@ export default function DaytradePage() {
       
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
-          <StockSetupForm 
-            onSubmit={runAnalysis} 
-            isLoading={isLoading}
-            planType={planType}
-            subscriptionLoading={subscriptionLoading}
-          />
+          <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
           
           {isLoading && (
             <div className="mt-6">
@@ -287,53 +233,10 @@ export default function DaytradePage() {
             </div>
           )}
           
-          {/* Free Plan Upgrade Message */}
-          {planType === 'free' && !isLoading && (
-            <Card className="mt-6 border-orange-200 bg-orange-50/50">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <Crown className="h-5 w-5 text-orange-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-orange-900">Upgrade to Premium for Full Access</h3>
-                      <p className="text-sm text-orange-700 mt-1">
-                        Get unlimited analysis periods, complete results, and advanced filtering capabilities.
-                      </p>
-                      <div className="mt-2 space-y-1">
-                        <div className="flex items-center text-sm text-orange-700">
-                          <Check className="h-3 w-3 mr-1" />
-                          <span>All time periods available</span>
-                        </div>
-                        <div className="flex items-center text-sm text-orange-700">
-                          <Check className="h-3 w-3 mr-1" />
-                          <span>Complete stock results</span>
-                        </div>
-                        <div className="flex items-center text-sm text-orange-700">
-                          <Check className="h-3 w-3 mr-1" />
-                          <span>Advanced table filtering</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      onClick={createCheckout}
-                      className="bg-orange-600 hover:bg-orange-700"
-                      disabled={subscriptionLoading}
-                    >
-                      Upgrade to Premium
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
           {analysisResults.length > 0 && !isLoading && (
             <ResultsTable 
               results={analysisResults} 
-              onViewDetails={viewDetails}
-              planType={planType}
+              onViewDetails={viewDetails} 
             />
           )}
         </div>

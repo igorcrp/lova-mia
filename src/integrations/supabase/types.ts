@@ -72,87 +72,6 @@ export type Database = {
         }
         Relationships: []
       }
-      stock_results: {
-        Row: {
-          change_percent: number | null
-          company_name: string
-          created_at: string | null
-          dividend_yield: number | null
-          id: string
-          industry: string | null
-          market_cap: number | null
-          pe_ratio: number | null
-          price: number
-          sector: string | null
-          symbol: string
-          volume: number | null
-        }
-        Insert: {
-          change_percent?: number | null
-          company_name: string
-          created_at?: string | null
-          dividend_yield?: number | null
-          id?: string
-          industry?: string | null
-          market_cap?: number | null
-          pe_ratio?: number | null
-          price: number
-          sector?: string | null
-          symbol: string
-          volume?: number | null
-        }
-        Update: {
-          change_percent?: number | null
-          company_name?: string
-          created_at?: string | null
-          dividend_yield?: number | null
-          id?: string
-          industry?: string | null
-          market_cap?: number | null
-          pe_ratio?: number | null
-          price?: number
-          sector?: string | null
-          symbol?: string
-          volume?: number | null
-        }
-        Relationships: []
-      }
-      subscribers: {
-        Row: {
-          created_at: string
-          email: string
-          id: string
-          stripe_customer_id: string | null
-          subscribed: boolean
-          subscription_end: string | null
-          subscription_tier: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          email: string
-          id?: string
-          stripe_customer_id?: string | null
-          subscribed?: boolean
-          subscription_end?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          id?: string
-          stripe_customer_id?: string | null
-          subscribed?: boolean
-          subscription_end?: string | null
-          subscription_tier?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       us_nasdaq_stocks: {
         Row: {
           close: number | null
@@ -227,10 +146,8 @@ export type Database = {
           id: string
           level_id: number | null
           name: string | null
-          plan_type: string
           role: string | null
           status_users: string | null
-          stripe_customer_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -240,10 +157,8 @@ export type Database = {
           id?: string
           level_id?: number | null
           name?: string | null
-          plan_type?: string
           role?: string | null
           status_users?: string | null
-          stripe_customer_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -253,10 +168,8 @@ export type Database = {
           id?: string
           level_id?: number | null
           name?: string | null
-          plan_type?: string
           role?: string | null
           status_users?: string | null
-          stripe_customer_id?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -270,61 +183,36 @@ export type Database = {
         Args: { p_email: string }
         Returns: {
           user_exists: boolean
+          id: string
+          email: string
+          name: string
           status_users: string
           level_id: number
-        }[]
-      }
-      get_current_user: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          created_at: string | null
-          email: string
-          email_verified: boolean | null
-          id: string
-          level_id: number | null
-          name: string | null
-          plan_type: string
-          role: string | null
-          status_users: string | null
-          stripe_customer_id: string | null
-          updated_at: string | null
+          email_verified: boolean
         }[]
       }
       get_stock_data: {
-        Args:
-          | {
-              p_table_name: string
-              p_stock_code_param: string
-              p_limit_rows?: number
-            }
-          | {
-              table_name: string
-              stock_code_param: string
-              start_date?: string
-              end_date?: string
-            }
-        Returns: Json
-      }
-      get_stock_results: {
-        Args: Record<PropertyKey, never>
+        Args: {
+          table_name: string
+          stock_code_param: string
+          start_date?: string
+          end_date?: string
+        }
         Returns: {
-          change_percent: number | null
-          company_name: string
-          created_at: string | null
-          dividend_yield: number | null
-          id: string
-          industry: string | null
-          market_cap: number | null
-          pe_ratio: number | null
-          price: number
-          sector: string | null
-          symbol: string
-          volume: number | null
+          date: string
+          open: number
+          high: number
+          low: number
+          close: number
+          volume: number
+          stock_code: string
         }[]
       }
       get_unique_stock_codes: {
         Args: { p_table_name: string }
-        Returns: string[]
+        Returns: {
+          stock_code: string
+        }[]
       }
       table_exists: {
         Args: { p_table_name: string }
