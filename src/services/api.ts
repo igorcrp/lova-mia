@@ -232,10 +232,12 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use a função check_user_by_email em vez de get_current_user
-      const { data, error } = await supabase.rpc('check_user_by_email', {
-        p_email: userId // Usando userId como email para compatibilidade
-      });
+      // Query the users table directly instead of using the RPC
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
       if (error) {
         console.error("Get user data error:", error);
@@ -244,18 +246,17 @@ export const auth = {
 
       console.log("User data retrieved:", data);
       
-      // Converter o resultado para o tipo User
-      if (Array.isArray(data) && data.length > 0) {
-        const userData = data[0];
+      // Convert the result to the User type
+      if (data) {
         return {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.name,
-          level_id: userData.level_id,
-          status: userData.status_users as any,
-          email_verified: userData.email_verified,
-          account_type: 'free', // Valor padrão
-          created_at: new Date().toISOString(),
+          id: data.id,
+          email: data.email,
+          full_name: data.name || '',
+          level_id: data.level_id || 1,
+          status: data.status_users as any || 'pending',
+          email_verified: data.email_verified || false,
+          account_type: data.plan_type === 'premium' ? 'premium' : 'free',
+          created_at: data.created_at || new Date().toISOString(),
           last_login: null
         } as User;
       }
@@ -607,18 +608,19 @@ const analysis = {
       
       console.log(`Found ${data.length} unique stock codes`);
       
-      // Transform the data into StockInfo objects
-      // Corrected to handle potential object return from RPC
-      const stocks: StockInfo[] = data.map(item => {
-        // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
-        const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
-                          ? String(item.stock_code) 
-                          : String(item); // Fallback if it's just a string
-        return {
-          code: stockCode,
-          name: stockCode, // Use code as name if no name is available
-        };
-      });
+      // Transform the data into StockInfo objects with proper null checks
+      const stocks: StockInfo[] = data
+        .filter(item => item != null) // Filter out null items
+        .map(item => {
+          // Assuming the RPC returns objects like { stock_code: 'XYZ' } or just strings
+          const stockCode = (typeof item === 'object' && item !== null && 'stock_code' in item) 
+                            ? String(item.stock_code) 
+                            : String(item); // Fallback if it's just a string
+          return {
+            code: stockCode,
+            name: stockCode, // Use code as name if no name is available
+          };
+        });
       
       return stocks;
     } catch (error) {
@@ -923,33 +925,33 @@ const analysis = {
       
       // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      if (currentData.open <= suggestedEntryPrice) {
-        actualPrice = currentData.open;
-      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+      if (Number(currentData.open) <= suggestedEntryPrice) {
+        actualPrice = Number(currentData.open);
+      } else if (Number(currentData.open) > suggestedEntryPrice && suggestedEntryPrice >= Number(currentData.low)) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
       }
       
       // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
-        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
         : 0;
       
       // Determine if trade is executed
       let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-";
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || Number(currentData.low) <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || Number(currentData.high) >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
-        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
       let stopTrigger: string = '-';
@@ -969,13 +971,13 @@ const analysis = {
         if (stopTrigger === "Executed" && stopPrice !== '-') {
           // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
         } else {
           // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (currentData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - currentData.close) * lotSize;
+            ? (Number(currentData.close) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(currentData.close)) * lotSize;
         }
       }
       
@@ -986,17 +988,17 @@ const analysis = {
       // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: currentData.open, // Using open as entryPrice for consistency?
-        exitPrice: currentData.close, // Using close as exitPrice
-        high: currentData.high,
-        low: currentData.low,
-        volume: currentData.volume,
+        entryPrice: Number(currentData.open), // Using open as entryPrice for consistency
+        exitPrice: Number(currentData.close), // Using close as exitPrice
+        high: Number(currentData.high),
+        low: Number(currentData.low),
+        volume: Number(currentData.volume),
         suggestedEntryPrice,
         actualPrice,
         trade,
         lotSize,
         stopPrice,
-        stop: stopTrigger, // Changed from 'stopTrigger'
+        stop: stopTrigger as 'Executed' | 'Close' | '-', // Proper type casting
         profitLoss, // Changed from 'profit'
         currentCapital: capital // Changed from 'capital'
       });

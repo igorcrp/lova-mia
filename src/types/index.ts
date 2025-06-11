@@ -27,6 +27,7 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
+  created_at: string; // Added missing property
 }
 
 export interface StockAnalysisParams {

@@ -16,11 +16,13 @@ import { cn } from "@/lib/utils";
 interface StockSetupFormProps {
   onSubmit: (params: StockAnalysisParams) => void;
   isLoading?: boolean;
+  isFreePlan?: boolean; // Add the missing prop
 }
 
 export function StockSetupForm({
   onSubmit,
-  isLoading = false
+  isLoading = false,
+  isFreePlan = false
 }: StockSetupFormProps) {
   // State for options loaded from Supabase
   const [countries, setCountries] = useState<string[]>([]);

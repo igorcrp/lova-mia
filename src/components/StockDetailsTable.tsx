@@ -85,9 +85,9 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
-      // Numeric comparison for other fields
-      const numA = Number(valA) || 0;
-      const numB = Number(valB) || 0;
+      // Numeric comparison for other fields with proper type conversion
+      const numA = typeof valA === 'number' ? valA : Number(valA) || 0;
+      const numB = typeof valB === 'number' ? valB : Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, params.operation]);
@@ -595,4 +595,3 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
-
