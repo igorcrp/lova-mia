@@ -41,8 +41,8 @@ export interface StockAnalysisParams {
   stopPercentage: number;
   initialCapital: number;
   dataTableName?: string;
-  period: string; // Period parameter (now required)
-  comparisonStocks?: string[]; // Added comparisonStocks parameter
+  period: string;
+  comparisonStocks?: string[];
 }
 
 export interface AnalysisResult {
@@ -66,8 +66,8 @@ export interface AnalysisResult {
   sortinoRatio: number;
   recoveryFactor: number;
   successRate: number;
-  tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
-  tradeDetails?: TradeDetail[]; // Add tradeDetails property
+  tradeHistory?: TradeHistoryItem[];
+  tradeDetails?: TradeDetail[];
 }
 
 export interface DetailedResult extends AnalysisResult {
@@ -80,19 +80,20 @@ export interface TradeHistoryItem {
   entryPrice: number;
   exitPrice: number;
   profit?: number;
-  profitLoss?: number; // Add profitLoss property
+  profitLoss?: number;
   profitPercentage: number;
-  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
-  stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-';
+  stop?: 'Executed' | 'Close' | '-';
+  stopTrigger?: 'Executed' | 'Close' | '-';
   volume?: number;
   high?: number;
   low?: number;
   suggestedEntryPrice?: number;
-  actualPrice?: number;
+  actualPrice?: number | string;
   lotSize?: number;
-  stopPrice?: number;
-  capital?: number; // Current capital after this trade
-  currentCapital?: number; // Add currentCapital property
+  stopPrice?: number | string;
+  capital?: number;
+  currentCapital?: number;
 }
 
 export interface CapitalPoint {
@@ -106,10 +107,15 @@ export interface StockInfo {
   fullName?: string;
 }
 
-// Add TradeDetail interface for ResultsTable
 export interface TradeDetail {
   profitLoss: number;
   trade: string;
   stop: string;
 }
 
+// Add subscription related types
+export interface SubscriptionData {
+  subscribed: boolean;
+  subscription_tier?: string;
+  subscription_end?: string;
+}

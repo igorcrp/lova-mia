@@ -232,30 +232,29 @@ export const auth = {
     try {
       console.log(`Getting user data for ID: ${userId}`);
       
-      // Use a função check_user_by_email em vez de get_current_user
-      const { data, error } = await supabase.rpc('check_user_by_email', {
-        p_email: userId // Usando userId como email para compatibilidade
-      });
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error("Get user data error:", error);
-        throw error;
+        return null;
       }
 
       console.log("User data retrieved:", data);
       
-      // Converter o resultado para o tipo User
-      if (Array.isArray(data) && data.length > 0) {
-        const userData = data[0];
+      if (data) {
         return {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.name,
-          level_id: userData.level_id,
-          status: userData.status_users as any,
-          email_verified: userData.email_verified,
-          account_type: 'free', // Valor padrão
-          created_at: new Date().toISOString(),
+          id: data.id,
+          email: data.email,
+          full_name: data.name || '',
+          level_id: data.level_id || 1,
+          status: data.status_users as any || 'pending',
+          email_verified: data.email_verified || false,
+          account_type: data.plan_type === 'premium' ? 'premium' : 'free',
+          created_at: data.created_at || new Date().toISOString(),
           last_login: null
         } as User;
       }
@@ -827,11 +826,10 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
-    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+    const tradeHistory: TradeHistoryItem[] = [];
     let capital = params.initialCapital;
     
-    // Ensure data is sorted by date in ascending order
     const sortedData = [...stockData].sort((a, b) => 
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
@@ -840,106 +838,89 @@ const analysis = {
     
     for (let i = 0; i < sortedData.length; i++) {
       const currentData = sortedData[i];
-      // Use previous day's data for calculations when available
       const previousData = i > 0 ? sortedData[i - 1] : null;
       
-      // Get previous day capital (or initial capital if first day)
       const previousCapital = i > 0 
-        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital) // Use currentCapital from previous entry
+        ? (tradeHistory[i-1].currentCapital ?? params.initialCapital)
         : params.initialCapital;
       
-      // Calculate suggested entry price based on previous day's reference price
-      // Use current day's reference price if previous day is not available
-      const referencePrice = previousData ? previousData[params.referencePrice] : currentData[params.referencePrice];
+      const referencePrice = previousData ? Number(previousData[params.referencePrice]) : Number(currentData[params.referencePrice]);
       let suggestedEntryPrice: number;
       
       if (params.operation === 'buy') {
-        // Buy: Previous day's reference price - (Previous day's reference price * entry percentage)
         suggestedEntryPrice = referencePrice - (referencePrice * params.entryPercentage / 100);
       } else {
-        // Sell: Previous day's reference price + (Previous day's reference price * entry percentage)
         suggestedEntryPrice = referencePrice + (referencePrice * params.entryPercentage / 100);
       }
       
-      // Determine actual price based on conditional logic:
       let actualPrice: number | string;
-      if (currentData.open <= suggestedEntryPrice) {
-        actualPrice = currentData.open;
-      } else if (currentData.open > suggestedEntryPrice && suggestedEntryPrice >= currentData.low) {
+      const openPrice = Number(currentData.open);
+      const lowPrice = Number(currentData.low);
+      const highPrice = Number(currentData.high);
+      
+      if (openPrice <= suggestedEntryPrice) {
+        actualPrice = openPrice;
+      } else if (openPrice > suggestedEntryPrice && suggestedEntryPrice >= lowPrice) {
         actualPrice = suggestedEntryPrice;
       } else {
         actualPrice = '-';
       }
       
-      // Calculate lot size from previous day's capital and actual price
-      const lotSize = actualPrice !== '-' && previousCapital > 0 && actualPrice > 0
-        ? Math.floor(previousCapital / (actualPrice as number) / 10) * 10 
+      const lotSize = actualPrice !== '-' && previousCapital > 0 && Number(actualPrice) > 0
+        ? Math.floor(previousCapital / Number(actualPrice) / 10) * 10 
         : 0;
       
-      // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
-        // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) <= suggestedEntryPrice || lowPrice <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
-        // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (Number(actualPrice) >= suggestedEntryPrice || highPrice >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
-      // Calculate stop price
       const stopPrice = actualPrice !== '-' ? (params.operation === 'buy'
-        ? (actualPrice as number) - ((actualPrice as number) * params.stopPercentage / 100)
-        : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
+        ? Number(actualPrice) - (Number(actualPrice) * params.stopPercentage / 100)
+        : Number(actualPrice) + (Number(actualPrice) * params.stopPercentage / 100)) : '-';
       
-      // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: string = '-'; // Type corrected
-      if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
+      let stopTrigger: string = '-';
+      if (trade !== "-" && stopPrice !== '-') {
         if (params.operation === 'buy') {
-          // Buy: If CURRENT Low <= Stop Price → "Executed"
-          stopTrigger = Number(currentData.low) <= Number(stopPrice) ? "Executed" : "-";
+          stopTrigger = lowPrice <= Number(stopPrice) ? "Executed" : "-";
         } else {
-          // Sell: If CURRENT High >= Stop Price → "Executed"
-          stopTrigger = Number(currentData.high) >= Number(stopPrice) ? "Executed" : "-";
+          stopTrigger = highPrice >= Number(stopPrice) ? "Executed" : "-";
         }
       }
       
-      // Calculate profit/loss
       let profitLoss = 0;
-      if (trade !== "-" && actualPrice !== '-') { // Only if trade was initiated
+      if (trade !== "-" && actualPrice !== '-') {
         if (stopTrigger === "Executed" && stopPrice !== '-') {
-          // If stop is triggered on the SAME day, use stop price
           profitLoss = params.operation === 'buy'
-            ? ((stopPrice as number) - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - (stopPrice as number)) * lotSize;
+            ? (Number(stopPrice) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(stopPrice)) * lotSize;
         } else {
-          // Otherwise, use the close price of the CURRENT day
           profitLoss = params.operation === 'buy'
-            ? (currentData.close - (actualPrice as number)) * lotSize
-            : ((actualPrice as number) - currentData.close) * lotSize;
+            ? (Number(currentData.close) - Number(actualPrice)) * lotSize
+            : (Number(actualPrice) - Number(currentData.close)) * lotSize;
         }
       }
       
-      // Update capital: Previous day's capital + current day's profit/loss
-      // Ensure capital doesn't go below zero (optional, based on requirements)
       capital = Math.max(0, previousCapital + profitLoss);
       
-      // Create trade history item
       tradeHistory.push({
         date: currentData.date,
-        entryPrice: currentData.open, // Using open as entryPrice for consistency?
-        exitPrice: currentData.close, // Using close as exitPrice
-        high: currentData.high,
-        low: currentData.low,
-        volume: currentData.volume,
+        entryPrice: openPrice,
+        exitPrice: Number(currentData.close),
+        high: highPrice,
+        low: lowPrice,
+        volume: Number(currentData.volume),
         suggestedEntryPrice,
         actualPrice,
         trade,
         lotSize,
         stopPrice,
-        stopTrigger, // Changed from 'stop'
-        profitLoss, // Changed from 'profit'
-        currentCapital: capital // Changed from 'capital'
-        });
+        stopTrigger,
+        profitLoss,
+        currentCapital: capital
+      });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
@@ -949,7 +930,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -1179,10 +1160,85 @@ const analysis = {
 
 };
 
-// Export the API services
+// Add subscription API
+const subscription = {
+  /**
+   * Create checkout session for premium subscription
+   */
+  async createCheckoutSession(): Promise<{ url: string }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout');
+      
+      if (error) throw error;
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to create checkout session:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check current user subscription status
+   */
+  async checkSubscription(): Promise<SubscriptionData> {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) throw error;
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to check subscription:', error);
+      return { subscribed: false };
+    }
+  },
+
+  /**
+   * Get customer portal URL for subscription management
+   */
+  async getCustomerPortal(): Promise<{ url: string }> {
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      
+      if (error) throw error;
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to get customer portal:', error);
+      throw error;
+    }
+  }
+};
+
+// Mock assets API for admin functionality
+const assets = {
+  async getAssets(page = 1, search = '', country = '', stockMarket = '', assetClass = '') {
+    // Mock implementation
+    return { data: [], total: 0 };
+  },
+  
+  async getAllAssets() {
+    return [];
+  },
+  
+  async createAsset(asset: Omit<Asset, 'id'>) {
+    return { id: '1', ...asset };
+  },
+  
+  async updateAsset(id: string, asset: Partial<Asset>) {
+    return { id, ...asset };
+  },
+  
+  async deleteAsset(id: string) {
+    return true;
+  }
+};
+
 export const api = {
   auth,
   marketData,
-  analysis
+  analysis,
+  subscription,
+  assets
 };
-
