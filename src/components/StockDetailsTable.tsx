@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -455,7 +456,7 @@ export function StockDetailsTable({
                         } else if (column.id === "profitLoss" || column.id === "currentCapital") {
                           formattedValue = formatCurrency(value as number);
                         } else if (column.id === "volume" || column.id === "lotSize") {
-                          formattedValue = (value as number).toLocaleString();
+                          formattedValue = Number(value).toLocaleString();
                         } else if (column.id === "stopTrigger") {
                           formattedValue = item.stopTrigger || "-";
                         } else if (column.id === "trade") {

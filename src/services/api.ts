@@ -656,9 +656,9 @@ const analysis = {
       // Extract stock codes with proper type safety and remove duplicates
       const uniqueCodes = new Set<string>();
       (data as any[])
-        .filter(item => item != null && typeof item === 'object' && 'stock_code' in item && item.stock_code)
+        .filter(item => item != null && typeof item === 'object' && 'stock_code' in item && item.stock_code != null)
         .forEach(item => {
-          if (item && item.stock_code) {
+          if (item && item.stock_code != null) {
             uniqueCodes.add(String(item.stock_code));
           }
         });
@@ -995,7 +995,7 @@ const analysis = {
       // Ensure capital doesn't go below zero (optional, based on requirements)
       capital = Math.max(0, previousCapital + profitLoss);
       
-      // Create trade history item
+      // Create trade history item with proper type conversion
       tradeHistory.push({
         date: currentData.date,
         entryPrice: openPrice, // Using open as entryPrice for consistency
@@ -1004,10 +1004,10 @@ const analysis = {
         low: lowPrice,
         volume: Number(currentData.volume),
         suggestedEntryPrice,
-        actualPrice,
+        actualPrice: typeof actualPrice === 'number' ? actualPrice : actualPrice,
         trade,
         lotSize,
-        stopPrice,
+        stopPrice: typeof stopPrice === 'number' ? stopPrice : stopPrice,
         stop: stopTrigger as 'Executed' | 'Close' | '-', // Proper type casting
         profitLoss, // Changed from 'profit'
         currentCapital: capital // Changed from 'capital'
