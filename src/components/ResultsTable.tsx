@@ -1,3 +1,4 @@
+
 import { AnalysisResult } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   Pagination,
   PaginationContent,
@@ -51,6 +53,7 @@ interface SortConfig {
 }
 
 export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
+  const { isFree } = useSubscription();
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
@@ -58,7 +61,10 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-const sortedResults = [...results].sort((a, b) => {
+  // Limit results for free users
+  const displayResults = isFree ? results.slice(0, 10) : results;
+
+  const sortedResults = [...displayResults].sort((a, b) => {
     const fieldA = a[sortConfig.field];
     const fieldB = b[sortConfig.field];
     
@@ -79,6 +85,9 @@ const sortedResults = [...results].sort((a, b) => {
   );
   
   const handleSort = (field: SortField) => {
+    // Disable sorting for free users
+    if (isFree) return;
+    
     setSortConfig({
       field,
       direction:
@@ -89,15 +98,12 @@ const sortedResults = [...results].sort((a, b) => {
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortConfig.field !== field) {
-      return null;
-    }
+    // Don't show sort icons for free users
+    if (isFree || sortConfig.field !== field) return null;
     
-    return sortConfig.direction === "asc" ? (
-      <ChevronUp className="ml-1 h-4 w-4" />
-    ) : (
-      <ChevronDown className="ml-1 h-4 w-4" />
-    );
+    return sortConfig.direction === "asc" 
+      ? <ChevronUp className="ml-1 h-4 w-4" /> 
+      : <ChevronDown className="ml-1 h-4 w-4" />;
   };
 
   // Generate pagination items
@@ -185,7 +191,14 @@ const sortedResults = [...results].sort((a, b) => {
   
   return (
     <div className="mt-6 space-y-4">
-      <h2 className="text-xl font-semibold">Results</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Results</h2>
+        {isFree && (
+          <div className="text-sm text-muted-foreground">
+            Showing {Math.min(10, results.length)} of {results.length} results (Free Plan)
+          </div>
+        )}
+      </div>
       
       <div className="rounded-md border overflow-hidden">
         <div className="overflow-x-auto">
@@ -193,7 +206,7 @@ const sortedResults = [...results].sort((a, b) => {
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className="w-20 cursor-pointer text-center"
+                  className={`w-20 text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
@@ -202,7 +215,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer text-center"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
@@ -211,7 +224,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
@@ -220,7 +233,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -229,7 +242,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
@@ -238,7 +251,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -247,7 +260,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
@@ -256,7 +269,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -265,7 +278,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
@@ -274,7 +287,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -283,7 +296,7 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={`text-center ${!isFree ? 'cursor-pointer' : ''}`}
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">

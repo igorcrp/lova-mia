@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   email: string;
@@ -11,6 +10,18 @@ export interface User {
   account_type: 'free' | 'premium';
   created_at: string;
   last_login?: string;
+}
+
+export interface Subscriber {
+  id: string;
+  user_id: string;
+  email: string;
+  stripe_customer_id?: string;
+  subscribed: boolean;
+  subscription_tier: 'free' | 'premium';
+  subscription_end?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MarketDataSource {
@@ -29,6 +40,7 @@ export interface Asset {
   stock_market: string;
   asset_class: string;
   status: 'active' | 'inactive';
+  created_at?: string;
 }
 
 export interface StockAnalysisParams {
@@ -84,6 +96,7 @@ export interface TradeHistoryItem {
   profitPercentage: number;
   trade: 'Executed' | 'Not Executed' | 'Buy' | 'Sell' | 'Close' | '-'; // Expand trade types
   stop?: 'Executed' | 'Close' | '-'; // Updated to include 'Close'
+  stopTrigger?: string; // Add stopTrigger property
   volume?: number;
   high?: number;
   low?: number;
@@ -112,4 +125,3 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
-
