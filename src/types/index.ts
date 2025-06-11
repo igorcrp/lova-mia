@@ -1,5 +1,3 @@
-
-
 export interface User {
   id: string;
   email: string;
@@ -112,4 +110,3 @@ export interface TradeDetail {
   trade: string;
   stop: string;
 }
-

@@ -292,6 +292,68 @@ export const auth = {
 };
 
 /**
+ * Subscription API service
+ */
+const subscription = {
+  /**
+   * Check current subscription status
+   */
+  async checkSubscription(): Promise<{subscribed: boolean; subscription_tier: string; plan_type: string}> {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      
+      if (error) {
+        console.error('Subscription check error:', error);
+        return { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
+      }
+      
+      return data || { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
+    } catch (error) {
+      console.error('Failed to check subscription:', error);
+      return { subscribed: false, subscription_tier: 'free', plan_type: 'free' };
+    }
+  },
+
+  /**
+   * Create Stripe checkout session for premium subscription
+   */
+  async createCheckoutSession(): Promise<{url?: string; error?: string}> {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout');
+      
+      if (error) {
+        console.error('Checkout session error:', error);
+        return { error: error.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to create checkout session:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
+  /**
+   * Create customer portal session for subscription management
+   */
+  async createCustomerPortal(): Promise<{url?: string; error?: string}> {
+    try {
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      
+      if (error) {
+        console.error('Customer portal error:', error);
+        return { error: error.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Failed to create customer portal:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+};
+
+/**
  * Market Data API service for fetching market data
  */
 const marketData = {
@@ -705,8 +767,6 @@ const analysis = {
     }
   },
 
-  // --- Start: Functions copied from api-18.ts ---
-
   /**
    * Run stock analysis with given parameters
    */
@@ -827,8 +887,8 @@ const analysis = {
   /**
    * Generate trade history for a stock using the updated formulas
    */
-  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> { // Return type corrected
-    const tradeHistory: TradeHistoryItem[] = []; // Type corrected
+  async generateTradeHistory(stockData: any[], params: StockAnalysisParams): Promise<TradeHistoryItem[]> {
+    const tradeHistory: TradeHistoryItem[] = [];
     let capital = params.initialCapital;
     
     // Ensure data is sorted by date in ascending order
@@ -877,13 +937,13 @@ const analysis = {
         : 0;
       
       // Determine if trade is executed
-      let trade: TradeHistoryItem['trade'] = "-"; // Type corrected
+      let trade: TradeHistoryItem['trade'] = "-";
       if (params.operation === 'buy') {
         // Buy: If Actual Price <= Suggested Entry OR Low <= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (actualPrice <= suggestedEntryPrice || currentData.low <= suggestedEntryPrice)) ? "Buy" : "-";
       } else {
         // Sell: If Actual Price >= Suggested Entry OR High >= Suggested Entry → "Executed"
-        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-"; // Changed to Buy/Sell
+        trade = (actualPrice !== '-' && (actualPrice >= suggestedEntryPrice || currentData.high >= suggestedEntryPrice)) ? "Sell" : "-";
       }
       
       // Calculate stop price
@@ -892,7 +952,7 @@ const analysis = {
         : (actualPrice as number) + ((actualPrice as number) * params.stopPercentage / 100)) : '-';
       
       // Determine if stop is triggered based on the CURRENT day's low/high
-      let stopTrigger: string = '-'; // Type corrected
+      let stopTrigger: string = '-';
       if (trade !== "-" && stopPrice !== '-') { // Check if trade was initiated and stop price is valid
         if (params.operation === 'buy') {
           // Buy: If CURRENT Low <= Stop Price → "Executed"
@@ -936,10 +996,10 @@ const analysis = {
         trade,
         lotSize,
         stopPrice,
-        stopTrigger, // Changed from 'stop'
+        stop: stopTrigger, // Changed from 'stopTrigger'
         profitLoss, // Changed from 'profit'
         currentCapital: capital // Changed from 'capital'
-        });
+      });
     }
     
     console.info(`Generated ${tradeHistory.length} trade history entries`);
@@ -949,7 +1009,7 @@ const analysis = {
   /**
    * Calculate capital evolution based on trade history
    */
-  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] { // Type corrected
+  calculateCapitalEvolution(tradeHistory: TradeHistoryItem[], initialCapital: number): { date: string; capital: number }[] {
     if (!tradeHistory || tradeHistory.length === 0) {
       return [{ date: new Date().toISOString().split('T')[0], capital: initialCapital }];
     }
@@ -996,8 +1056,8 @@ const analysis = {
     
     // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
     const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
-    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
-    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length; // Stop is triggered regardless of P/L sign
+    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stop !== 'Executed').length;
+    const stops = executedTrades.filter(trade => trade.stop === 'Executed').length; // Stop is triggered regardless of P/L sign
     
     // Sum the profit/loss values
     let totalProfit = 0;
@@ -1174,15 +1234,25 @@ const analysis = {
       throw error; 
     }
   },
-
-  // --- End: Functions copied from api-18.ts ---
-
 };
 
 // Export the API services
 export const api = {
   auth,
   marketData,
-  analysis
+  analysis,
+  subscription,
+  assets: {
+    getAssets: async (page = 1, search = '', country = '', stockMarket = '', assetClass = '') => {
+      // Mock implementation for assets
+      return { data: [], total: 0 };
+    },
+    getAllAssets: async () => {
+      return [];
+    },
+    createAsset: async (asset: Partial<Asset>) => {
+      // Mock implementation
+      return { id: '1', ...asset } as Asset;
+    }
+  }
 };
-

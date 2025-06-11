@@ -1,15 +1,19 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Crown } from "lucide-react";
 
 export default function DaytradePage() {
+  const { planType, createCheckoutSession, isLoading: subscriptionLoading } = useSubscription();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
@@ -18,6 +22,8 @@ export default function DaytradePage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showDetailView, setShowDetailView] = useState(false);
+
+  const isFreePlan = planType === 'free';
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
@@ -215,13 +221,22 @@ export default function DaytradePage() {
     }
   };
 
+  const handleUpgrade = async () => {
+    if (subscriptionLoading) return;
+    await createCheckoutSession();
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Daytrade Portfolio</h1>
       
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
-          <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
+          <StockSetupForm 
+            onSubmit={runAnalysis} 
+            isLoading={isLoading}
+            isFreePlan={isFreePlan}
+          />
           
           {isLoading && (
             <div className="mt-6">
@@ -233,10 +248,33 @@ export default function DaytradePage() {
             </div>
           )}
           
+          {/* Upgrade Message */}
+          {isFreePlan && analysisResults.length > 0 && (
+            <Card className="mt-4 border-amber-200 bg-amber-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-amber-800">
+                    <Crown className="h-4 w-4" />
+                    <span>Upgrade to Premium for full access to all results and features</span>
+                  </div>
+                  <Button 
+                    onClick={handleUpgrade}
+                    disabled={subscriptionLoading}
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700"
+                  >
+                    {subscriptionLoading ? "Loading..." : "Upgrade to Premium"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {analysisResults.length > 0 && !isLoading && (
             <ResultsTable 
               results={analysisResults} 
-              onViewDetails={viewDetails} 
+              onViewDetails={viewDetails}
+              isFreePlan={isFreePlan}
             />
           )}
         </div>
