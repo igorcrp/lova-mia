@@ -48,7 +48,27 @@ export default function AppHomePage() {
       </div>
       
       <div className="space-y-6">
-        {/* Seção 1: Principais Índices Financeiros Globais */}
+        {/* Status dos Mercados - Movido para cima */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Status dos Mercados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              {marketStatus.map((market, i) => (
+                <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                  <span className="font-medium">{market.region}</span>
+                  <Badge className={market.color}>{market.status}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Seção 1: Principais Índices Financeiros Globais - Convertido para Cards */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -57,45 +77,25 @@ export default function AppHomePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Índice</TableHead>
-                  <TableHead>Último</TableHead>
-                  <TableHead>Variação (%)</TableHead>
-                  <TableHead>Máxima do Dia</TableHead>
-                  <TableHead>Mínima do Dia</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {indices.map((index, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{index.name}</TableCell>
-                    <TableCell>{index.value}</TableCell>
-                    <TableCell>
-                      <div className={`flex items-center gap-1 ${index.negative ? 'text-red-600' : 'text-green-600'}`}>
-                        {index.negative ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-                        {index.change}
-                      </div>
-                    </TableCell>
-                    <TableCell>{index.max}</TableCell>
-                    <TableCell>{index.min}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            {/* Status dos Mercados */}
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-4">Status dos Mercados</h3>
-              <div className="grid grid-cols-3 gap-4">
-                {marketStatus.map((market, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                    <span className="font-medium">{market.region}</span>
-                    <Badge className={market.color}>{market.status}</Badge>
+            <div className="grid grid-cols-5 gap-3">
+              {indices.map((index, i) => (
+                <div key={i} className="p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                  <div className="text-xs font-medium text-muted-foreground mb-1">
+                    {index.name}
                   </div>
-                ))}
-              </div>
+                  <div className="text-sm font-bold mb-1">
+                    {index.value}
+                  </div>
+                  <div className={`flex items-center gap-1 text-xs ${index.negative ? 'text-red-600' : 'text-green-600'}`}>
+                    {index.negative ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                    {index.change}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <div>Max: {index.max}</div>
+                    <div>Min: {index.min}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
