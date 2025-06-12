@@ -11,9 +11,7 @@ import { Crown, Check } from "lucide-react";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
 
 export default function ProfilePage() {
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
   const {
     isSubscribed,
     subscriptionTier,
@@ -22,7 +20,8 @@ export default function ProfilePage() {
     isLoading
   } = useSubscription();
   
-  return <div>
+  return (
+    <div>
       <div className="grid grid-cols-1 md:grid gap-6">
         <div className="md:col-span-2 space-y-6">
           <Card>
@@ -45,9 +44,11 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground mt-1">
                       {user?.email_verified ? 'Verified' : 'Not verified'}
                     </p>
-                    {!user?.email_verified && <Button variant="outline" size="sm" className="mt-2">
+                    {!user?.email_verified && (
+                      <Button variant="outline" size="sm" className="mt-2">
                         Verify Email
-                      </Button>}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -129,9 +130,11 @@ export default function ProfilePage() {
                       Basic features
                     </li>
                   </ul>
-                  {!isSubscribed && <Badge variant="outline" className="absolute top-4 right-4 text-green-600 border-green-600">
+                  {!isSubscribed && (
+                    <Badge variant="outline" className="absolute top-4 right-4 text-green-600 border-green-600">
                       Current Plan
-                    </Badge>}
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Premium Plan */}
@@ -163,20 +166,29 @@ export default function ProfilePage() {
                     </li>
                   </ul>
                   
-                  {isSubscribed ? <>
+                  {isSubscribed ? (
+                    <>
                       <Badge variant="outline" className="absolute top-4 right-4 text-green-600 border-green-600">
                         Current Plan
                       </Badge>
                       <SubscriptionManagement />
-                    </> : <Button onClick={createCheckout} disabled={isLoading} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    </>
+                  ) : (
+                    <Button 
+                      onClick={createCheckout} 
+                      disabled={isLoading} 
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    >
                       <Crown className="h-4 w-4 mr-2" />
                       Upgrade to Premium
-                    </Button>}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 }
