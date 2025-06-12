@@ -116,7 +116,22 @@ export default function AppHomePage() {
       
       <div className="space-y-6">
         {/* Status dos Mercados - Movido para cima */}
-        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Status dos Mercados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              {marketStatus.map((market, i) => <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                  <span className="font-medium">{market.region}</span>
+                  <Badge className={market.color}>{market.status}</Badge>
+                </div>)}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Seção 1: Principais Índices Financeiros Globais - Convertido para Cards */}
         <Card>
