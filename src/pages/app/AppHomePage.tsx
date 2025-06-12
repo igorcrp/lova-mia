@@ -182,7 +182,7 @@ export default function AppHomePage() {
         </Card>
 
         {/* Seção 3: Notícias e Alertas do Mercado */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -200,30 +200,7 @@ export default function AppHomePage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Calendário Econômico
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <h4 className="font-medium mb-2">Próximos Eventos</h4>
-                  <ul className="text-sm space-y-1">
-                    <li>• Próximos lançamentos de dados importantes</li>
-                    <li>• Reuniões de bancos centrais agendadas</li>
-                    <li>• Relatórios trimestrais de grandes empresas</li>
-                  </ul>
-                </div>
-                
-                <Button variant="outline" className="w-full">
-                  Ver Calendário Completo
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
       </div>
     </div>;
