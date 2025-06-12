@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
-  const [fullName, setFullName] = useState(user?.name || user?.full_name || "");
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   
   const {
@@ -24,8 +25,38 @@ export default function ProfilePage() {
     subscriptionTier,
     subscriptionEnd,
     createCheckout,
-    isLoading
+    isLoading: subscriptionLoading
   } = useSubscription();
+
+  // Fetch user profile data on component mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user profile:', error);
+        } else if (data) {
+          setFullName(data.name || "");
+        }
+      } catch (error) {
+        console.error('Error in fetchUserProfile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [user?.id]);
 
   const handleSaveChanges = async () => {
     if (!user?.id) return;
@@ -48,9 +79,6 @@ export default function ProfilePage() {
         });
         return;
       }
-
-      // Refresh user data
-      await refreshUser();
       
       toast({
         title: "Success",
@@ -67,6 +95,14 @@ export default function ProfilePage() {
       setIsUpdating(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="loading-circle"></div>
+      </div>
+    );
+  }
   
   return (
     <div>
@@ -94,9 +130,9 @@ export default function ProfilePage() {
                   <div>
                     <Label className="text-base">Email Verification</Label>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {user?.email_verified ? 'Verified' : 'Not verified'}
+                      {user?.email_confirmed_at ? 'Verified' : 'Not verified'}
                     </p>
-                    {!user?.email_verified && (
+                    {!user?.email_confirmed_at && (
                       <Button variant="outline" size="sm" className="mt-2">
                         Verify Email
                       </Button>
@@ -230,7 +266,7 @@ export default function ProfilePage() {
                   ) : (
                     <Button 
                       onClick={createCheckout} 
-                      disabled={isLoading} 
+                      disabled={subscriptionLoading} 
                       className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     >
                       <Crown className="h-4 w-4 mr-2" />
