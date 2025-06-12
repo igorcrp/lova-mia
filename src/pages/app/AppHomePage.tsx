@@ -183,22 +183,7 @@ export default function AppHomePage() {
 
         {/* Seção 3: Notícias e Alertas do Mercado */}
         <div className="">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Últimas Notícias
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-3">
-                {news.map((item, i) => <li key={i} className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                    <span className="text-sm">{item}</span>
-                  </li>)}
-              </ul>
-            </CardContent>
-          </Card>
+          
 
           
         </div>
