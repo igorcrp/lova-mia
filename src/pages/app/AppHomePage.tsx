@@ -1,78 +1,45 @@
 
-import { useState, useEffect } from "react";
-import { api } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AnalysisResult, StockAnalysisParams } from "@/types";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { ArrowRight, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowUp, ArrowDown, Clock, TrendingUp, Globe, Calendar } from "lucide-react";
 
 export default function AppHomePage() {
-  const [topPerformers, setTopPerformers] = useState<AnalysisResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<"30" | "60" | "90">("30");
+  // Dados mockados para os índices financeiros
+  const indices = [
+    { name: "S&P 500", value: "6.022,24", change: "-0,27%", max: "6.059,40", min: "6.002,32", negative: true },
+    { name: "Dow Jones", value: "42.865,77", change: "0,00%", max: "43.115,69", min: "42.738,62", negative: false },
+    { name: "Nasdaq Composite", value: "19.615,88", change: "-0,50%", max: "19.800,46", min: "19.551,35", negative: true },
+    { name: "FTSE 100", value: "8.882,68", change: "+0,21%", max: "8.886,76", min: "8.836,75", negative: false },
+    { name: "DAX (Alemanha)", value: "23.751,87", change: "-0,94%", max: "23.811,00", min: "23.616,69", negative: true },
+    { name: "Nikkei 225 (Japão)", value: "38.173,09", change: "-0,65%", max: "38.407,57", min: "38.102,05", negative: true },
+    { name: "Hang Seng (Hong Kong)", value: "24.035,38", change: "-1,36%", max: "24.288,76", min: "24.002,42", negative: true },
+    { name: "Ibovespa (Brasil)", value: "137.128", change: "+0,51%", max: "137.531", min: "135.628", negative: false }
+  ];
 
-  // Dummy data for the chart
-  const chartData = [{
-    date: "Jan",
-    value: 10000
-  }, {
-    date: "Feb",
-    value: 10800
-  }, {
-    date: "Mar",
-    value: 11200
-  }, {
-    date: "Apr",
-    value: 10900
-  }, {
-    date: "May",
-    value: 11800
-  }, {
-    date: "Jun",
-    value: 12400
-  }, {
-    date: "Jul",
-    value: 12900
-  }];
+  // Dados mockados para indicadores econômicos
+  const economies = [
+    { country: "EUA", gdp: "2,3% (est.)", inflation: "3,1%", interest: "5,25-5,50%", currency: "USD 1,00" },
+    { country: "Zona Euro", gdp: "1,5%", inflation: "2,8%", interest: "4,50%", currency: "EUR 0,92" },
+    { country: "China", gdp: "5,0%", inflation: "2,5%", interest: "3,45%", currency: "CNY 7,10" },
+    { country: "Japão", gdp: "1,2%", inflation: "2,3%", interest: "-0,10%", currency: "JPY 153,00" },
+    { country: "Brasil", gdp: "2,18%", inflation: "5,44%", interest: "14,75%", currency: "BRL 5,53" }
+  ];
 
-  useEffect(() => {
-    const fetchTopPerformers = async () => {
-      try {
-        setIsLoading(true);
+  // Dados mockados para notícias
+  const news = [
+    "Negociações comerciais EUA-China em Londres",
+    "Medida Provisória sobre IOF no Brasil",
+    "Expectativas de inflação nos EUA",
+    "Produção de petróleo americano sob nova administração"
+  ];
 
-        // In a real app, we would fetch data for the specific time range
-        // Here we're using the same simulated data
-        const params: StockAnalysisParams = {
-          operation: "buy",
-          country: "USA",
-          stockMarket: "NASDAQ",
-          assetClass: "Ações",
-          referencePrice: "close",
-          period: "3m",
-          entryPercentage: 1,
-          stopPercentage: 1,
-          initialCapital: 10000,
-          initialInvestment: 1000,
-          stopLoss: 0,
-          profitTarget: 0,
-          riskFactor: 1,
-          comparisonStocks: []
-        };
-        const results = await api.analysis.runAnalysis(params);
-
-        // Sort by profit percentage
-        const sorted = [...results].sort((a, b) => b.profitPercentage - a.profitPercentage);
-        setTopPerformers(sorted.slice(0, 5)); // Take top 5
-      } catch (error) {
-        console.error("Failed to fetch top performers", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchTopPerformers();
-  }, [timeRange]);
+  const marketStatus = [
+    { region: "Asiático", status: "Fechado", color: "bg-red-100 text-red-800" },
+    { region: "Europeu", status: "Aberto", color: "bg-green-100 text-green-800" },
+    { region: "Americano", status: "Aberto", color: "bg-green-100 text-green-800" }
+  ];
 
   return (
     <div>
@@ -80,99 +47,140 @@ export default function AppHomePage() {
         <h1 className="text-2xl font-bold">Dashboard</h1>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Portfolio Performance</CardTitle>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-8 text-xs">1M</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10">6M</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs">1Y</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs">All</Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5
-                }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={value => `$${value.toLocaleString()}`} />
-                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Value"]} labelFormatter={label => `Date: ${label}`} />
-                  <Line type="monotone" dataKey="value" stroke="#3b82f6" activeDot={{
-                    r: 6
-                  }} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
+      <div className="space-y-6">
+        {/* Seção 1: Principais Índices Financeiros Globais */}
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Top Performers</CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "30" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("30")}>
-                  30d
-                </Button>
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "60" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("60")}>
-                  60d
-                </Button>
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "90" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("90")}>
-                  90d
-                </Button>
-              </div>
-            </div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Principais Índices Financeiros Globais (em tempo real)
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="h-[260px] flex items-center justify-center">
-                <div className="loading-circle" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {topPerformers.map((stock, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-primary/10 p-2 rounded-full">
-                        <TrendingUp className="h-4 w-4 text-primary" />
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Índice</TableHead>
+                  <TableHead>Último</TableHead>
+                  <TableHead>Variação (%)</TableHead>
+                  <TableHead>Máxima do Dia</TableHead>
+                  <TableHead>Mínima do Dia</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {indices.map((index, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{index.name}</TableCell>
+                    <TableCell>{index.value}</TableCell>
+                    <TableCell>
+                      <div className={`flex items-center gap-1 ${index.negative ? 'text-red-600' : 'text-green-600'}`}>
+                        {index.negative ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+                        {index.change}
                       </div>
-                      <div>
-                        <div className="font-medium">{stock.assetCode}</div>
-                        <div className="text-xs text-muted-foreground">{stock.assetName || 'N/A'}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium text-green-600 dark:text-green-400">
-                        +{stock.profitPercentage.toFixed(2)}%
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        ${stock.profit.toFixed(2)}
-                      </div>
-                    </div>
+                    </TableCell>
+                    <TableCell>{index.max}</TableCell>
+                    <TableCell>{index.min}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {/* Status dos Mercados */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-4">Status dos Mercados</h3>
+              <div className="grid grid-cols-3 gap-4">
+                {marketStatus.map((market, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                    <span className="font-medium">{market.region}</span>
+                    <Badge className={market.color}>{market.status}</Badge>
                   </div>
                 ))}
-                
-                <Link to="/app/daytrade">
-                  <Button variant="ghost" size="sm" className="w-full mt-2">
-                    View All
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        
+
+        {/* Seção 2: Indicadores Econômicos Globais */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Indicadores Econômicos Globais
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <h3 className="text-lg font-semibold mb-4">Principais Economias</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>País</TableHead>
+                  <TableHead>Cresc. PIB 2025</TableHead>
+                  <TableHead>Inflação</TableHead>
+                  <TableHead>Taxa de Juros</TableHead>
+                  <TableHead>Moeda (Câmbio)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {economies.map((economy, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{economy.country}</TableCell>
+                    <TableCell>{economy.gdp}</TableCell>
+                    <TableCell>{economy.inflation}</TableCell>
+                    <TableCell>{economy.interest}</TableCell>
+                    <TableCell>{economy.currency}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Seção 3: Notícias e Alertas do Mercado */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Últimas Notícias
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {news.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                    <span className="text-sm">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Calendário Econômico
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Próximos Eventos</h4>
+                  <ul className="text-sm space-y-1">
+                    <li>• Próximos lançamentos de dados importantes</li>
+                    <li>• Reuniões de bancos centrais agendadas</li>
+                    <li>• Relatórios trimestrais de grandes empresas</li>
+                  </ul>
+                </div>
+                
+                <Button variant="outline" className="w-full">
+                  Ver Calendário Completo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

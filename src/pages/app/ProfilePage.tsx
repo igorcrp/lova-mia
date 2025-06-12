@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,9 +10,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Crown, Check } from "lucide-react";
 import { SubscriptionManagement } from "@/components/SubscriptionManagement";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const [fullName, setFullName] = useState(user?.name || user?.full_name || "");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
+  
   const {
     isSubscribed,
     subscriptionTier,
@@ -19,6 +26,47 @@ export default function ProfilePage() {
     createCheckout,
     isLoading
   } = useSubscription();
+
+  const handleSaveChanges = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsUpdating(true);
+      
+      // Update the users table
+      const { error } = await supabase
+        .from('users')
+        .update({ name: fullName })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error updating user:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update profile. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Refresh user data
+      await refreshUser();
+      
+      toast({
+        title: "Success",
+        description: "Profile updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
   
   return (
     <div>
@@ -32,7 +80,11 @@ export default function ProfilePage() {
               <div className="grid grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
-                  <Input id="fullName" defaultValue={user?.full_name || ""} />
+                  <Input 
+                    id="fullName" 
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -74,7 +126,9 @@ export default function ProfilePage() {
               </div>
               
               <div className="flex justify-end">
-                <Button>Save Changes</Button>
+                <Button onClick={handleSaveChanges} disabled={isUpdating}>
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
+                </Button>
               </div>
             </CardContent>
           </Card>
