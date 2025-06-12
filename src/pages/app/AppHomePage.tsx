@@ -123,7 +123,7 @@ export default function AppHomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Major Global Financial Indices
+              Principais Índices Financeiros Globais (em tempo real)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -140,8 +140,8 @@ export default function AppHomePage() {
                     {index.change}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    <div>Max: {index.max}</div>
-                    <div>Min: {index.min}</div>
+                    
+                    
                   </div>
                 </div>)}
             </div>
