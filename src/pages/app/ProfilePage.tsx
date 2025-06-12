@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,9 +129,9 @@ export default function ProfilePage() {
                   <div>
                     <Label className="text-base">Email Verification</Label>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {user?.email_confirmed_at ? 'Verified' : 'Not verified'}
+                      {user?.email_verified ? 'Verified' : 'Not verified'}
                     </p>
-                    {!user?.email_confirmed_at && (
+                    {!user?.email_verified && (
                       <Button variant="outline" size="sm" className="mt-2">
                         Verify Email
                       </Button>
