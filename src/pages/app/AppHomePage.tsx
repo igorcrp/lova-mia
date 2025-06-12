@@ -123,7 +123,7 @@ export default function AppHomePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Principais Índices Financeiros Globais (em tempo real)
+              Major Global Financial Indices
             </CardTitle>
           </CardHeader>
           <CardContent>
