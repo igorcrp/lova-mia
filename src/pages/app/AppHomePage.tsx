@@ -111,13 +111,9 @@ export default function AppHomePage() {
     status: "Aberto",
     color: "bg-green-100 text-green-800"
   }];
-  return <div>
-      
+  return <div>      
       
       <div className="space-y-6">
-        {/* Status dos Mercados - Movido para cima */}
-        
-
         {/* Seção 1: Principais Índices Financeiros Globais - Convertido para Cards */}
         <Card>
           <CardHeader>
