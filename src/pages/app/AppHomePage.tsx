@@ -1,51 +1,118 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowUp, ArrowDown, Clock, TrendingUp, Globe, Calendar } from "lucide-react";
-
 export default function AppHomePage() {
   // Dados mockados para os índices financeiros
-  const indices = [
-    { name: "S&P 500", value: "6.022,24", change: "-0,27%", max: "6.059,40", min: "6.002,32", negative: true },
-    { name: "Dow Jones", value: "42.865,77", change: "0,00%", max: "43.115,69", min: "42.738,62", negative: false },
-    { name: "Nasdaq Composite", value: "19.615,88", change: "-0,50%", max: "19.800,46", min: "19.551,35", negative: true },
-    { name: "FTSE 100", value: "8.882,68", change: "+0,21%", max: "8.886,76", min: "8.836,75", negative: false },
-    { name: "DAX (Alemanha)", value: "23.751,87", change: "-0,94%", max: "23.811,00", min: "23.616,69", negative: true },
-    { name: "Nikkei 225 (Japão)", value: "38.173,09", change: "-0,65%", max: "38.407,57", min: "38.102,05", negative: true },
-    { name: "Hang Seng (Hong Kong)", value: "24.035,38", change: "-1,36%", max: "24.288,76", min: "24.002,42", negative: true },
-    { name: "Ibovespa (Brasil)", value: "137.128", change: "+0,51%", max: "137.531", min: "135.628", negative: false }
-  ];
+  const indices = [{
+    name: "S&P 500",
+    value: "6.022,24",
+    change: "-0,27%",
+    max: "6.059,40",
+    min: "6.002,32",
+    negative: true
+  }, {
+    name: "Dow Jones",
+    value: "42.865,77",
+    change: "0,00%",
+    max: "43.115,69",
+    min: "42.738,62",
+    negative: false
+  }, {
+    name: "Nasdaq Composite",
+    value: "19.615,88",
+    change: "-0,50%",
+    max: "19.800,46",
+    min: "19.551,35",
+    negative: true
+  }, {
+    name: "FTSE 100",
+    value: "8.882,68",
+    change: "+0,21%",
+    max: "8.886,76",
+    min: "8.836,75",
+    negative: false
+  }, {
+    name: "DAX (Alemanha)",
+    value: "23.751,87",
+    change: "-0,94%",
+    max: "23.811,00",
+    min: "23.616,69",
+    negative: true
+  }, {
+    name: "Nikkei 225 (Japão)",
+    value: "38.173,09",
+    change: "-0,65%",
+    max: "38.407,57",
+    min: "38.102,05",
+    negative: true
+  }, {
+    name: "Hang Seng (Hong Kong)",
+    value: "24.035,38",
+    change: "-1,36%",
+    max: "24.288,76",
+    min: "24.002,42",
+    negative: true
+  }, {
+    name: "Ibovespa (Brasil)",
+    value: "137.128",
+    change: "+0,51%",
+    max: "137.531",
+    min: "135.628",
+    negative: false
+  }];
 
   // Dados mockados para indicadores econômicos
-  const economies = [
-    { country: "EUA", gdp: "2,3% (est.)", inflation: "3,1%", interest: "5,25-5,50%", currency: "USD 1,00" },
-    { country: "Zona Euro", gdp: "1,5%", inflation: "2,8%", interest: "4,50%", currency: "EUR 0,92" },
-    { country: "China", gdp: "5,0%", inflation: "2,5%", interest: "3,45%", currency: "CNY 7,10" },
-    { country: "Japão", gdp: "1,2%", inflation: "2,3%", interest: "-0,10%", currency: "JPY 153,00" },
-    { country: "Brasil", gdp: "2,18%", inflation: "5,44%", interest: "14,75%", currency: "BRL 5,53" }
-  ];
+  const economies = [{
+    country: "EUA",
+    gdp: "2,3% (est.)",
+    inflation: "3,1%",
+    interest: "5,25-5,50%",
+    currency: "USD 1,00"
+  }, {
+    country: "Zona Euro",
+    gdp: "1,5%",
+    inflation: "2,8%",
+    interest: "4,50%",
+    currency: "EUR 0,92"
+  }, {
+    country: "China",
+    gdp: "5,0%",
+    inflation: "2,5%",
+    interest: "3,45%",
+    currency: "CNY 7,10"
+  }, {
+    country: "Japão",
+    gdp: "1,2%",
+    inflation: "2,3%",
+    interest: "-0,10%",
+    currency: "JPY 153,00"
+  }, {
+    country: "Brasil",
+    gdp: "2,18%",
+    inflation: "5,44%",
+    interest: "14,75%",
+    currency: "BRL 5,53"
+  }];
 
   // Dados mockados para notícias
-  const news = [
-    "Negociações comerciais EUA-China em Londres",
-    "Medida Provisória sobre IOF no Brasil",
-    "Expectativas de inflação nos EUA",
-    "Produção de petróleo americano sob nova administração"
-  ];
-
-  const marketStatus = [
-    { region: "Asiático", status: "Fechado", color: "bg-red-100 text-red-800" },
-    { region: "Europeu", status: "Aberto", color: "bg-green-100 text-green-800" },
-    { region: "Americano", status: "Aberto", color: "bg-green-100 text-green-800" }
-  ];
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-      </div>
+  const news = ["Negociações comerciais EUA-China em Londres", "Medida Provisória sobre IOF no Brasil", "Expectativas de inflação nos EUA", "Produção de petróleo americano sob nova administração"];
+  const marketStatus = [{
+    region: "Asiático",
+    status: "Fechado",
+    color: "bg-red-100 text-red-800"
+  }, {
+    region: "Europeu",
+    status: "Aberto",
+    color: "bg-green-100 text-green-800"
+  }, {
+    region: "Americano",
+    status: "Aberto",
+    color: "bg-green-100 text-green-800"
+  }];
+  return <div>
+      
       
       <div className="space-y-6">
         {/* Status dos Mercados - Movido para cima */}
@@ -58,12 +125,10 @@ export default function AppHomePage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
-              {marketStatus.map((market, i) => (
-                <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+              {marketStatus.map((market, i) => <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
                   <span className="font-medium">{market.region}</span>
                   <Badge className={market.color}>{market.status}</Badge>
-                </div>
-              ))}
+                </div>)}
             </div>
           </CardContent>
         </Card>
@@ -78,8 +143,7 @@ export default function AppHomePage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-5 gap-3">
-              {indices.map((index, i) => (
-                <div key={i} className="p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+              {indices.map((index, i) => <div key={i} className="p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
                   <div className="text-xs font-medium text-muted-foreground mb-1">
                     {index.name}
                   </div>
@@ -94,8 +158,7 @@ export default function AppHomePage() {
                     <div>Max: {index.max}</div>
                     <div>Min: {index.min}</div>
                   </div>
-                </div>
-              ))}
+                </div>)}
             </div>
           </CardContent>
         </Card>
@@ -121,15 +184,13 @@ export default function AppHomePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {economies.map((economy, i) => (
-                  <TableRow key={i}>
+                {economies.map((economy, i) => <TableRow key={i}>
                     <TableCell className="font-medium">{economy.country}</TableCell>
                     <TableCell>{economy.gdp}</TableCell>
                     <TableCell>{economy.inflation}</TableCell>
                     <TableCell>{economy.interest}</TableCell>
                     <TableCell>{economy.currency}</TableCell>
-                  </TableRow>
-                ))}
+                  </TableRow>)}
               </TableBody>
             </Table>
           </CardContent>
@@ -146,12 +207,10 @@ export default function AppHomePage() {
             </CardHeader>
             <CardContent>
               <ul className="space-y-3">
-                {news.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+                {news.map((item, i) => <li key={i} className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
                     <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
                     <span className="text-sm">{item}</span>
-                  </li>
-                ))}
+                  </li>)}
               </ul>
             </CardContent>
           </Card>
@@ -182,6 +241,5 @@ export default function AppHomePage() {
           </Card>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
