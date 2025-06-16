@@ -37,7 +37,7 @@ const INDEX_STOCKS: { [key: string]: string[] } = {
   'SPY': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'JNJ', 'V'],
   'DJI': ['AAPL', 'MSFT', 'UNH', 'GS', 'HD', 'MCD', 'CAT', 'AMGN', 'V', 'BA'],
   'QQQ': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'ADBE', 'CRM'],
-  'EWZ': ['PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'BBDC4.SA', 'ABEV3.SA', 'WEGE3.SA', 'RENT3.SA', 'LREN3.SA', 'MGLU3.SA', 'JBSS3.SA'],
+  'BVMF': ['PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'BBDC4.SA', 'ABEV3.SA', 'WEGE3.SA', 'RENT3.SA', 'LREN3.SA', 'MGLU3.SA', 'JBSS3.SA'],
   'EWU': ['AZN.L', 'SHEL.L', 'LSEG.L', 'UU.L', 'ULVR.L', 'RKT.L', 'RELX.L', 'BP.L', 'GSK.L', 'DGE.L'],
   'EWG': ['SAP.DE', 'ASME.DE', 'SIE.DE', 'ALV.DE', 'DTE.DE', 'MUV2.DE', 'AIR.DE', 'BAS.DE', 'BMW.DE', 'VOW3.DE'],
   'EWQ': ['LVMH.PA', 'TTE.PA', 'ASML.PA', 'OR.PA', 'SAP.PA', 'SAN.PA', 'RMS.PA', 'MC.PA', 'BNP.PA', 'AIR.PA'],
