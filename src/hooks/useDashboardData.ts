@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { fetchIndexData, fetchStocksForIndex, fetchEconomicData, type IndexData, type StockData } from '@/services/finnhubService';
+import { fetchIndexData, fetchStocksForIndex, fetchEconomicData, type IndexData, type StockData } from '@/services/alphaVantageService';
 
 export const useDashboardData = () => {
   const [indices, setIndices] = useState<IndexData[]>([]);
