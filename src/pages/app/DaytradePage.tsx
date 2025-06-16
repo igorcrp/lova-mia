@@ -140,45 +140,22 @@ export default function DaytradePage() {
   };
   
   const updateAnalysis = async (params: StockAnalysisParams) => {
-    if (!selectedAsset) return;
+    if (!selectedAsset || !detailedResult) return;
     
     try {
       setIsLoadingDetails(true);
       
-      const dataTableName = params.dataTableName || await api.marketData.getDataTableName(
-        params.country,
-        params.stockMarket,
-        params.assetClass
+      // Use optimized update method instead of full recalculation
+      const updatedDetailedData = await api.analysis.updateDetailedAnalysisOptimized(
+        detailedResult,
+        params
       );
       
-      if (!dataTableName) {
-        throw new Error("Failed to identify data source");
-      }
+      // Update analysis params
+      setAnalysisParams(params);
       
-      const paramsWithTable = {
-        ...params,
-        dataTableName
-      };
-      
-      setAnalysisParams(paramsWithTable);
-      
-      const results = await api.analysis.runAnalysis(paramsWithTable);
-      
-      const today = new Date();
-      const startDate = getStartDateForPeriod(paramsWithTable.period);
-      const tradingDaysCount = countBusinessDays(startDate, today);
-      
-      console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
-      
-      setAnalysisResults(results);
-      
-      const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
-      
-      if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
-        console.info(`Actual trading days in updated data: ${detailedData.tradingDays}`);
-      }
-      
-      setDetailedResult(detailedData);
+      // Update detailed result with optimized data
+      setDetailedResult(updatedDetailedData);
       
       toast({
         title: "Analysis updated",

@@ -514,7 +514,7 @@ const marketData = {
 /**
  * Stock Analysis API service
  */
-const analysis = {
+const analysisService = {
   /**
    * Get a list of available stocks for a specific data table
    */
@@ -1171,13 +1171,67 @@ const analysis = {
     }
   },
 
-  // --- End: Functions copied from api-18.ts ---
+  // New optimized method for updating only specific columns
+  async updateDetailedAnalysisOptimized(
+    existingResult: DetailedResult,
+    params: StockAnalysisParams
+  ): Promise<DetailedResult> {
+    try {
+      // Only recalculate Suggested Entry and Stop Price columns
+      const updatedTradeHistory = existingResult.tradeHistory.map(item => {
+        const referencePrice = this.getReferencePrice(item, params.referencePrice);
+        
+        // Recalculate only Suggested Entry Price
+        const suggestedEntryPrice = params.operation.toLowerCase() === 'buy'
+          ? referencePrice * (1 - params.entryPercentage / 100)
+          : referencePrice * (1 + params.entryPercentage / 100);
+        
+        // Recalculate only Stop Price
+        const stopPrice = params.operation.toLowerCase() === 'buy'
+          ? referencePrice * (1 - params.stopPercentage / 100)
+          : referencePrice * (1 + params.stopPercentage / 100);
 
+        return {
+          ...item,
+          suggestedEntryPrice: Number(suggestedEntryPrice.toFixed(2)),
+          stopPrice: Number(stopPrice.toFixed(2))
+        };
+      });
+
+      // Return updated result with only the necessary recalculations
+      return {
+        ...existingResult,
+        tradeHistory: updatedTradeHistory,
+        initialBalance: params.initialCapital,
+        finalBalance: params.initialCapital, // Will be auto-calculated by frontend
+        finalCapital: params.initialCapital  // Will be auto-calculated by frontend
+      };
+    } catch (error) {
+      console.error('Error in updateDetailedAnalysisOptimized:', error);
+      throw error;
+    }
+  },
+
+  // Helper method to get reference price
+  getReferencePrice(item: TradeHistoryItem, referencePrice: string): number {
+    switch (referencePrice.toLowerCase()) {
+      case 'open':
+        return item.entryPrice;
+      case 'high':
+        return item.high;
+      case 'low':
+        return item.low;
+      case 'close':
+        return item.exitPrice;
+      default:
+        return item.entryPrice;
+    }
+  }
 };
 
 // Export the API services
 export const api = {
   auth,
   marketData,
-  analysis
+  analysis: analysisService
 };
