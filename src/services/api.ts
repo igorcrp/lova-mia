@@ -14,9 +14,6 @@ export const auth = {
   async login(email: string, password: string): Promise<any> {
     try {
       console.log(`Attempting to login with email: ${email}`);
-      
-      // REMOVIDO: Bloco que chamava RPC inexistente 'check_user_by_email'
-      // A verificação de status agora é feita no AuthContext após o login do Supabase Auth
 
       // Autentica com Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -33,13 +30,14 @@ export const auth = {
         throw error; // Lança outros erros de autenticação
       }
 
-      // REMOVIDO: Bloco que verificava status 'pending' após login bem-sucedido
-      // Essa lógica agora está no AuthContext
-
       console.log("Supabase Auth Login successful:", data);
+      
+      // Retorna no formato esperado pelo AuthContext
       return {
-        user: data.user,
-        session: data.session,
+        data: {
+          user: data.user,
+          session: data.session
+        }
       };
     } catch (error) {
       console.error("Login failed:", error);
@@ -1185,4 +1183,3 @@ export const api = {
   marketData,
   analysis
 };
-

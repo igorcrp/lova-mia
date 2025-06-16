@@ -1,4 +1,3 @@
-
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
@@ -130,8 +129,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.auth.login(email, password) as AuthResponse;
       console.log("Login response:", response);
       
-      // CORRIGIDO: Verificar a estrutura correta da resposta do Supabase
-      if (!response || !response.data || !response.data.session) {
+      // CORRIGIDO: Verificar a estrutura correta da resposta
+      if (!response || !response.data || !response.data.user || !response.data.session) {
+        console.error("Invalid login response structure:", response);
         throw new Error("Invalid login response from API");
       }
       
