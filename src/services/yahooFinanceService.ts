@@ -1,4 +1,3 @@
-
 // Yahoo Finance API service for fetching real-time financial data
 export interface IndexData {
   name: string;
@@ -28,29 +27,34 @@ export interface EconomicData {
 
 // Yahoo Finance API endpoints (using public API)
 const YAHOO_FINANCE_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
+const YAHOO_FINANCE_V2_BASE = 'https://query2.finance.yahoo.com/v8/finance/chart';
 
-// Index symbols mapping
+// Index symbols mapping - reorganized in the requested order
 export const INDEX_SYMBOLS = {
-  'S&P 500': '^GSPC',
-  'Dow Jones': '^DJI',
-  'Nasdaq Composite': '^IXIC',
-  'FTSE 100': '^FTSE',
+  'S&P 500 (US)': '^GSPC',
+  'Dow Jones (US)': '^DJI',
+  'Nasdaq (US)': '^IXIC',
+  'Ibovespa (Brazil)': '^BVSP',
+  'FTSE 100 (UK)': '^FTSE',
   'DAX (Germany)': '^GDAXI',
+  'CAC 40 (France)': '^FCHI',
   'Nikkei 225 (Japan)': '^N225',
   'Hang Seng (Hong Kong)': '^HSI',
-  'Ibovespa (Brazil)': '^BVSP'
+  'Shanghai Composite (China)': '000001.SS'
 };
 
-// Stock symbols for each index
+// Stock symbols for each index - updated with proper stocks for each index
 export const INDEX_STOCKS = {
   '^GSPC': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'JPM', 'JNJ', 'V'],
   '^DJI': ['AAPL', 'MSFT', 'UNH', 'GS', 'HD', 'MCD', 'CAT', 'V', 'AXP', 'IBM'],
   '^IXIC': ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'ADBE', 'CRM'],
-  '^FTSE': ['SHEL', 'AZN', 'LSEG', 'BP', 'ULVR', 'GSK', 'RIO', 'HSBA', 'DGE', 'VOD'],
-  '^GDAXI': ['SAP', 'ASML', 'SIE', 'DTE', 'ALV', 'MUV2', 'AIR', 'BAS', 'BMW', 'VOW3'],
-  '^N225': ['7203', '6758', '9984', '6861', '9433', '8306', '4063', '6367', '9020', '8035'],
-  '^HSI': ['700', '9988', '9618', '3690', '1299', '2318', '1398', '939', '2020', '1109'],
-  '^BVSP': ['PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'B3SA3.SA', 'BBDC4.SA', 'WEGE3.SA', 'RENT3.SA', 'LREN3.SA', 'MGLU3.SA', 'ABEV3.SA']
+  '^BVSP': ['PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'B3SA3.SA', 'BBDC4.SA', 'WEGE3.SA', 'RENT3.SA', 'LREN3.SA', 'MGLU3.SA', 'ABEV3.SA'],
+  '^FTSE': ['SHEL', 'AZN', 'LSEG', 'BP.L', 'ULVR.L', 'GSK.L', 'RIO.L', 'HSBA.L', 'DGE.L', 'VOD.L'],
+  '^GDAXI': ['SAP.DE', 'ASML.AS', 'SIE.DE', 'DTE.DE', 'ALV.DE', 'MUV2.DE', 'AIR.PA', 'BAS.DE', 'BMW.DE', 'VOW3.DE'],
+  '^FCHI': ['MC.PA', 'ASML.AS', 'OR.PA', 'SAP.DE', 'TTE.PA', 'SAN.PA', 'AIR.PA', 'BNP.PA', 'EL.PA', 'CA.PA'],
+  '^N225': ['7203.T', '6758.T', '9984.T', '6861.T', '9433.T', '8306.T', '4063.T', '6367.T', '9020.T', '8035.T'],
+  '^HSI': ['700.HK', '9988.HK', '9618.HK', '3690.HK', '1299.HK', '2318.HK', '1398.HK', '939.HK', '2020.HK', '1109.HK'],
+  '000001.SS': ['600519.SS', '000858.SZ', '300750.SZ', '000001.SZ', '600036.SS', '600887.SS', '002594.SZ', '000002.SZ', '600276.SS', '002415.SZ']
 };
 
 export const fetchIndexData = async (): Promise<IndexData[]> => {
@@ -59,7 +63,12 @@ export const fetchIndexData = async (): Promise<IndexData[]> => {
     const data = await Promise.all(
       indices.map(async ([name, symbol]) => {
         try {
-          const response = await fetch(`${YAHOO_FINANCE_BASE}/${symbol}`);
+          // Try Yahoo Finance V2 first, fallback to V1
+          let response = await fetch(`${YAHOO_FINANCE_V2_BASE}/${symbol}`);
+          if (!response.ok) {
+            response = await fetch(`${YAHOO_FINANCE_BASE}/${symbol}`);
+          }
+          
           const result = await response.json();
           
           if (result.chart?.result?.[0]) {
@@ -108,7 +117,12 @@ export const fetchStocksForIndex = async (indexSymbol: string): Promise<{ gainer
     const stockData = await Promise.all(
       stockSymbols.map(async (symbol) => {
         try {
-          const response = await fetch(`${YAHOO_FINANCE_BASE}/${symbol}`);
+          // Try Yahoo Finance V2 first, fallback to V1
+          let response = await fetch(`${YAHOO_FINANCE_V2_BASE}/${symbol}`);
+          if (!response.ok) {
+            response = await fetch(`${YAHOO_FINANCE_BASE}/${symbol}`);
+          }
+          
           const result = await response.json();
           
           if (result.chart?.result?.[0]) {
