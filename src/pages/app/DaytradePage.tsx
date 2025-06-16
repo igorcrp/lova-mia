@@ -1,8 +1,9 @@
-
 import { useState } from "react";
 import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
+import { PremiumUpgrade } from "@/components/PremiumUpgrade";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
@@ -10,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 
 export default function DaytradePage() {
+  const { isSubscribed } = useSubscription();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
@@ -29,10 +31,8 @@ export default function DaytradePage() {
       
       console.info('Running analysis with params:', params);
       
-      // Simulating the initial data loading
       setProgress(10);
       
-      // Get data_table_name from market_data_sources based on selected parameters
       let dataTableName = params.dataTableName;
       
       if (!dataTableName) {
@@ -47,33 +47,26 @@ export default function DaytradePage() {
         }
       }
       
-      // Simulating progress after fetching data source
       setProgress(20);
       
-      // Store the data_table_name for future reference
       const paramsWithTable = {
         ...params,
         dataTableName
       };
       setAnalysisParams(paramsWithTable);
       
-      // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
       const today = new Date();
       const startDate = getStartDateForPeriod(params.period);
       const tradingDaysCount = countBusinessDays(startDate, today);
       
       console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
       
-      // Run the analysis using API with the table name
       const results = await api.analysis.runAnalysis(paramsWithTable, (currentProgress) => {
-        // Update progress based on the API's progress reports
         setProgress(20 + currentProgress * 0.7);
       });
       
-      // Usar diretamente os resultados do backend sem sobrescrever tradingDays
       setAnalysisResults(results);
       
-      // Final processing
       setProgress(95);
       setProgress(100);
       
@@ -90,7 +83,6 @@ export default function DaytradePage() {
       });
       setProgress(0);
     } finally {
-      // Reset progress after a short delay to allow the progress bar to reach 100%
       setTimeout(() => {
         setIsLoading(false);
       }, 500);
@@ -104,7 +96,6 @@ export default function DaytradePage() {
       setIsLoadingDetails(true);
       setSelectedAsset(assetCode);
       
-      // Add data table name to params if not already present
       const paramsWithTable = analysisParams.dataTableName
         ? analysisParams
         : {
@@ -120,11 +111,8 @@ export default function DaytradePage() {
         throw new Error("Could not determine data table name");
       }
       
-      // Get detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(assetCode, paramsWithTable);
       
-      // Não sobrescrever o valor de tradingDays calculado pelo backend
-      // Apenas registrar para fins de depuração
       if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
         console.info(`Actual trading days in data: ${detailedData.tradingDays}`);
       } else {
@@ -157,7 +145,6 @@ export default function DaytradePage() {
     try {
       setIsLoadingDetails(true);
       
-      // Ensure we have the data table name
       const dataTableName = params.dataTableName || await api.marketData.getDataTableName(
         params.country,
         params.stockMarket,
@@ -175,24 +162,18 @@ export default function DaytradePage() {
       
       setAnalysisParams(paramsWithTable);
       
-      // Update both the main results and the detailed result
       const results = await api.analysis.runAnalysis(paramsWithTable);
       
-      // Calcular dias úteis apenas para referência (não sobrescrever os resultados)
       const today = new Date();
       const startDate = getStartDateForPeriod(paramsWithTable.period);
       const tradingDaysCount = countBusinessDays(startDate, today);
       
       console.info(`Period: ${params.period}, Start date: ${startDate.toISOString()}, Calculated trading days: ${tradingDaysCount}`);
       
-      // Usar diretamente os resultados do backend sem sobrescrever tradingDays
       setAnalysisResults(results);
       
-      // Fetch detailed analysis with correct period filtering
       const detailedData = await api.analysis.getDetailedAnalysis(selectedAsset, paramsWithTable);
       
-      // Não sobrescrever o valor de tradingDays calculado pelo backend
-      // Apenas registrar para fins de depuração
       if (detailedData && detailedData.tradeHistory && detailedData.tradeHistory.length > 0) {
         console.info(`Actual trading days in updated data: ${detailedData.tradingDays}`);
       }
@@ -222,6 +203,9 @@ export default function DaytradePage() {
       {!showDetailView ? (
         <div className="bg-card p-6 rounded-lg border">
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
+          
+          {/* Only show PremiumUpgrade for non-premium users */}
+          {!isSubscribed && <PremiumUpgrade />}
           
           {isLoading && (
             <div className="mt-6">

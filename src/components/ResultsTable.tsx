@@ -20,6 +20,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface TradeDetail {
   profitLoss: number;
@@ -51,6 +52,7 @@ interface SortConfig {
 }
 
 export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
+  const { isSubscribed } = useSubscription();
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     field: "assetCode",
     direction: "asc"
@@ -58,27 +60,38 @@ export function ResultsTable({ results, onViewDetails }: ResultsTableProps) {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-const sortedResults = [...results].sort((a, b) => {
-    const fieldA = a[sortConfig.field];
-    const fieldB = b[sortConfig.field];
-    
-    if (fieldA < fieldB) {
-      return sortConfig.direction === "asc" ? -1 : 1;
+  // Sort results alphabetically by assetCode
+  const sortedResults = [...results].sort((a, b) => {
+    if (isSubscribed) {
+      const fieldA = a[sortConfig.field];
+      const fieldB = b[sortConfig.field];
+      
+      if (fieldA < fieldB) {
+        return sortConfig.direction === "asc" ? -1 : 1;
+      }
+      if (fieldA > fieldB) {
+        return sortConfig.direction === "asc" ? 1 : -1;
+      }
+      return 0;
+    } else {
+      // For free users, always sort alphabetically by assetCode
+      return a.assetCode.localeCompare(b.assetCode);
     }
-    if (fieldA > fieldB) {
-      return sortConfig.direction === "asc" ? 1 : -1;
-    }
-    return 0;
   });
 
+  // For free users, limit to 10 results
+  const displayResults = isSubscribed ? sortedResults : sortedResults.slice(0, 10);
+
   // Pagination
-  const totalPages = Math.ceil(sortedResults.length / rowsPerPage);
-  const paginatedResults = sortedResults.slice(
+  const totalPages = Math.ceil(displayResults.length / rowsPerPage);
+  const paginatedResults = displayResults.slice(
     (page - 1) * rowsPerPage,
     page * rowsPerPage
   );
   
   const handleSort = (field: SortField) => {
+    if (!isSubscribed) return; // Disable sorting for free users
+    
     setSortConfig({
       field,
       direction:
@@ -89,7 +102,7 @@ const sortedResults = [...results].sort((a, b) => {
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortConfig.field !== field) {
+    if (!isSubscribed || sortConfig.field !== field) {
       return null;
     }
     
@@ -185,7 +198,14 @@ const sortedResults = [...results].sort((a, b) => {
   
   return (
     <div className="mt-6 space-y-4">
-      <h2 className="text-xl font-semibold">Results</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Results</h2>
+        {!isSubscribed && results.length > 10 && (
+          <div className="text-sm text-muted-foreground">
+            Showing 10 of {results.length} results (Premium shows all)
+          </div>
+        )}
+      </div>
       
       <div className="rounded-md border overflow-hidden">
         <div className="overflow-x-auto">
@@ -193,7 +213,10 @@ const sortedResults = [...results].sort((a, b) => {
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className="w-20 cursor-pointer text-center"
+                  className={cn(
+                    "w-20 text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
@@ -202,7 +225,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer text-center"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
@@ -211,7 +237,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
@@ -220,7 +249,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -229,7 +261,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
@@ -238,7 +273,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -247,7 +285,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
@@ -256,7 +297,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -265,7 +309,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
@@ -274,7 +321,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -283,7 +333,10 @@ const sortedResults = [...results].sort((a, b) => {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="text-center cursor-pointer"
+                  className={cn(
+                    "text-center",
+                    isSubscribed && "cursor-pointer"
+                  )}
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">
@@ -349,46 +402,53 @@ const sortedResults = [...results].sort((a, b) => {
         </div>
       </div>
       
-      {/* Pagination */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Rows per page:</span>
-          <select
-            className="bg-transparent border rounded px-2 py-1 text-sm"
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(Number(e.target.value));
-              setPage(1);
-            }}
-            style={{ backgroundColor: "#0f1729" }}
-          >
-            <option value={10}>10</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={500}>500</option>
-          </select>
+      {/* Pagination - only show if subscribed or if free user has less than 10 results */}
+      {(isSubscribed || paginatedResults.length <= 10) && totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Rows per page:</span>
+            <select
+              className="bg-transparent border rounded px-2 py-1 text-sm"
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(1);
+              }}
+              disabled={!isSubscribed}
+              style={{ backgroundColor: "#0f1729" }}
+            >
+              <option value={10}>10</option>
+              {isSubscribed && (
+                <>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={500}>500</option>
+                </>
+              )}
+            </select>
+          </div>
+          
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  className={cn(page === 1 && "pointer-events-none opacity-50")}
+                />
+              </PaginationItem>
+              
+              {generatePaginationItems()}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  className={cn(page === totalPages && "pointer-events-none opacity-50")}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
-        
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                onClick={() => setPage(Math.max(1, page - 1))}
-                className={cn(page === 1 && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-            
-            {generatePaginationItems()}
-            
-            <PaginationItem>
-              <PaginationNext 
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                className={cn(page === totalPages && "pointer-events-none opacity-50")}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
+      )}
     </div>
   );
 }

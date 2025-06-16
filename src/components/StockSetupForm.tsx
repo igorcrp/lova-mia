@@ -12,6 +12,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface StockSetupFormProps {
   onSubmit: (params: StockAnalysisParams) => void;
@@ -58,9 +59,13 @@ export function StockSetupForm({
       assetClass: "",
       referencePrice: "close",
       period: "1m",
-      entryPercentage: 1.00, // Default com 2 casas decimais
-      stopPercentage: 1.00,  // Default com 2 casas decimais
+      entryPercentage: 1.00,
+      stopPercentage: 1.00,
       initialCapital: 10000.00,
+      initialInvestment: 10000.00,
+      stopLoss: 1.00,
+      profitTarget: 1.00,
+      riskFactor: 1.00,
       comparisonStocks: []
     }
   });
@@ -277,6 +282,10 @@ export function StockSetupForm({
       data.entryPercentage = Number(data.entryPercentage) || 0;
       data.stopPercentage = Number(data.stopPercentage) || 0;
       data.initialCapital = Number(data.initialCapital) || 0;
+      data.initialInvestment = Number(data.initialInvestment) || 0;
+      data.stopLoss = Number(data.stopLoss) || 0;
+      data.profitTarget = Number(data.profitTarget) || 0;
+      data.riskFactor = Number(data.riskFactor) || 0;
       onSubmit(data);
     } else {
       // If we don't have the table name, try to get it again
@@ -293,6 +302,10 @@ export function StockSetupForm({
           data.entryPercentage = Number(data.entryPercentage) || 0;
           data.stopPercentage = Number(data.stopPercentage) || 0;
           data.initialCapital = Number(data.initialCapital) || 0;
+          data.initialInvestment = Number(data.initialInvestment) || 0;
+          data.stopLoss = Number(data.stopLoss) || 0;
+          data.profitTarget = Number(data.profitTarget) || 0;
+          data.riskFactor = Number(data.riskFactor) || 0;
           onSubmit(data);
         } else {
           toast({
@@ -387,6 +400,8 @@ export function StockSetupForm({
     onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
   };
   
+  const { isSubscribed } = useSubscription();
+
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -575,11 +590,21 @@ export function StockSetupForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="1m">1 Month</SelectItem>
-                    <SelectItem value="3m">3 Months</SelectItem>
-                    <SelectItem value="6m">6 Months</SelectItem>
-                    <SelectItem value="1y">1 Year</SelectItem>
-                    <SelectItem value="2y">2 Years</SelectItem>
-                    <SelectItem value="5y">5 Years</SelectItem>
+                    <SelectItem value="3m" disabled={!isSubscribed} className={!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}>
+                      3 Months
+                    </SelectItem>
+                    <SelectItem value="6m" disabled={!isSubscribed} className={!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}>
+                      6 Months
+                    </SelectItem>
+                    <SelectItem value="1y" disabled={!isSubscribed} className={!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}>
+                      1 Year
+                    </SelectItem>
+                    <SelectItem value="2y" disabled={!isSubscribed} className={!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}>
+                      2 Years
+                    </SelectItem>
+                    <SelectItem value="5y" disabled={!isSubscribed} className={!isSubscribed ? "opacity-50 cursor-not-allowed" : ""}>
+                      5 Years
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -1,164 +1,197 @@
-import { useState, useEffect } from "react";
-import { api } from "@/services/api";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AnalysisResult, StockAnalysisParams } from "@/types";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { ArrowRight, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ArrowUp, ArrowDown, TrendingUp, Globe, BarChart3 } from "lucide-react";
+import { useDashboardData } from "@/hooks/useDashboardData";
+
 export default function AppHomePage() {
-  const [topPerformers, setTopPerformers] = useState<AnalysisResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<"30" | "60" | "90">("30");
+  const { indices, stocks, economicData, selectedIndex, loading, handleIndexClick } = useDashboardData();
 
-  // Dummy data for the chart
-  const chartData = [{
-    date: "Jan",
-    value: 10000
-  }, {
-    date: "Feb",
-    value: 10800
-  }, {
-    date: "Mar",
-    value: 11200
-  }, {
-    date: "Apr",
-    value: 10900
-  }, {
-    date: "May",
-    value: 11800
-  }, {
-    date: "Jun",
-    value: 12400
-  }, {
-    date: "Jul",
-    value: 12900
-  }];
-  useEffect(() => {
-    const fetchTopPerformers = async () => {
-      try {
-        setIsLoading(true);
+  // Market status data
+  const marketStatus = [
+    {
+      region: "Asian",
+      status: "Closed",
+      color: "bg-red-100 text-red-800"
+    },
+    {
+      region: "European", 
+      status: "Open",
+      color: "bg-green-100 text-green-800"
+    },
+    {
+      region: "American",
+      status: "Open", 
+      color: "bg-green-100 text-green-800"
+    }
+  ];
 
-        // In a real app, we would fetch data for the specific time range
-        // Here we're using the same simulated data
-        const params: StockAnalysisParams = {
-          operation: "buy",
-          country: "USA",
-          stockMarket: "NASDAQ",
-          assetClass: "Ações",
-          referencePrice: "close",
-          period: "3m",
-          entryPercentage: 1,
-          stopPercentage: 1,
-          initialCapital: 10000,
-          // Now comparisonStocks is valid in the interface
-          comparisonStocks: []
-        };
-        const results = await api.analysis.runAnalysis(params);
+  // News data
+  const news = [
+    "US-China trade negotiations in London",
+    "Provisional Measure on IOF in Brazil", 
+    "US inflation expectations",
+    "American oil production under new administration"
+  ];
 
-        // Sort by profit percentage
-        const sorted = [...results].sort((a, b) => b.profitPercentage - a.profitPercentage);
-        setTopPerformers(sorted.slice(0, 5)); // Take top 5
-      } catch (error) {
-        console.error("Failed to fetch top performers", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchTopPerformers();
-  }, [timeRange]);
-  return <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg">Portfolio Performance</CardTitle>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-8 text-xs">1M</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs bg-primary/10">6M</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs">1Y</Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs">All</Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5
-              }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" />
-                  <YAxis tickFormatter={value => `$${value.toLocaleString()}`} />
-                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Value"]} labelFormatter={label => `Date: ${label}`} />
-                  <Line type="monotone" dataKey="value" stroke="#3b82f6" activeDot={{
-                  r: 6
-                }} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
+  return (
+    <div>
+      <div className="space-y-6">
+        {/* Market Status Section */}
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg">Top Performers</CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "30" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("30")}>
-                  30d
-                </Button>
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "60" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("60")}>
-                  60d
-                </Button>
-                <Button variant="ghost" size="sm" className={`h-7 text-xs px-2 ${timeRange === "90" ? "bg-primary/10" : ""}`} onClick={() => setTimeRange("90")}>
-                  90d
-                </Button>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Global Market Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              {marketStatus.map((market, i) => (
+                <Badge key={i} className={market.color}>
+                  {market.region}: {market.status}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Main Global Financial Indices Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Main Global Financial Indices (Real-time)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-4">Loading real-time data...</div>
+            ) : (
+              <div className="grid grid-cols-5 gap-3">
+                {indices.map((index, i) => (
+                  <div 
+                    key={i} 
+                    className={`p-3 border rounded-lg bg-card hover:bg-muted/50 transition-colors cursor-pointer ${
+                      selectedIndex === index.symbol ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => handleIndexClick(index.symbol)}
+                  >
+                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                      {index.name}
+                    </div>
+                    <div className="text-sm font-bold mb-1">
+                      {index.value}
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs ${
+                      index.isNegative ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {index.isNegative ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                      {index.changePercent}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Stocks Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Stocks - Top Gainers & Losers
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Click on an index above to see its top performing stocks
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Top Gainers */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2 text-green-600">Top 5 Gainers</h4>
+                <div className="grid grid-cols-5 gap-2">
+                  {stocks.gainers.map((stock, i) => (
+                    <div key={i} className="p-2 border rounded bg-green-50 dark:bg-green-950">
+                      <div className="text-xs font-medium">{stock.symbol}</div>
+                      <div className="text-xs">${stock.price}</div>
+                      <div className="text-xs text-green-600">{stock.changePercent}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Losers */}
+              <div>
+                <h4 className="text-sm font-semibold mb-2 text-red-600">Top 5 Losers</h4>
+                <div className="grid grid-cols-5 gap-2">
+                  {stocks.losers.map((stock, i) => (
+                    <div key={i} className="p-2 border rounded bg-red-50 dark:bg-red-950">
+                      <div className="text-xs font-medium">{stock.symbol}</div>
+                      <div className="text-xs">${stock.price}</div>
+                      <div className="text-xs text-red-600">{stock.changePercent}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Global Economic Indicators Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Global Economic Indicators
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            {isLoading ? <div className="h-[260px] flex items-center justify-center">
-                <div className="loading-circle" />
-              </div> : <div className="space-y-4">
-                {topPerformers.map((stock, index) => <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-primary/10 p-2 rounded-full">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <div className="font-medium">{stock.assetCode}</div>
-                        <div className="text-xs text-muted-foreground">{stock.assetName}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium text-green-600 dark:text-green-400">
-                        +{stock.profitPercentage.toFixed(2)}%
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        ${stock.profit.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>)}
-                
-                <Link to="/app/daytrade">
-                  <Button variant="ghost" size="sm" className="w-full mt-2">
-                    View All
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>}
+          <CardContent>
+            <h3 className="text-lg font-semibold mb-4">Major Economies</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Country</TableHead>
+                  <TableHead>GDP Growth 2025</TableHead>
+                  <TableHead>Inflation</TableHead>
+                  <TableHead>Interest Rate</TableHead>
+                  <TableHead>Currency (Exchange)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {economicData.map((economy, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{economy.country}</TableCell>
+                    <TableCell>{economy.gdp}</TableCell>
+                    <TableCell>{economy.inflation}</TableCell>
+                    <TableCell>{economy.interest}</TableCell>
+                    <TableCell>{economy.currency}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* News and Market Alerts Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest News & Market Alerts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {news.map((item, i) => (
+                <li key={i} className="text-sm p-2 border-l-2 border-primary/20 pl-4">
+                  {item}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-        
-      </div>
-    </div>;
+    </div>
+  );
 }
