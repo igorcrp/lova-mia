@@ -21,7 +21,7 @@ const INDEX_NAMES: { [key: string]: string } = {
   'SPY': 'S&P 500 (US)',
   'DJI': 'Dow Jones (US)',
   'IXIC': 'Nasdaq (US)',
-  'BVSP': 'Ibovespa (Brazil)',
+  'BVMF': 'Ibovespa (Brazil)',
   'UKX': 'FTSE 100 (UK)',
   'DAX': 'DAX (Germany)',
   'CAC': 'CAC 40 (France)',
@@ -30,7 +30,7 @@ const INDEX_NAMES: { [key: string]: string } = {
   'SHCOMP': 'Shanghai Composite (China)'
 };
 
-const MAJOR_INDICES = ['SPY', 'DJI', 'QQQ', 'EWZ', 'EWU', 'EWG', 'EWQ', 'EWJ', 'EWH', 'ASHR'];
+const MAJOR_INDICES = ['SPY', 'DJI', 'QQQ', 'BVMF', 'EWU', 'EWG', 'EWQ', 'EWJ', 'EWH', 'ASHR'];
 
 // Mapear índices para suas principais ações
 const INDEX_STOCKS: { [key: string]: string[] } = {
