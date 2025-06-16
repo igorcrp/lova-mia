@@ -21,11 +21,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-interface TradeDetail {
-  profitLoss: number;
-  trade: string;
-  stop: string;
-}
+// Removed unused local TradeDetail interface
 
 interface ResultsTableProps {
   results: AnalysisResult[];
@@ -43,7 +39,8 @@ type SortField =
   | "lossPercentage"
   | "stops"
   | "stopPercentage"
-  | "finalCapital";
+  | "finalCapital"
+  | "lastCurrentCapital"; // Added lastCurrentCapital for sorting
 
 interface SortConfig {
   field: SortField;
@@ -215,7 +212,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
-                    Nº of Trades
+                    Trades
                     <SortIcon field="trades" />
                   </div>
                 </TableHead>
@@ -224,7 +221,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
-                    % Trade
+                    % Trades
                     <SortIcon field="tradePercentage" />
                   </div>
                 </TableHead>
@@ -233,7 +230,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
-                    Profits
+                    Profit Trades
                     <SortIcon field="profits" />
                   </div>
                 </TableHead>
@@ -242,7 +239,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
-                    % Profits
+                    % Profit Trades
                     <SortIcon field="profitPercentage" />
                   </div>
                 </TableHead>
@@ -251,7 +248,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
-                    Losses
+                    Loss Trades
                     <SortIcon field="losses" />
                   </div>
                 </TableHead>
@@ -260,7 +257,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
-                    % Losses
+                    % Loss Trades
                     <SortIcon field="lossPercentage" />
                   </div>
                 </TableHead>
@@ -269,7 +266,7 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
-                    Nº of Stop
+                    Stopped Trades
                     <SortIcon field="stops" />
                   </div>
                 </TableHead>
@@ -278,17 +275,17 @@ const sortedResults = [...results].sort((a, b) => {
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
-                    % Stop
+                    % Stopped Trades
                     <SortIcon field="stopPercentage" />
                   </div>
                 </TableHead>
                 <TableHead 
                   className="text-center cursor-pointer"
-                  onClick={() => handleSort("finalCapital")}
+                  onClick={() => handleSort("lastCurrentCapital")} // Sort by lastCurrentCapital
                 >
                   <div className="flex items-center justify-center">
                     Final Capital
-                    <SortIcon field="finalCapital" />
+                    <SortIcon field="lastCurrentCapital" />
                   </div>
                 </TableHead>
                 <TableHead className="w-24 text-center">Details</TableHead>
@@ -298,7 +295,7 @@ const sortedResults = [...results].sort((a, b) => {
               {paginatedResults.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
-                    No results to display
+                    No results to display.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -308,28 +305,28 @@ const sortedResults = [...results].sort((a, b) => {
                     <TableCell className="text-center">{result.tradingDays}</TableCell>
                     <TableCell className="text-center">{result.trades}</TableCell>
                     <TableCell className="text-center">
-                      {result.tradePercentage.toFixed(2)}%
+                      {result.tradePercentage?.toFixed(2) ?? '0.00'}%
                     </TableCell>
                     <TableCell className="text-center">{result.profits}</TableCell>
                     <TableCell className={cn(
                       "text-center",
-                      "text-green-600 dark:text-green-400"
+                      result.profitPercentage > 0 ? "text-green-600 dark:text-green-400" : ""
                     )}>
-                      {result.profitPercentage.toFixed(2)}%
+                      {result.profitPercentage?.toFixed(2) ?? '0.00'}%
                     </TableCell>
                     <TableCell className="text-center">{result.losses}</TableCell>
                     <TableCell className={cn(
                       "text-center",
-                      "text-red-600 dark:text-red-400"
+                      result.lossPercentage > 0 ? "text-red-600 dark:text-red-400" : ""
                     )}>
-                      {result.lossPercentage.toFixed(2)}%
+                      {result.lossPercentage?.toFixed(2) ?? '0.00'}%
                     </TableCell>
                     <TableCell className="text-center">{result.stops}</TableCell>
                     <TableCell className="text-center">
-                      {result.stopPercentage.toFixed(2)}%
+                      {result.stopPercentage?.toFixed(2) ?? '0.00'}%
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      ${(result as any).lastCurrentCapital ? (result as any).lastCurrentCapital.toFixed(2) : result.finalCapital.toFixed(2)}
+                      ${(result.lastCurrentCapital ?? result.finalCapital)?.toFixed(2) ?? '0.00'}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button 

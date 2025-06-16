@@ -51,6 +51,7 @@ export interface AnalysisResult {
   tradingDays: number;
   trades: number;
   tradePercentage: number;
+  lastCurrentCapital?: number; // Added to reflect usage in ResultsTable and api.ts
   profits: number;
   profitPercentage: number;
   losses: number;
@@ -66,6 +67,7 @@ export interface AnalysisResult {
   sortinoRatio: number;
   recoveryFactor: number;
   successRate: number;
+  lastCurrentCapital?: number; // Ensure it's here as well if DetailedResult extends AnalysisResult
   tradeHistory?: TradeHistoryItem[]; // Make tradeHistory optional in AnalysisResult
   tradeDetails?: TradeDetail[]; // Add tradeDetails property
 }
