@@ -69,7 +69,7 @@ export function StockDetailsTable({
         ? Number(item.currentCapital) 
         : undefined,
       trade: typeof item.trade === 'string' ? item.trade.trim() || "-" : "-",
-      stopTrigger: calculateStopTrigger(item, params.operation)
+      stopTrigger: typeof item.stopTrigger === 'string' ? item.stopTrigger : "-"
     }));
 
     // Sort data
@@ -93,12 +93,6 @@ export function StockDetailsTable({
   }, [result, sortField, sortDirection, params.operation]);
 
   // Function to calculate stop trigger
-  interface TradeItemForStopTrigger {
-    stopPrice: string | number | null;
-    low: number | string | null;
-    high: number | string | null;
-  }
-
   function calculateStopTrigger(item: TradeHistoryItem, operation: string): string {
     if (!item || item.stopPrice === '-' || item.stopPrice === null || item.low === null || item.high === null) {
         return "-";
@@ -457,7 +451,7 @@ export function StockDetailsTable({
                         } else if (column.id === "volume" || column.id === "lotSize") {
                           formattedValue = (value as number).toLocaleString();
                         } else if (column.id === "stopTrigger") {
-                          formattedValue = item.stopTrigger || "-";
+                          formattedValue = typeof item.stopTrigger === 'string' ? item.stopTrigger : "-";
                         } else if (column.id === "trade") {
                           formattedValue = value as string;
                         } else if (typeof value === "number") {
@@ -595,4 +589,3 @@ function handleBlurFormatting(value: number | string | null | undefined, onChang
   }
   onChange(Math.max(0, parseFloat(numValue.toFixed(2))));
 }
-

@@ -37,10 +37,12 @@ export interface AnalysisResult {
   maxDrawdown: number;
   averageReturn: number;
   profit: number;
+  lastCurrentCapital?: number;
 }
 
 export interface DetailedResult {
   assetCode: string;
+  assetName?: string;
   initialBalance: number;
   finalBalance: number;
   finalCapital: number;
@@ -66,6 +68,7 @@ export interface DetailedResult {
   averageLoss: number;
   tradingDays: number;
   tradeHistory: TradeHistoryItem[];
+  capitalEvolution: { date: string; capital: number }[];
 }
 
 export interface Asset {
@@ -86,13 +89,25 @@ export interface StockInfo {
 
 export interface TradeHistoryItem {
   date: string;
-  action: string;
-  price: number;
-  quantity: number;
-  value: number;
-  balance: number;
-  stopTrigger?: boolean;
-  profitPercentage: number;
+  action?: string;
+  price?: number;
+  quantity?: number;
+  value?: number;
+  balance?: number;
+  stopTrigger?: boolean | string;
+  profitPercentage?: number;
+  entryPrice: number;
+  exitPrice: number;
+  high: number;
+  low: number;
+  volume: number;
+  suggestedEntryPrice: number;
+  actualPrice: number | string;
+  trade: string;
+  lotSize: number;
+  stopPrice: number | string;
+  profitLoss: number;
+  currentCapital: number;
 }
 
 export interface User {
