@@ -3,7 +3,6 @@ import { StockSetupForm } from "@/components/StockSetupForm";
 import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
 import { PremiumUpgrade } from "@/components/PremiumUpgrade";
-import { useSubscription } from "@/contexts/SubscriptionContext";
 import { api } from "@/services/api";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
 import { toast } from "@/components/ui/use-toast";
@@ -11,7 +10,6 @@ import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 
 export default function DaytradePage() {
-  const { isSubscribed } = useSubscription();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
@@ -204,8 +202,7 @@ export default function DaytradePage() {
         <div className="bg-card p-6 rounded-lg border">
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} />
           
-          {/* Only show PremiumUpgrade for non-premium users */}
-          {!isSubscribed && <PremiumUpgrade />}
+          <PremiumUpgrade />
           
           {isLoading && (
             <div className="mt-6">

@@ -1,4 +1,3 @@
-
 import { api } from "@/services/api";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@/types";
@@ -19,14 +18,11 @@ interface AuthContextType {
 
 // Define types for API responses to fix TypeScript errors
 interface AuthResponse {
-  data?: {
-    user?: Partial<User>;
-    session?: {
-      access_token?: string;
-      token?: string;
-    } | string;
-  };
-  error?: any;
+  user?: Partial<User>;
+  session?: {
+    access_token?: string;
+    token?: string;
+  } | string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -130,8 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.auth.login(email, password) as AuthResponse;
       console.log("Login response:", response);
       
-      // CORRIGIDO: Verificar a estrutura correta da resposta do Supabase
-      if (!response || !response.data || !response.data.session) {
+      if (!response || !response.session) {
         throw new Error("Invalid login response from API");
       }
       
@@ -142,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Only create user object if user is active
       if (userStatus.isActive) {
         // Safely extract user data with default values
-        const userResponse = response.data.user || {};
+        const userResponse = response.user || {};
         
         // Create a user object with all required properties from the User type
         const fullUser: User = {
@@ -153,12 +148,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: 'active',
           email_verified: true,
           account_type: (userResponse.account_type as 'free' | 'premium') || 'free',
+          created_at: userResponse.created_at || new Date().toISOString(),
+          last_login: userResponse.last_login || new Date().toISOString(),
           avatar_url: userResponse.avatar_url
         };
         
         // Extract token safely
         let sessionToken = '';
-        const session = response.data.session || {};
+        const session = response.session || {};
         
         if (typeof session === 'string') {
           sessionToken = session;
@@ -188,12 +185,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.auth.googleLogin() as AuthResponse;
       console.log("Google login response:", response);
       
-      if (!response.data?.user?.email) {
+      if (!response.user?.email) {
         throw new Error('Failed to get user email from Google login');
       }
       
       // Check user status in Supabase and handle redirection
-      const userEmail = response.data.user.email;
+      const userEmail = response.user.email;
       const userStatus = await checkUserStatusAndRedirect(userEmail);
       console.log("User status after check:", userStatus);
       
@@ -201,19 +198,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userStatus.isActive) {
         // Create a user object with all required properties from the User type
         const fullUser: User = {
-          id: response.data.user.id || '',
+          id: response.user.id || '',
           email: userEmail,
-          full_name: response.data.user.full_name || '',
+          full_name: response.user.full_name || '',
           level_id: userStatus.level,
           status: 'active',
           email_verified: true,
-          account_type: (response.data.user.account_type as 'free' | 'premium') || 'free',
-          avatar_url: response.data.user.avatar_url
+          account_type: (response.user.account_type as 'free' | 'premium') || 'free',
+          created_at: response.user.created_at || new Date().toISOString(),
+          last_login: response.user.last_login || new Date().toISOString(),
+          avatar_url: response.user.avatar_url
         };
         
         // Extract token safely
         let sessionToken = '';
-        const session = response.data.session || {};
+        const session = response.session || {};
         
         if (typeof session === 'string') {
           sessionToken = session;
@@ -242,35 +241,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Attempting to register user:", email);
       
-      // Call the API function
-      const result = await api.auth.register(email, password, fullName);
+    // Call the API function
+    const result = await api.auth.register(email, password, fullName);
 
-      // Check if the API call was successful
-      if (result && !result.error) {
-        console.log("Registration successful, navigating to login...");
-        // Try navigating FIRST
-        navigate("/login");
-        // Then show messages
-        toast.success("Cadastro realizado com sucesso!");
-        toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
-      } else {
-        // Handle API error case
-        console.error("Registration API call failed or returned error:", result);
-        toast.error("Ocorreu um erro durante o registro. Tente novamente.");
-        // Optionally re-throw or handle specific errors from 'result' if available
-        throw new Error(result?.error?.message || "Erro desconhecido no registro");
-      }
-
-      return result; // Return result for potential further use
-
-    } catch (error: any) { // Catch errors from await or thrown errors
-      console.error("Registration failed in AuthContext:", error);
-      // Display a generic error or a specific one if available
-      toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
-      throw error; // Re-throw the error so the calling component knows about it
-    } finally {
-      setIsLoading(false);
+    // Check if the API call was successful (adapt if needed)
+    if (result && !result.error) {
+      console.log("Registration successful, navigating to login...");
+      // Try navigating FIRST
+      navigate("/login");
+      // Then show messages
+      toast.success("Cadastro realizado com sucesso!");
+      toast.info("Enviamos um link de confirmação para o seu email. Por favor, verifique sua caixa de entrada e confirme seu cadastro antes de fazer login.");
+    } else {
+      // Handle API error case
+      console.error("Registration API call failed or returned error:", result);
+      toast.error("Ocorreu um erro durante o registro. Tente novamente.");
+      // Optionally re-throw or handle specific errors from 'result' if available
+      throw new Error(result?.error?.message || "Erro desconhecido no registro");
     }
+
+    return result; // Return result for potential further use
+
+  } catch (error: any) { // Catch errors from await or thrown errors
+    console.error("Registration failed in AuthContext:", error);
+    // Display a generic error or a specific one if available
+    toast.error(error.message || "Falha no registro. Verifique os dados e tente novamente.");
+    throw error; // Re-throw the error so the calling component knows about it
+  } finally {
+    setIsLoading(false);
+  }
   };
   
   const resetPassword = async (email: string) => {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { api } from "@/services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,6 @@ import { AnalysisResult, StockAnalysisParams } from "@/types";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
-
 export default function AppHomePage() {
   const [topPerformers, setTopPerformers] = useState<AnalysisResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +34,6 @@ export default function AppHomePage() {
     date: "Jul",
     value: 12900
   }];
-
   useEffect(() => {
     const fetchTopPerformers = async () => {
       try {
@@ -54,10 +51,7 @@ export default function AppHomePage() {
           entryPercentage: 1,
           stopPercentage: 1,
           initialCapital: 10000,
-          initialInvestment: 1000,
-          stopLoss: 0,
-          profitTarget: 0,
-          riskFactor: 1,
+          // Now comparisonStocks is valid in the interface
           comparisonStocks: []
         };
         const results = await api.analysis.runAnalysis(params);
@@ -73,9 +67,7 @@ export default function AppHomePage() {
     };
     fetchTopPerformers();
   }, [timeRange]);
-
-  return (
-    <div>
+  return <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">Dashboard</h1>
       </div>
@@ -95,18 +87,18 @@ export default function AppHomePage() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5
-                }}>
+                top: 5,
+                right: 30,
+                left: 20,
+                bottom: 5
+              }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="date" />
                   <YAxis tickFormatter={value => `$${value.toLocaleString()}`} />
                   <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Value"]} labelFormatter={label => `Date: ${label}`} />
                   <Line type="monotone" dataKey="value" stroke="#3b82f6" activeDot={{
-                    r: 6
-                  }} strokeWidth={2} />
+                  r: 6
+                }} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -131,21 +123,17 @@ export default function AppHomePage() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            {isLoading ? (
-              <div className="h-[260px] flex items-center justify-center">
+            {isLoading ? <div className="h-[260px] flex items-center justify-center">
                 <div className="loading-circle" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {topPerformers.map((stock, index) => (
-                  <div key={index} className="flex items-center justify-between">
+              </div> : <div className="space-y-4">
+                {topPerformers.map((stock, index) => <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="bg-primary/10 p-2 rounded-full">
                         <TrendingUp className="h-4 w-4 text-primary" />
                       </div>
                       <div>
                         <div className="font-medium">{stock.assetCode}</div>
-                        <div className="text-xs text-muted-foreground">{stock.assetName || 'N/A'}</div>
+                        <div className="text-xs text-muted-foreground">{stock.assetName}</div>
                       </div>
                     </div>
                     <div className="text-right">
@@ -156,8 +144,7 @@ export default function AppHomePage() {
                         ${stock.profit.toFixed(2)}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  </div>)}
                 
                 <Link to="/app/daytrade">
                   <Button variant="ghost" size="sm" className="w-full mt-2">
@@ -165,8 +152,7 @@ export default function AppHomePage() {
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-              </div>
-            )}
+              </div>}
           </CardContent>
         </Card>
       </div>
@@ -174,6 +160,5 @@ export default function AppHomePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
         
       </div>
-    </div>
-  );
+    </div>;
 }

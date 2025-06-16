@@ -59,13 +59,9 @@ export function StockSetupForm({
       assetClass: "",
       referencePrice: "close",
       period: "1m",
-      entryPercentage: 1.00,
-      stopPercentage: 1.00,
+      entryPercentage: 1.00, // Default com 2 casas decimais
+      stopPercentage: 1.00,  // Default com 2 casas decimais
       initialCapital: 10000.00,
-      initialInvestment: 10000.00,
-      stopLoss: 1.00,
-      profitTarget: 1.00,
-      riskFactor: 1.00,
       comparisonStocks: []
     }
   });
@@ -282,10 +278,6 @@ export function StockSetupForm({
       data.entryPercentage = Number(data.entryPercentage) || 0;
       data.stopPercentage = Number(data.stopPercentage) || 0;
       data.initialCapital = Number(data.initialCapital) || 0;
-      data.initialInvestment = Number(data.initialInvestment) || 0;
-      data.stopLoss = Number(data.stopLoss) || 0;
-      data.profitTarget = Number(data.profitTarget) || 0;
-      data.riskFactor = Number(data.riskFactor) || 0;
       onSubmit(data);
     } else {
       // If we don't have the table name, try to get it again
@@ -302,10 +294,6 @@ export function StockSetupForm({
           data.entryPercentage = Number(data.entryPercentage) || 0;
           data.stopPercentage = Number(data.stopPercentage) || 0;
           data.initialCapital = Number(data.initialCapital) || 0;
-          data.initialInvestment = Number(data.initialInvestment) || 0;
-          data.stopLoss = Number(data.stopLoss) || 0;
-          data.profitTarget = Number(data.profitTarget) || 0;
-          data.riskFactor = Number(data.riskFactor) || 0;
           onSubmit(data);
         } else {
           toast({
