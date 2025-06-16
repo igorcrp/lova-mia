@@ -274,6 +274,22 @@ export type Database = {
           level_id: number
         }[]
       }
+      get_current_user: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string | null
+          email: string
+          email_verified: boolean | null
+          id: string
+          level_id: number | null
+          name: string | null
+          plan_type: string
+          role: string | null
+          status_users: string | null
+          stripe_customer_id: string | null
+          updated_at: string | null
+        }[]
+      }
       get_stock_data: {
         Args:
           | {
@@ -288,6 +304,23 @@ export type Database = {
               end_date?: string
             }
         Returns: Json
+      }
+      get_stock_results: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          change_percent: number | null
+          company_name: string
+          created_at: string | null
+          dividend_yield: number | null
+          id: string
+          industry: string | null
+          market_cap: number | null
+          pe_ratio: number | null
+          price: number
+          sector: string | null
+          symbol: string
+          volume: number | null
+        }[]
       }
       get_unique_stock_codes: {
         Args: { p_table_name: string }

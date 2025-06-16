@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -31,43 +30,41 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
-        <SubscriptionProvider>
-          <ThemeProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<LoginPage />} />
               
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<LoginPage />} />
-                
-                {/* Redirect from root to login */}
-                <Route path="/" element={<Navigate to="/login" replace />} />
-                
-                {/* Protected admin routes */}
-                <Route element={<ProtectedRoute requireLevel={2} />}>
-                  <Route element={<AdminLayout />}>
-                    <Route path="/admin" element={<AdminDashboardPage />} />
-                    <Route path="/admin/users" element={<AdminUsersPage />} />
-                    <Route path="/admin/assets" element={<AdminAssetsPage />} />
-                  </Route>
+              {/* Redirect from root to login */}
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              
+              {/* Protected admin routes */}
+              <Route element={<ProtectedRoute requireLevel={2} />}>
+                <Route element={<AdminLayout />}>
+                  <Route path="/admin" element={<AdminDashboardPage />} />
+                  <Route path="/admin/users" element={<AdminUsersPage />} />
+                  <Route path="/admin/assets" element={<AdminAssetsPage />} />
                 </Route>
-                
-                {/* Protected app routes */}
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<AppLayout />}>
-                    <Route path="/app" element={<AppHomePage />} />
-                    <Route path="/app/daytrade" element={<DaytradePage />} />
-                    <Route path="/app/profile" element={<ProfilePage />} />
-                  </Route>
+              </Route>
+              
+              {/* Protected app routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/app" element={<AppHomePage />} />
+                  <Route path="/app/daytrade" element={<DaytradePage />} />
+                  <Route path="/app/profile" element={<ProfilePage />} />
                 </Route>
-                
-                {/* 404 route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </TooltipProvider>
-          </ThemeProvider>
-        </SubscriptionProvider>
+              </Route>
+              
+              {/* 404 route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   </QueryClientProvider>
