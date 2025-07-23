@@ -272,7 +272,7 @@ export function StockDetailsTable({
     return 0;
   };
 
-  // Process and sort data with corrected formulas
+  // Process and sort data with corrected formulas - USE ORIGINAL DATA FROM ANALYSIS SERVICES
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
     
@@ -284,59 +284,44 @@ export function StockDetailsTable({
       operation: params.operation
     });
     
-    let currentCapital = appliedInitialCapital;
-    
     const data = result.tradeHistory.map((item, index) => {
-      // CORREÇÃO 1: Data mais antiga (index 0) não deve ter trades
-      if (index === 0) {
+      // CORREÇÃO CRÍTICA: Usar dados originais dos serviços de análise ao invés de recalcular
+      // Os serviços (normal e premium) já calculam corretamente todos os valores
+      
+      // Se os parâmetros mudaram, recalcular apenas Suggested Entry e Stop Price para visualização
+      if (appliedRefPrice !== params.referencePrice || 
+          appliedEntryPercentage !== params.entryPercentage || 
+          appliedStopPercentage !== params.stopPercentage ||
+          appliedInitialCapital !== params.initialCapital) {
+        
+        // Para parâmetros alterados, recalcular apenas os campos de visualização
+        const suggestedEntry = index > 0 ? calculateSuggestedEntry(item, index) : 0;
+        const actualPrice = index > 0 ? calculateActualPrice(item, suggestedEntry) : "-";
+        const stopPrice = actualPrice !== "-" ? calculateStopPrice(actualPrice) : 0;
+        
         return {
           ...item,
-          date: item.date,
-          suggestedEntry: 0,
-          actualPrice: "-",
-          tradeStatus: "-",
-          lotSize: 0,
-          stopPrice: 0,
-          stopTrigger: "-",
-          profitLoss: 0,
-          currentCapital: appliedInitialCapital
+          suggestedEntryPrice: suggestedEntry,
+          actualPrice: actualPrice,
+          stopPrice: stopPrice,
+          // MANTER todos os outros valores originais dos serviços de análise
+          // incluindo currentCapital, profitLoss, trade, lotSize, stopTrigger
         };
       }
       
-      // 1. Calculate suggested entry price
-      const suggestedEntry = calculateSuggestedEntry(item, index);
-      
-      // 2. Calculate actual price (CORRECTED)
-      const actualPrice = calculateActualPrice(item, suggestedEntry);
-      
-      // 3. Calculate trade status
-      const tradeStatus = calculateTradeStatus(item, actualPrice, suggestedEntry);
-      
-      // 4. Calculate lot size - usando capital do dia anterior
-      const lotSize = calculateLotSize(actualPrice, currentCapital);
-      
-      // 5. Calculate stop price
-      const stopPrice = calculateStopPrice(actualPrice);
-      
-      // 6. Calculate stop trigger
-      const stopTrigger = calculateStopTrigger(item, stopPrice);
-      
-      // 7. Calculate profit/loss - apenas se há trade
-      const profitLoss = tradeStatus !== "-" ? calculateProfitLoss(item, actualPrice, stopPrice, lotSize, stopTrigger) : 0;
-      
-      // 8. Update current capital for next iteration
-      currentCapital = currentCapital + profitLoss;
-      
+      // Se os parâmetros não mudaram, usar os dados originais completamente
       return {
         ...item,
-        suggestedEntryPrice: suggestedEntry,
-        actualPrice: actualPrice,
-        trade: tradeStatus,
-        lotSize: lotSize,
-        stopPrice: stopPrice,
-        stopTrigger: stopTrigger,
-        profitLoss: profitLoss,
-        currentCapital: currentCapital
+        // Garantir que campos de visualização existam
+        suggestedEntryPrice: item.suggestedEntryPrice || (index > 0 ? calculateSuggestedEntry(item, index) : 0),
+        actualPrice: item.actualPrice !== undefined ? item.actualPrice : (index > 0 ? calculateActualPrice(item, item.suggestedEntryPrice || 0) : "-"),
+        trade: item.trade || "-",
+        stopPrice: item.stopPrice !== undefined ? item.stopPrice : 0,
+        stopTrigger: item.stopTrigger || "-",
+        // USAR valores originais dos serviços de análise - CRÍTICO para consistência
+        currentCapital: item.currentCapital || appliedInitialCapital,
+        profitLoss: item.profitLoss || 0,
+        lotSize: item.lotSize || 0
       };
     });
 
