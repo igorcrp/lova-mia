@@ -207,14 +207,14 @@ export function ResultsTable({
   
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex items-baseline gap-2">
-        <h2 className="text-xl font-semibold">Results</h2>
+      <h2 className="text-xl font-semibold">
+        Results
         {!isSubscribed && results.length > 10 && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground ml-2">
             Showing 10 of {results.length} results (Premium shows all)
           </span>
         )}
-      </div>
+      </h2>
       
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
