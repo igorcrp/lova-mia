@@ -210,9 +210,9 @@ export function ResultsTable({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Results</h2>
         {!isSubscribed && results.length > 10 && (
-          <div className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             Showing 10 of {results.length} results (Premium shows all)
-          </div>
+          </span>
         )}
       </div>
       
