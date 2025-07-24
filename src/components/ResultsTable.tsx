@@ -207,15 +207,13 @@ export function ResultsTable({
   
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">Results</h2>
-          {!isSubscribed && results.length > 10 && (
-            <span className="text-sm text-muted-foreground">
-              Showing 10 of {results.length} results (Premium shows all)
-            </span>
-          )}
-        </div>
+      <div className="flex items-center gap-2">
+        <h2 className="text-xl font-semibold">Results</h2>
+        {!isSubscribed && results.length > 10 && (
+          <span className="text-sm text-muted-foreground">
+            Showing 10 of {results.length} results (Premium shows all)
+          </span>
+        )}
       </div>
       
       {/* Mobile Card View */}
