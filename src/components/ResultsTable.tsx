@@ -207,7 +207,7 @@ export function ResultsTable({
   
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-baseline gap-2">
         <h2 className="text-xl font-semibold">Results</h2>
         {!isSubscribed && results.length > 10 && (
           <span className="text-sm text-muted-foreground">
