@@ -196,11 +196,11 @@ export default function DaytradePage() {
   };
 
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <h1 className="text-2xl font-bold mb-6">Daytrade Portfolio</h1>
       
       {!showDetailView ? (
-        <div className="bg-card p-6 rounded-lg border">
+        <div className="bg-card p-3 md:p-6 rounded-lg border">
           <StockSetupForm onSubmit={runAnalysis} isLoading={isLoading} initialParams={analysisParams} />
           
           {/* Only show PremiumUpgrade for non-premium users */}
@@ -231,7 +231,7 @@ export default function DaytradePage() {
         </div>
       ) : (
         detailedResult && analysisParams && (
-          <div className="bg-card p-6 rounded-lg border">
+          <div className="bg-card p-3 md:p-6 rounded-lg border">
             <StockDetailView
               result={detailedResult}
               params={analysisParams}

@@ -222,45 +222,35 @@ export function ResultsTable({
       <div className="md:hidden space-y-3">
         {/* Mobile Sorting Controls for Premium users */}
         {isSubscribed && (
-          <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+          <div className="mb-4 p-2 bg-muted/30 rounded-lg overflow-hidden">
             <div className="text-sm font-medium text-muted-foreground mb-2">Sort by:</div>
-            <div className="flex gap-1 overflow-x-auto" 
-                 style={{ 
-                   scrollbarWidth: 'none', 
-                   msOverflowStyle: 'none',
-                   whiteSpace: 'nowrap'
-                 }}>
-              <style dangerouslySetInnerHTML={{
-                __html: `
-                  .overflow-x-auto::-webkit-scrollbar {
-                    display: none;
-                  }
-                `
-              }} />
-              {[
-                { field: "assetCode", label: "Stock" },
-                { field: "finalCapital", label: "Final Capital" },
-                { field: "trades", label: "Trades" },
-                { field: "profits", label: "Profits" },
-                { field: "losses", label: "Losses" }
-              ].map(({ field, label }) => (
-                <Button
-                  key={field}
-                  variant={sortConfig.field === field ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleSort(field as SortField)}
-                  className="h-8 px-2 text-xs whitespace-nowrap flex-shrink-0"
-                >
-                  {label}
-                  {sortConfig.field === field && (
-                    sortConfig.direction === "asc" ? (
-                      <ChevronUp className="ml-1 h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="ml-1 h-3 w-3" />
-                    )
-                  )}
-                </Button>
-              ))}
+            <div className="w-full overflow-x-auto pb-1">
+              <div className="flex gap-1 min-w-max">
+                {[
+                  { field: "assetCode", label: "Stock" },
+                  { field: "finalCapital", label: "Final Capital" },
+                  { field: "trades", label: "Trades" },
+                  { field: "profits", label: "Profits" },
+                  { field: "losses", label: "Losses" }
+                ].map(({ field, label }) => (
+                  <Button
+                    key={field}
+                    variant={sortConfig.field === field ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleSort(field as SortField)}
+                    className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                  >
+                    {label}
+                    {sortConfig.field === field && (
+                      sortConfig.direction === "asc" ? (
+                        <ChevronUp className="ml-1 h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="ml-1 h-3 w-3" />
+                      )
+                    )}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         )}
