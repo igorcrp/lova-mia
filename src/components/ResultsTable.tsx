@@ -276,45 +276,40 @@ export function ResultsTable({
                   </Button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Trading Days:</span>
-                      <span className="font-medium">{result.tradingDays}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nº Trades:</span>
-                      <span className="font-medium">{result.trades}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">% Trade:</span>
-                      <span className="font-medium">{result.tradePercentage.toFixed(2)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Profits:</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">
-                        {result.profits} ({result.profitPercentage.toFixed(2)}%)
-                      </span>
-                    </div>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Trading Days:</span>
+                    <span className="font-medium text-right">{result.tradingDays}</span>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Losses:</span>
-                      <span className="font-medium text-red-600 dark:text-red-400">
-                        {result.losses} ({result.lossPercentage.toFixed(2)}%)
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Stops:</span>
-                      <span className="font-medium">{result.stops} ({result.stopPercentage.toFixed(2)}%)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Final Capital:</span>
-                      <span className="font-semibold">
-                        ${result.finalCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Nº Trades:</span>
+                    <span className="font-medium text-right">{result.trades}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">% Trade:</span>
+                    <span className="font-medium text-right">{result.tradePercentage.toFixed(2)}%</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Profits:</span>
+                    <span className="font-medium text-green-600 dark:text-green-400 text-right">
+                      {result.profits} ({result.profitPercentage.toFixed(2)}%)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Losses:</span>
+                    <span className="font-medium text-red-600 dark:text-red-400 text-right">
+                      {result.losses} ({result.lossPercentage.toFixed(2)}%)
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Stops:</span>
+                    <span className="font-medium text-right">{result.stops} ({result.stopPercentage.toFixed(2)}%)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2">
+                    <span className="text-muted-foreground truncate">Final Capital:</span>
+                    <span className="font-semibold text-right text-xs">
+                      ${result.finalCapital.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
