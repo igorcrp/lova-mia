@@ -222,24 +222,12 @@ export function ResultsTable({
       <div className="md:hidden space-y-3">
         {/* Mobile Sorting Controls for Premium users */}
         {isSubscribed && (
-          <div className="mb-4 p-3 bg-muted/30 rounded-lg">
-            <div className="text-sm font-medium text-muted-foreground mb-2">Sort by:</div>
-            <div className="flex gap-1 overflow-x-auto" 
-                 style={{ 
-                   scrollbarWidth: 'none', 
-                   msOverflowStyle: 'none',
-                   whiteSpace: 'nowrap'
-                 }}>
-              <style dangerouslySetInnerHTML={{
-                __html: `
-                  .overflow-x-auto::-webkit-scrollbar {
-                    display: none;
-                  }
-                `
-              }} />
+          <div className="mb-4 p-2 bg-muted/30 rounded-lg">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Sort by:</div>
+            <div className="grid grid-cols-3 gap-1">
               {[
                 { field: "assetCode", label: "Stock" },
-                { field: "finalCapital", label: "Final Capital" },
+                { field: "finalCapital", label: "Capital" },
                 { field: "trades", label: "Trades" },
                 { field: "profits", label: "Profits" },
                 { field: "losses", label: "Losses" }
@@ -249,7 +237,7 @@ export function ResultsTable({
                   variant={sortConfig.field === field ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleSort(field as SortField)}
-                  className="h-8 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                  className="h-7 px-1 text-xs whitespace-nowrap"
                 >
                   {label}
                   {sortConfig.field === field && (
