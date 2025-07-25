@@ -10,15 +10,15 @@ export function AppLayout() {
   
   return (
     <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen bg-background flex w-full">
+      <div className="min-h-screen bg-background flex w-full overflow-x-hidden">
         <AppSidebar />
         <SidebarInset>
           {/* Header com título e trigger do sidebar - visível em todas as páginas */}
-          <div className="flex items-center gap-3 p-4 border-b border-border md:hidden">
+          <div className="flex items-center gap-3 p-2 border-b border-border md:hidden">
             <h1 className="text-xl font-bold">Alpha Quant</h1>
             <SidebarTrigger />
           </div>
-          <div className="p-4 md:p-8">
+          <div className="p-2 md:p-8 overflow-x-hidden">
             <Outlet />
           </div>
         </SidebarInset>
