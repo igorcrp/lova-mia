@@ -222,35 +222,45 @@ export function ResultsTable({
       <div className="md:hidden space-y-3">
         {/* Mobile Sorting Controls for Premium users */}
         {isSubscribed && (
-          <div className="mb-4 p-2 bg-muted/30 rounded-lg overflow-hidden">
+          <div className="mb-4 p-3 bg-muted/30 rounded-lg">
             <div className="text-sm font-medium text-muted-foreground mb-2">Sort by:</div>
-            <div className="w-full overflow-x-auto pb-1">
-              <div className="flex gap-1 min-w-max">
-                {[
-                  { field: "assetCode", label: "Stock" },
-                  { field: "finalCapital", label: "Final Capital" },
-                  { field: "trades", label: "Trades" },
-                  { field: "profits", label: "Profits" },
-                  { field: "losses", label: "Losses" }
-                ].map(({ field, label }) => (
-                  <Button
-                    key={field}
-                    variant={sortConfig.field === field ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleSort(field as SortField)}
-                    className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
-                  >
-                    {label}
-                    {sortConfig.field === field && (
-                      sortConfig.direction === "asc" ? (
-                        <ChevronUp className="ml-1 h-3 w-3" />
-                      ) : (
-                        <ChevronDown className="ml-1 h-3 w-3" />
-                      )
-                    )}
-                  </Button>
-                ))}
-              </div>
+            <div className="flex gap-1 overflow-x-auto" 
+                 style={{ 
+                   scrollbarWidth: 'none', 
+                   msOverflowStyle: 'none',
+                   whiteSpace: 'nowrap'
+                 }}>
+              <style dangerouslySetInnerHTML={{
+                __html: `
+                  .overflow-x-auto::-webkit-scrollbar {
+                    display: none;
+                  }
+                `
+              }} />
+              {[
+                { field: "assetCode", label: "Stock" },
+                { field: "finalCapital", label: "Final Capital" },
+                { field: "trades", label: "Trades" },
+                { field: "profits", label: "Profits" },
+                { field: "losses", label: "Losses" }
+              ].map(({ field, label }) => (
+                <Button
+                  key={field}
+                  variant={sortConfig.field === field ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleSort(field as SortField)}
+                  className="h-8 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                >
+                  {label}
+                  {sortConfig.field === field && (
+                    sortConfig.direction === "asc" ? (
+                      <ChevronUp className="ml-1 h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="ml-1 h-3 w-3" />
+                    )
+                  )}
+                </Button>
+              ))}
             </div>
           </div>
         )}
@@ -276,40 +286,45 @@ export function ResultsTable({
                   </Button>
                 </div>
                 
-                <div className="space-y-2 text-sm">
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Trading Days:</span>
-                    <span className="font-medium text-right">{result.tradingDays}</span>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Trading Days:</span>
+                      <span className="font-medium">{result.tradingDays}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Nº Trades:</span>
+                      <span className="font-medium">{result.trades}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">% Trade:</span>
+                      <span className="font-medium">{result.tradePercentage.toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Profits:</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {result.profits} ({result.profitPercentage.toFixed(2)}%)
+                      </span>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Nº Trades:</span>
-                    <span className="font-medium text-right">{result.trades}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">% Trade:</span>
-                    <span className="font-medium text-right">{result.tradePercentage.toFixed(2)}%</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Profits:</span>
-                    <span className="font-medium text-green-600 dark:text-green-400 text-right">
-                      {result.profits} ({result.profitPercentage.toFixed(2)}%)
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Losses:</span>
-                    <span className="font-medium text-red-600 dark:text-red-400 text-right">
-                      {result.losses} ({result.lossPercentage.toFixed(2)}%)
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Stops:</span>
-                    <span className="font-medium text-right">{result.stops} ({result.stopPercentage.toFixed(2)}%)</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-2">
-                    <span className="text-muted-foreground truncate">Final Capital:</span>
-                    <span className="font-semibold text-right text-xs">
-                      ${result.finalCapital.toFixed(2)}
-                    </span>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Losses:</span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        {result.losses} ({result.lossPercentage.toFixed(2)}%)
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Stops:</span>
+                      <span className="font-medium">{result.stops} ({result.stopPercentage.toFixed(2)}%)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Final Capital:</span>
+                      <span className="font-semibold">
+                        ${result.finalCapital.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
