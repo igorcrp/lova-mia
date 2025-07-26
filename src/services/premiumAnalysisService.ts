@@ -401,6 +401,7 @@ export const premiumAnalysisService = {
     const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
     const trades = executedTrades.length;
     
+    // Count profits, losses, and stops using EXACT same formula as free version
     let profits = 0;
     let losses = 0;
     let stops = 0;
@@ -412,6 +413,7 @@ export const premiumAnalysisService = {
         profits++;
         totalProfit += trade.profitLoss;
       } else if (trade.profitLoss < 0) {
+        // Nº of Stop = Conta nº < 0 coluna "Profit/Loss", se coluna "Stop" igual "Executed"
         if (trade.stopTrigger === 'Executed') {
           stops++;
         } else {
