@@ -982,10 +982,22 @@ const analysisService = {
     const executedTrades = tradeHistory.filter(trade => trade.trade === 'Buy' || trade.trade === 'Sell');
     const trades = executedTrades.length;
     
-    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields
-    const profits = executedTrades.filter(trade => trade.profitLoss > 0).length;
-    const losses = executedTrades.filter(trade => trade.profitLoss < 0 && trade.stopTrigger !== 'Executed').length;
-    const stops = executedTrades.filter(trade => trade.stopTrigger === 'Executed').length;
+    // Count profits, losses, and stops based on the profitLoss and stopTrigger fields - FIXED LOGIC
+    let profits = 0;
+    let losses = 0;
+    let stops = 0;
+    
+    for (const trade of executedTrades) {
+      if (trade.profitLoss > 0) {
+        profits++;
+      } else if (trade.profitLoss < 0) {
+        if (trade.stopTrigger === 'Executed') {
+          stops++;
+        } else {
+          losses++;
+        }
+      }
+    }
     
     // Sum the profit/loss values
     let totalProfit = 0;
