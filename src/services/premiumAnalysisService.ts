@@ -354,7 +354,7 @@ export const premiumAnalysisService = {
         }
       }
       
-      capital = Math.max(0, previousCapital + profitLoss);
+      capital = previousCapital + profitLoss;
       
       tradeHistory.push({
         date: currentData.date,

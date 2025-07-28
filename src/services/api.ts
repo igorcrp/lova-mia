@@ -909,7 +909,7 @@ const analysisService = {
       }
       
       // Update capital: Previous day's capital + current day's profit/loss
-      capital = Math.max(0, previousCapital + profitLoss);
+      capital = previousCapital + profitLoss;
       
       // Create trade history item
       tradeHistory.push({

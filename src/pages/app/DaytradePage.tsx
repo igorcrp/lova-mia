@@ -7,12 +7,13 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { api } from "@/services/api";
 import { premiumAnalysisService } from "@/services/premiumAnalysisService";
 import { AnalysisResult, DetailedResult, StockAnalysisParams } from "@/types";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 
 export default function DaytradePage() {
   const { isSubscribed } = useSubscription();
+  const { toast } = useToast();
   const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
   const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);

@@ -284,7 +284,28 @@ export function StockDetailsTable({
       operation: params.operation
     });
     
-    // Sempre recalcular todos os valores quando há mudança nos parâmetros aplicados
+    // CRITICAL: Use the exact same logic as the analysis services to ensure Final Capital = last Current Capital
+    // Instead of recalculating everything locally, use the existing Current Capital from trade history
+    // and only recalculate if the applied parameters are different from the original params
+    
+    const shouldRecalculate = (
+      appliedRefPrice !== params.referencePrice ||
+      appliedEntryPercentage !== params.entryPercentage ||
+      appliedStopPercentage !== params.stopPercentage ||
+      appliedInitialCapital !== params.initialCapital
+    );
+    
+    if (!shouldRecalculate) {
+      // If parameters haven't changed, use the original current capital values
+      // This ensures consistency with Final Capital
+      return result.tradeHistory.map(item => ({
+        ...item,
+        // Keep original calculated values to maintain consistency
+        currentCapital: item.currentCapital ?? appliedInitialCapital
+      }));
+    }
+    
+    // Only recalculate if parameters have changed
     let runningCapital = appliedInitialCapital;
     
     const data = result.tradeHistory.map((item, index) => {
@@ -316,7 +337,7 @@ export function StockDetailsTable({
       // Calcular profit/loss
       const profitLoss = calculateProfitLoss(item, actualPrice, stopPrice, lotSize, stopTrigger);
       
-      // Atualizar capital corrente
+      // Atualizar capital corrente - mesma lógica dos serviios de análise
       runningCapital = runningCapital + profitLoss;
       
       return {
