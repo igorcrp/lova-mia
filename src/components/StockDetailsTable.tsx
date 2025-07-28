@@ -353,7 +353,7 @@ export function StockDetailsTable({
       };
     });
 
-    // Sort data
+    // Sort data - CORRIGIR ORDENAÇÃO PARA TODOS OS TIPOS DE CAMPOS
     return [...data].sort((a, b) => {
       const valA = a[sortField];
       const valB = b[sortField];
@@ -366,6 +366,23 @@ export function StockDetailsTable({
           : dateB.getTime() - dateA.getTime();
       }
 
+      // Para campos que podem ser strings ou números
+      if (sortField === "actualPrice") {
+        const numA = valA === "-" ? 0 : Number(valA) || 0;
+        const numB = valB === "-" ? 0 : Number(valB) || 0;
+        return sortDirection === "asc" ? numA - numB : numB - numA;
+      }
+
+      // Para campos string como trade e stopTrigger
+      if (sortField === "trade" || sortField === "stopTrigger") {
+        const strA = String(valA || "-");
+        const strB = String(valB || "-");
+        return sortDirection === "asc" 
+          ? strA.localeCompare(strB) 
+          : strB.localeCompare(strA);
+      }
+
+      // Para campos numéricos
       const numA = Number(valA) || 0;
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
