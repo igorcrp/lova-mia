@@ -65,6 +65,15 @@ export function StockDetailsTable({
     setAppliedInitialCapital(params.initialCapital ?? 0);
   }, [params.referencePrice, params.entryPercentage, params.stopPercentage, params.initialCapital]);
 
+  // FORÇAR ORDENAÇÃO INICIAL POR DATA DESCENDENTE
+  useEffect(() => {
+    if (result?.tradeHistory?.length > 0) {
+      setSortField("date");
+      setSortDirection("desc");
+      setCurrentPage(1);
+    }
+  }, [result]);
+
   // Update chart height to match setup panel
   useEffect(() => {
     const updateHeight = () => {
@@ -462,11 +471,15 @@ export function StockDetailsTable({
     currentPage * itemsPerPage
   );
 
-  // Handlers
+  // Handlers - CORRIGIR ORDENAÇÃO PADRÃO
   const handleSortChange = (field: keyof TradeHistoryItem) => {
+    console.log(`Sorting by field: ${field}, current sort: ${sortField}, direction: ${sortDirection}`);
+    
     if (sortField === field) {
+      // Se já está ordenando por este campo, inverte a direção
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
+      // Novo campo: começar sempre com descendente (mais recente primeiro para datas)
       setSortField(field);
       setSortDirection("desc");
     }
