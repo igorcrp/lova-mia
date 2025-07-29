@@ -319,12 +319,12 @@ export function ResultsTable({
                       <span className="text-muted-foreground">Stops:</span>
                       <span className="font-medium">{result.stops} ({result.stopPercentage.toFixed(2)}%)</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Final Capital:</span>
-                       <span className="font-semibold">
-                         ${(result.lastCurrentCapital ?? result.finalCapital).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                       </span>
-                    </div>
+                     <div className="flex justify-between">
+                       <span className="text-muted-foreground">Final Capital:</span>
+                        <span className="font-semibold">
+                          ${(result.lastCurrentCapital ?? result.finalCapital).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                     </div>
                   </div>
                 </div>
               </div>
@@ -509,7 +509,7 @@ export function ResultsTable({
                       {result.stopPercentage.toFixed(2)}%
                     </TableCell>
                      <TableCell className="text-center font-medium">
-                       ${(result.lastCurrentCapital ?? result.finalCapital).toFixed(2)}
+                       ${(result.lastCurrentCapital ?? result.finalCapital).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                      </TableCell>
                     <TableCell className="text-center">
                       <Button 

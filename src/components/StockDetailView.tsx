@@ -24,36 +24,16 @@ export function StockDetailView({
   const [activeTab, setActiveTab] = useState<string>("overview");
   const isMobile = useIsMobile();
   
-  // Usar valores originais do backend - fonte única da verdade
+  // Usar valores originais do backend como fonte única da verdade
   const correctedValues = useMemo(() => {
     if (!result?.tradeHistory?.length) return null;
     
-    console.info(`[StockDetailView ${result.assetCode}] Using ORIGINAL values from backend`);
+    console.info(`[StockDetailView ${result.assetCode}] Using values from result - sync managed by parent`);
     
-    // Ordenar tradeHistory por data (mais antigo primeiro)
-    const sortedHistory = [...result.tradeHistory].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    
-    // Pegar o último trade para obter o currentCapital final (fonte única da verdade)
-    const lastTrade = sortedHistory[sortedHistory.length - 1];
-    const finalCapital = lastTrade?.currentCapital ?? params.initialCapital;
-    const totalProfit = finalCapital - params.initialCapital;
-    
-    console.info(`[StockDetailView ${result.assetCode}] ORIGINAL values (NO recalculation):`, {
-      lastTradeDate: lastTrade?.date,
-      lastCurrentCapital: lastTrade?.currentCapital,
-      finalCapital,
-      totalProfit,
-      initialCapital: params.initialCapital
-    });
-    
+    // Usar os valores que vêm do result (que devem ser atualizados pelo componente pai)
     return {
-      // Manter outros valores do result original
-      ...result,
-      // Override com valores corretos baseados no último currentCapital
-      finalCapital,
-      profit: totalProfit
+      finalCapital: result.finalCapital,
+      profit: result.profit || (result.finalCapital - params.initialCapital)
     };
   }, [result, params.initialCapital]);
 

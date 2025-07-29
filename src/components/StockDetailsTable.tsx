@@ -449,22 +449,111 @@ export function StockDetailsTable({
   };
 
   const handleUpdateResults = () => {
-    // Atualizar os valores aplicados com os valores dos inputs
-    setAppliedRefPrice(refPrice);
-    setAppliedEntryPercentage(Number(entryPercentage) || 0);
-    setAppliedStopPercentage(Number(stopPercentage) || 0);
-    setAppliedInitialCapital(Number(initialCapital) || 0);
+    console.log('[StockDetailsTable] handleUpdateResults called with:', {
+      refPrice,
+      entryPercentage: Number(entryPercentage) || 0,
+      stopPercentage: Number(stopPercentage) || 0,
+      initialCapital: Number(initialCapital) || 0
+    });
+    
+    // Primeiro atualizar os valores aplicados com os valores dos inputs
+    const newAppliedRefPrice = refPrice;
+    const newAppliedEntryPercentage = Number(entryPercentage) || 0;
+    const newAppliedStopPercentage = Number(stopPercentage) || 0;
+    const newAppliedInitialCapital = Number(initialCapital) || 0;
+    
+    setAppliedRefPrice(newAppliedRefPrice);
+    setAppliedEntryPercentage(newAppliedEntryPercentage);
+    setAppliedStopPercentage(newAppliedStopPercentage);
+    setAppliedInitialCapital(newAppliedInitialCapital);
+    
+    // Calcular o novo Final Capital ANTES de chamar onUpdateParams
+    // Para garantir que passamos o valor correto
+    const newFinalCapital = calculateNewFinalCapital(
+      newAppliedRefPrice,
+      newAppliedEntryPercentage,
+      newAppliedStopPercentage,
+      newAppliedInitialCapital
+    );
+    
+    console.log('[StockDetailsTable] Calculated new Final Capital:', newFinalCapital);
     
     const cleanParams = {
       ...params,
-      referencePrice: refPrice,
-      entryPercentage: typeof entryPercentage === 'number' ? Number(entryPercentage.toFixed(2)) : Number(entryPercentage) || 0,
-      stopPercentage: typeof stopPercentage === 'number' ? Number(stopPercentage.toFixed(2)) : Number(stopPercentage) || 0,
-      initialCapital: initialCapital !== null ? Number(initialCapital.toFixed(2)) : 0
+      referencePrice: newAppliedRefPrice,
+      entryPercentage: Number(newAppliedEntryPercentage.toFixed(2)),
+      stopPercentage: Number(newAppliedStopPercentage.toFixed(2)),
+      initialCapital: Number(newAppliedInitialCapital.toFixed(2)),
+      // Adicionar o final capital calculado para sincronização
+      _calculatedFinalCapital: newFinalCapital
     };
     
     console.log('Calling onUpdateParams with:', cleanParams);
     onUpdateParams(cleanParams);
+  };
+
+  // Função para calcular o novo Final Capital antes da atualização
+  const calculateNewFinalCapital = (
+    newRefPrice: string,
+    newEntryPercentage: number,
+    newStopPercentage: number,
+    newInitialCapital: number
+  ): number => {
+    if (!result?.tradeHistory?.length) return newInitialCapital;
+    
+    const sortedHistory = [...result.tradeHistory].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    let runningCapital = newInitialCapital;
+    
+    sortedHistory.forEach((item, index) => {
+      if (index === 0) return; // Pular primeiro item que não tem entrada
+      
+      const previousDayRefPrice = getPreviousDayReferencePrice(index, sortedHistory, newRefPrice);
+      if (previousDayRefPrice <= 0) return;
+      
+      const entryPercent = newEntryPercentage / 100;
+      let suggestedEntry = 0;
+      
+      if (params.operation?.toLowerCase() === 'buy') {
+        suggestedEntry = previousDayRefPrice - (previousDayRefPrice * entryPercent);
+      } else if (params.operation?.toLowerCase() === 'sell') {
+        suggestedEntry = previousDayRefPrice + (previousDayRefPrice * entryPercent);
+      }
+      
+      const actualPrice = calculateActualPrice(item, suggestedEntry);
+      
+      if (actualPrice !== "-") {
+        const actualPriceNum = Number(actualPrice);
+        const lotSize = Math.floor(runningCapital / actualPriceNum / 10) * 10;
+        
+        const stopPercent = newStopPercentage / 100;
+        let stopPrice = 0;
+        if (params.operation?.toLowerCase() === 'buy') {
+          stopPrice = actualPriceNum - (actualPriceNum * stopPercent);
+        } else {
+          stopPrice = actualPriceNum + (actualPriceNum * stopPercent);
+        }
+        
+        const low = Number(item.low) || 0;
+        const high = Number(item.high) || 0;
+        const close = Number(item.exitPrice) || 0;
+        
+        let profitLoss = 0;
+        if (params.operation?.toLowerCase() === 'buy') {
+          const stopTrigger = low < stopPrice;
+          profitLoss = stopTrigger ? (stopPrice - actualPriceNum) * lotSize : (close - actualPriceNum) * lotSize;
+        } else {
+          const stopTrigger = high > stopPrice;
+          profitLoss = stopTrigger ? (actualPriceNum - stopPrice) * lotSize : (actualPriceNum - close) * lotSize;
+        }
+        
+        runningCapital += profitLoss;
+      }
+    });
+    
+    return runningCapital;
   };
 
   // Formatting functions

@@ -187,11 +187,18 @@ export default function DaytradePage() {
     try {
       setIsLoadingDetails(true);
       
+      console.log('[DaytradePage] Updating analysis with new params:', params);
+      
       // Use optimized update method instead of full recalculation
       const updatedDetailedData = await api.analysis.updateDetailedAnalysisOptimized(
         detailedResult,
         params
       );
+      
+      console.log('[DaytradePage] Updated detailed result:', {
+        finalCapital: updatedDetailedData.finalCapital,
+        profit: updatedDetailedData.profit
+      });
       
       // Update analysis params
       setAnalysisParams(params);
@@ -199,9 +206,63 @@ export default function DaytradePage() {
       // Update detailed result with optimized data
       setDetailedResult(updatedDetailedData);
       
+      // CRITICAL: Update the analysisResults to sync with the new values
+      // Se temos o valor calculado do StockDetailsTable, usar esse
+      const finalCapitalToUse = (params as any)._calculatedFinalCapital ?? updatedDetailedData.finalCapital;
+      
+      console.log('[DaytradePage] Using Final Capital:', {
+        fromStockDetailsTable: (params as any)._calculatedFinalCapital,
+        fromUpdatedDetailedData: updatedDetailedData.finalCapital,
+        finalValueUsed: finalCapitalToUse
+      });
+      
+      // Find the result for the selected asset and update it
+      setAnalysisResults(prevResults => {
+        return prevResults.map(result => {
+          if (result.assetCode === selectedAsset) {
+            console.log('[DaytradePage] Updating analysisResults for', selectedAsset, {
+              oldFinalCapital: result.finalCapital,
+              newFinalCapital: finalCapitalToUse,
+              oldLastCurrentCapital: result.lastCurrentCapital,
+              newLastCurrentCapital: finalCapitalToUse
+            });
+            
+            return {
+              ...result,
+              finalCapital: finalCapitalToUse,
+              lastCurrentCapital: finalCapitalToUse,
+              profit: finalCapitalToUse - params.initialCapital,
+              // Update other metrics that might have changed
+              trades: updatedDetailedData.trades,
+              profits: updatedDetailedData.profits,
+              losses: updatedDetailedData.losses,
+              stops: updatedDetailedData.stops,
+              tradingDays: updatedDetailedData.tradingDays,
+              profitPercentage: updatedDetailedData.profitPercentage,
+              lossPercentage: updatedDetailedData.lossPercentage,
+              stopPercentage: updatedDetailedData.stopPercentage,
+              tradePercentage: updatedDetailedData.tradePercentage
+            };
+          }
+          return result;
+        });
+      });
+      
+      // Também atualizar o detailedResult para usar o valor calculado
+      setDetailedResult(prev => {
+        if (prev) {
+          return {
+            ...prev,
+            finalCapital: finalCapitalToUse,
+            profit: finalCapitalToUse - params.initialCapital
+          };
+        }
+        return prev;
+      });
+      
       toast({
         title: "Analysis updated",
-        description: "Analysis was updated successfully",
+        description: "Analysis was updated successfully - all values synchronized",
       });
     } catch (error) {
       console.error("Analysis update failed", error);
