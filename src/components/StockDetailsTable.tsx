@@ -284,6 +284,7 @@ export function StockDetailsTable({
       appliedStopPercentage,
       appliedInitialCapital
     });
+    console.log('[StockDetailsTable] Entry percentage dependency check:', appliedEntryPercentage);
     
     // Ordenar tradeHistory por data (mais antigo primeiro) antes de processar
     const sortedHistory = [...result.tradeHistory].sort((a, b) => 
@@ -297,62 +298,40 @@ export function StockDetailsTable({
     let runningCapital = Number(appliedInitialCapital) || 0;
     
     const data = sortedHistory.map((item, index) => {
-      // Usar valores originais para campos que não mudam com os parâmetros
-      const baseItem = {
-        ...item,
-        // Garantir campos obrigatórios existem
-        suggestedEntryPrice: item.suggestedEntryPrice || 0,
-        actualPrice: item.actualPrice || "-",
-        trade: item.trade || "-", 
-        stopPrice: item.stopPrice || 0,
-        stopTrigger: item.stopTrigger || "-",
-        currentCapital: item.currentCapital || 0, // Manter original inicialmente
-        profitLoss: item.profitLoss || 0, // Será recalculado
-        lotSize: item.lotSize || 0
-      };
+      console.log(`[StockDetailsTable] Processing item ${index} with appliedEntryPercentage:`, appliedEntryPercentage);
       
-      // RECALCULAR apenas Profit/Loss baseado nos parâmetros aplicados atuais
-      if (typeof baseItem.actualPrice === "number" && baseItem.lotSize > 0) {
-        const currentOperation = params.operation || 'buy';
-        const actualPriceNum = Number(baseItem.actualPrice);
-        const close = Number(item.exitPrice) || 0;
-        const stopPrice = Number(baseItem.stopPrice) || 0;
-        const lotSize = Number(baseItem.lotSize) || 0;
-        const stopTrigger = baseItem.stopTrigger || "-";
-        
-        let recalculatedProfitLoss = 0;
-        
-        if (currentOperation.toLowerCase() === 'buy') {
-          if (stopTrigger === "Executed") {
-            // Buy + Executed: (Stop Price – Actual Price) * Lot Size
-            recalculatedProfitLoss = (stopPrice - actualPriceNum) * lotSize;
-          } else {
-            // Buy + "-": (Close – Actual Price) * Lot Size
-            recalculatedProfitLoss = (close - actualPriceNum) * lotSize;
-          }
-        } else if (currentOperation.toLowerCase() === 'sell') {
-          if (stopTrigger === "Executed") {
-            // Sell + Executed: (Actual Price - Stop Price) * Lot Size
-            recalculatedProfitLoss = (actualPriceNum - stopPrice) * lotSize;
-          } else {
-            // Sell + "-": (Actual Price - Close do dia atual) * Lot Size
-            recalculatedProfitLoss = (actualPriceNum - close) * lotSize;
-          }
-        }
-        
-        // Atualizar apenas o profitLoss recalculado
-        baseItem.profitLoss = recalculatedProfitLoss;
-        
-        // Recalcular Current Capital para manter consistência
-        if (index === 0) {
-          runningCapital = Number(appliedInitialCapital) + recalculatedProfitLoss;
-        } else {
-          runningCapital = runningCapital + recalculatedProfitLoss;
-        }
-        baseItem.currentCapital = runningCapital;
+      // RECALCULAR tudo com base nos parâmetros aplicados atuais
+      const suggestedEntry = calculateSuggestedEntry(item, index);
+      const actualPrice = calculateActualPrice(item, suggestedEntry);
+      const trade = calculateTradeStatus(item, actualPrice, suggestedEntry);
+      
+      // Usar capital do item anterior ou inicial
+      const previousCapital = index === 0 ? Number(appliedInitialCapital) : runningCapital;
+      const lotSize = calculateLotSize(actualPrice, previousCapital);
+      const stopPrice = calculateStopPrice(actualPrice);
+      const stopTrigger = calculateStopTrigger(item, stopPrice);
+      const profitLoss = calculateProfitLoss(item, actualPrice, stopPrice, lotSize, stopTrigger);
+      
+      // Atualizar running capital para próxima iteração
+      if (index === 0) {
+        runningCapital = Number(appliedInitialCapital) + profitLoss;
+      } else {
+        runningCapital = runningCapital + profitLoss;
       }
       
-      return baseItem;
+      console.log(`[StockDetailsTable] Item ${index} - suggestedEntry: ${suggestedEntry}, actualPrice: ${actualPrice}, profitLoss: ${profitLoss}`);
+      
+      return {
+        ...item,
+        suggestedEntryPrice: suggestedEntry,
+        actualPrice: actualPrice,
+        trade: trade,
+        lotSize: lotSize,
+        stopPrice: stopPrice,
+        stopTrigger: stopTrigger,
+        profitLoss: profitLoss,
+        currentCapital: runningCapital
+      };
     });
 
     // Sort data
@@ -373,6 +352,11 @@ export function StockDetailsTable({
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
   }, [result, sortField, sortDirection, appliedRefPrice, appliedEntryPercentage, appliedStopPercentage, appliedInitialCapital, params.operation]);
+  
+  // Log para verificar mudanças no Entry Percentage
+  useEffect(() => {
+    console.log('[StockDetailsTable] Entry Percentage changed, triggering recalculation:', appliedEntryPercentage);
+  }, [appliedEntryPercentage]);
 
   // Enhanced chart data processing - sempre do mais antigo para o mais novo
   const chartData = useMemo(() => {
