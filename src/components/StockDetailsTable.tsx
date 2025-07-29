@@ -272,12 +272,18 @@ export function StockDetailsTable({
     return 0;
   };
 
-  // Process and sort data with corrected formulas - USE ORIGINAL DATA, DON'T RECALCULATE
+  // Process and sort data with corrected formulas - RECALCULATE PROFIT/LOSS when params change
   const processedData = useMemo(() => {
     if (!result?.tradeHistory?.length) return [];
     
-    console.log('[StockDetailsTable] Using ORIGINAL trade history data (no recalculation)');
+    console.log('[StockDetailsTable] Processing trade history data');
     console.log('[StockDetailsTable] Original tradeHistory length:', result.tradeHistory.length);
+    console.log('[StockDetailsTable] Applied params for recalculation:', {
+      appliedRefPrice,
+      appliedEntryPercentage, 
+      appliedStopPercentage,
+      appliedInitialCapital
+    });
     
     // Ordenar tradeHistory por data (mais antigo primeiro) antes de processar
     const sortedHistory = [...result.tradeHistory].sort((a, b) => 
@@ -287,24 +293,66 @@ export function StockDetailsTable({
     console.log('[StockDetailsTable] Last trade currentCapital from sorted history:', 
       sortedHistory[sortedHistory.length - 1]?.currentCapital);
     
-    // NÃO recalcular - usar dados originais do backend que são a fonte única da verdade
+    // Recalcular apenas as colunas que dependem dos parâmetros modificáveis
+    let runningCapital = Number(appliedInitialCapital) || 0;
     
-    // Usar dados originais do backend - SEM recalcular
-    const data = sortedHistory.map((item) => {
-      // Usar TODOS os valores originais do backend/API
-      // Adicionar apenas campos que possam estar faltando para compatibilidade da UI
-      return {
+    const data = sortedHistory.map((item, index) => {
+      // Usar valores originais para campos que não mudam com os parâmetros
+      const baseItem = {
         ...item,
-        // Garantir campos obrigatórios existem (usar valores originais quando disponíveis)
+        // Garantir campos obrigatórios existem
         suggestedEntryPrice: item.suggestedEntryPrice || 0,
         actualPrice: item.actualPrice || "-",
         trade: item.trade || "-", 
         stopPrice: item.stopPrice || 0,
         stopTrigger: item.stopTrigger || "-",
-        currentCapital: item.currentCapital || 0, // USAR VALOR ORIGINAL DO BACKEND
-        profitLoss: item.profitLoss || 0,
+        currentCapital: item.currentCapital || 0, // Manter original inicialmente
+        profitLoss: item.profitLoss || 0, // Será recalculado
         lotSize: item.lotSize || 0
       };
+      
+      // RECALCULAR apenas Profit/Loss baseado nos parâmetros aplicados atuais
+      if (typeof baseItem.actualPrice === "number" && baseItem.lotSize > 0) {
+        const currentOperation = params.operation || 'buy';
+        const actualPriceNum = Number(baseItem.actualPrice);
+        const close = Number(item.exitPrice) || 0;
+        const stopPrice = Number(baseItem.stopPrice) || 0;
+        const lotSize = Number(baseItem.lotSize) || 0;
+        const stopTrigger = baseItem.stopTrigger || "-";
+        
+        let recalculatedProfitLoss = 0;
+        
+        if (currentOperation.toLowerCase() === 'buy') {
+          if (stopTrigger === "Executed") {
+            // Buy + Executed: (Stop Price – Actual Price) * Lot Size
+            recalculatedProfitLoss = (stopPrice - actualPriceNum) * lotSize;
+          } else {
+            // Buy + "-": (Close – Actual Price) * Lot Size
+            recalculatedProfitLoss = (close - actualPriceNum) * lotSize;
+          }
+        } else if (currentOperation.toLowerCase() === 'sell') {
+          if (stopTrigger === "Executed") {
+            // Sell + Executed: (Actual Price - Stop Price) * Lot Size
+            recalculatedProfitLoss = (actualPriceNum - stopPrice) * lotSize;
+          } else {
+            // Sell + "-": (Actual Price - Close do dia atual) * Lot Size
+            recalculatedProfitLoss = (actualPriceNum - close) * lotSize;
+          }
+        }
+        
+        // Atualizar apenas o profitLoss recalculado
+        baseItem.profitLoss = recalculatedProfitLoss;
+        
+        // Recalcular Current Capital para manter consistência
+        if (index === 0) {
+          runningCapital = Number(appliedInitialCapital) + recalculatedProfitLoss;
+        } else {
+          runningCapital = runningCapital + recalculatedProfitLoss;
+        }
+        baseItem.currentCapital = runningCapital;
+      }
+      
+      return baseItem;
     });
 
     // Sort data
@@ -324,7 +372,7 @@ export function StockDetailsTable({
       const numB = Number(valB) || 0;
       return sortDirection === "asc" ? numA - numB : numB - numA;
     });
-  }, [result, sortField, sortDirection]);
+  }, [result, sortField, sortDirection, appliedRefPrice, appliedEntryPercentage, appliedStopPercentage, appliedInitialCapital, params.operation]);
 
   // Enhanced chart data processing - sempre do mais antigo para o mais novo
   const chartData = useMemo(() => {
