@@ -50,6 +50,36 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          operation: string
+          table_name: string
+          timestamp: string
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          operation: string
+          table_name: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          operation?: string
+          table_name?: string
+          timestamp?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       br_b3_stocks: {
         Row: {
           close: number | null
@@ -398,6 +428,19 @@ export type Database = {
           status_users: string
         }[]
       }
+      get_masked_subscriber_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+          subscribed: boolean
+          subscription_end: string
+          subscription_tier: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_stock_data: {
         Args:
           | {
@@ -416,6 +459,14 @@ export type Database = {
       get_unique_stock_codes: {
         Args: { p_table_name: string }
         Returns: string[]
+      }
+      get_user_subscription_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscribed: boolean
+          subscription_end: string
+          subscription_tier: string
+        }[]
       }
       is_admin: {
         Args: Record<PropertyKey, never>
