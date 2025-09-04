@@ -25,7 +25,7 @@ const tourSteps: TourStep[] = [
   {
     id: 1,
     title: "Welcome to Our Investment Platform",
-    content: "Welcome! This tour will show you the platform's purpose and how to use it to analyze stocks. The platform uses AI to calculate millions of data points and show you, over time, which stocks are profitable for you to invest in and execute your trades. It will show you the best price to buy or sell a specific stock.",
+    content: "This tour will show you the purpose of the platform and how to use it to analyze stocks. We use AI to calculate millions of data points and show you the best stocks to trade, the best entry price, and other essential information.",
     targetSelector: "",
     position: "bottom",
     isInteractive: false
