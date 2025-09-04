@@ -488,14 +488,39 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
         style={{
           // Mobile positioning
           ...(window.innerWidth < 768 ? {
-            left: currentStep === 1 ? '50%' : (targetElement ? '50%' : modalPosition.x),
-            top: currentStep === 1 ? '50%' : (targetElement ? 
-              Math.min(window.innerHeight - 280, targetElement.getBoundingClientRect().bottom + 20) : 
-              modalPosition.y),
-            transform: currentStep === 1 ? 'translate(-50%, -50%)' : (targetElement ? 'translateX(-50%)' : 'none'),
-            maxHeight: targetElement && currentStep !== 1 ? 
-              `${window.innerHeight - targetElement.getBoundingClientRect().bottom - 40}px` : 
-              '260px'
+            left: '50%',
+            top: (() => {
+              if (currentStep === 1) return '50%';
+              if (!targetElement) return modalPosition.y;
+              
+              const targetRect = targetElement.getBoundingClientRect();
+              const modalHeight = 280;
+              const padding = 20;
+              const availableSpaceBelow = window.innerHeight - targetRect.bottom - padding;
+              const availableSpaceAbove = targetRect.top - padding;
+              
+              // Try to position below the target element
+              if (availableSpaceBelow >= modalHeight) {
+                return Math.min(targetRect.bottom + padding, window.innerHeight - modalHeight - padding);
+              }
+              // If not enough space below, try above
+              else if (availableSpaceAbove >= modalHeight) {
+                return Math.max(padding, targetRect.top - modalHeight - padding);
+              }
+              // If neither works, position at top of screen
+              else {
+                return padding;
+              }
+            })(),
+            transform: currentStep === 1 ? 'translate(-50%, -50%)' : 'translateX(-50%)',
+            maxHeight: (() => {
+              if (currentStep === 1 || !targetElement) return '280px';
+              
+              const targetRect = targetElement.getBoundingClientRect();
+              const padding = 40;
+              const availableHeight = window.innerHeight - padding * 2;
+              return Math.min(280, availableHeight) + 'px';
+            })()
           } : {
             // Desktop: Use existing positioning
             left: modalPosition.x,

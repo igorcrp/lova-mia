@@ -14,16 +14,32 @@ import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 
 export default function DaytradePage() {
   const { isSubscribed } = useSubscription();
-  const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
-  const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
+  
+  // Load state from localStorage on mobile
+  const loadStateFromStorage = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      try {
+        const savedState = localStorage.getItem('daytrade-page-state');
+        return savedState ? JSON.parse(savedState) : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  };
+
+  const savedState = loadStateFromStorage();
+  
+  const [analysisParams, setAnalysisParams] = useState<StockAnalysisParams | null>(savedState.analysisParams || null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>(savedState.analysisResults || []);
+  const [detailedResult, setDetailedResult] = useState<DetailedResult | null>(savedState.detailedResult || null);
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(savedState.selectedAsset || null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [showDetailView, setShowDetailView] = useState(false);
+  const [showDetailView, setShowDetailView] = useState(savedState.showDetailView || false);
   const [showTour, setShowTour] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ field: string; direction: "asc" | "desc" }>({
+  const [sortConfig, setSortConfig] = useState<{ field: string; direction: "asc" | "desc" }>(savedState.sortConfig || {
     field: "assetCode",
     direction: "asc"
   });
@@ -42,8 +58,30 @@ export default function DaytradePage() {
     window.addEventListener('showTour', handleShowTour);
     return () => window.removeEventListener('showTour', handleShowTour);
   }, []);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(savedState.currentPage || 1);
+  const [rowsPerPage, setRowsPerPage] = useState(savedState.rowsPerPage || 10);
+
+  // Save state to localStorage on mobile when key states change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const stateToSave = {
+        analysisParams,
+        analysisResults,
+        detailedResult,
+        selectedAsset,
+        showDetailView,
+        sortConfig,
+        currentPage,
+        rowsPerPage
+      };
+      
+      try {
+        localStorage.setItem('daytrade-page-state', JSON.stringify(stateToSave));
+      } catch (error) {
+        console.warn('Failed to save state to localStorage:', error);
+      }
+    }
+  }, [analysisParams, analysisResults, detailedResult, selectedAsset, showDetailView, sortConfig, currentPage, rowsPerPage]);
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
