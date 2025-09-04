@@ -50,24 +50,6 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
           
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg">API Keys</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-muted-foreground">
-                Configure API keys to enable integration with external services.
-              </p>
-              
-              <div className="space-y-2">
-                <Label htmlFor="alphaVantageKey">Alpha Vantage API Key</Label>
-                <div className="flex gap-2">
-                  <Input id="alphaVantageKey" type="password" placeholder="Enter your API key" />
-                  <Button variant="outline">Save</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
         
         <div>
