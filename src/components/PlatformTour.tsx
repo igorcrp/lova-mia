@@ -273,13 +273,39 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
         element.scrollIntoView({ behavior: "smooth", block: "center" });
       }
       
-      // Position modal - mobile uses centered positioning, desktop uses element-based
+      // Position modal
       if (window.innerWidth < 768) {
-        // Mobile: Center the modal
-        setModalPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2
-        });
+        // Mobile: Smart positioning to avoid overlapping with target element
+        const rect = element.getBoundingClientRect();
+        const modalWidth = 320; // Mobile modal width
+        const modalHeight = 280; // Approximate modal height
+        const padding = 16;
+        
+        // Calculate available space above and below the target
+        const spaceAbove = rect.top;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        
+        let x = (window.innerWidth - modalWidth) / 2; // Center horizontally
+        let y;
+        
+        // Position above if there's more space above and it fits
+        if (spaceAbove > spaceBelow && spaceAbove >= modalHeight + padding) {
+          y = rect.top - modalHeight - padding;
+        }
+        // Position below if there's enough space
+        else if (spaceBelow >= modalHeight + padding) {
+          y = rect.bottom + padding;
+        }
+        // If neither fits well, position at the top of the screen
+        else {
+          y = padding;
+        }
+        
+        // Ensure the modal stays within viewport bounds
+        y = Math.max(padding, Math.min(window.innerHeight - modalHeight - padding, y));
+        x = Math.max(padding, Math.min(window.innerWidth - modalWidth - padding, x));
+        
+        setModalPosition({ x, y });
       } else {
         // Desktop: Position based on element
         const rect = element.getBoundingClientRect();
@@ -311,10 +337,14 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
   useEffect(() => {
     if (isOpen && currentStep === 1) {
       if (window.innerWidth < 768) {
-        // Mobile: Center the modal
+        // Mobile: Center the modal with proper constraints
+        const modalWidth = 320;
+        const modalHeight = 280;
+        const padding = 16;
+        
         setModalPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2
+          x: (window.innerWidth - modalWidth) / 2,
+          y: Math.max(padding, (window.innerHeight - modalHeight) / 2)
         });
       } else {
         // Desktop: Center horizontally, position at top
@@ -326,8 +356,11 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
     }
   }, [isOpen, currentStep]);
 
-  // Mouse handlers for dragging
+  // Touch and mouse handlers for dragging (mobile-friendly)
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only enable dragging on mobile
+    if (window.innerWidth >= 768) return;
+    
     const target = e.target as HTMLElement;
     // Allow dragging from the header or any non-interactive area
     if (target.closest('button') || target.closest('input') || target.closest('[role="button"]')) {
@@ -341,19 +374,56 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
     });
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Only enable dragging on mobile
+    if (window.innerWidth >= 768) return;
+    
+    const target = e.target as HTMLElement;
+    // Allow dragging from the header or any non-interactive area
+    if (target.closest('button') || target.closest('input') || target.closest('[role="button"]')) {
+      return;
+    }
+    
+    const touch = e.touches[0];
+    setIsDragging(true);
+    setDragOffset({
+      x: touch.clientX - modalPosition.x,
+      y: touch.clientY - modalPosition.y
+    });
+  };
+
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || window.innerWidth >= 768) return;
     
-    const modalWidth = 400; // Approximate modal width
-    const modalHeight = 350; // Approximate modal height
+    const modalWidth = 320; // Mobile modal width
+    const modalHeight = 280; // Approximate modal height
+    const padding = 16;
     
-    // Allow free movement anywhere on screen
     const newX = e.clientX - dragOffset.x;
     const newY = e.clientY - dragOffset.y;
     
+    // Keep modal within viewport bounds on mobile
     setModalPosition({
-      x: Math.max(-modalWidth + 50, Math.min(window.innerWidth - 50, newX)), // Allow partial off-screen
-      y: Math.max(-modalHeight + 50, Math.min(window.innerHeight - 50, newY)) // Allow partial off-screen
+      x: Math.max(padding, Math.min(window.innerWidth - modalWidth - padding, newX)),
+      y: Math.max(padding, Math.min(window.innerHeight - modalHeight - padding, newY))
+    });
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isDragging || window.innerWidth >= 768) return;
+    
+    const modalWidth = 320; // Mobile modal width
+    const modalHeight = 280; // Approximate modal height
+    const padding = 16;
+    
+    const touch = e.touches[0];
+    const newX = touch.clientX - dragOffset.x;
+    const newY = touch.clientY - dragOffset.y;
+    
+    // Keep modal within viewport bounds on mobile
+    setModalPosition({
+      x: Math.max(padding, Math.min(window.innerWidth - modalWidth - padding, newX)),
+      y: Math.max(padding, Math.min(window.innerHeight - modalHeight - padding, newY))
     });
   };
 
@@ -361,13 +431,21 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
     setIsDragging(false);
   };
 
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   useEffect(() => {
-    if (isDragging) {
+    if (isDragging && window.innerWidth < 768) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
       };
     }
   }, [isDragging, dragOffset]);
@@ -486,49 +564,13 @@ export function PlatformTour({ isOpen, onClose, onComplete }: PlatformTourProps)
           "md:w-full md:max-w-md md:mx-0 md:cursor-move md:max-h-none"
         )}
         style={{
-          // Mobile positioning
-          ...(window.innerWidth < 768 ? {
-            left: '50%',
-            top: (() => {
-              if (currentStep === 1) return '50%';
-              if (!targetElement) return modalPosition.y;
-              
-              const targetRect = targetElement.getBoundingClientRect();
-              const modalHeight = 280;
-              const padding = 20;
-              const availableSpaceBelow = window.innerHeight - targetRect.bottom - padding;
-              const availableSpaceAbove = targetRect.top - padding;
-              
-              // Try to position below the target element
-              if (availableSpaceBelow >= modalHeight) {
-                return Math.min(targetRect.bottom + padding, window.innerHeight - modalHeight - padding);
-              }
-              // If not enough space below, try above
-              else if (availableSpaceAbove >= modalHeight) {
-                return Math.max(padding, targetRect.top - modalHeight - padding);
-              }
-              // If neither works, position at top of screen
-              else {
-                return padding;
-              }
-            })(),
-            transform: currentStep === 1 ? 'translate(-50%, -50%)' : 'translateX(-50%)',
-            maxHeight: (() => {
-              if (currentStep === 1 || !targetElement) return '280px';
-              
-              const targetRect = targetElement.getBoundingClientRect();
-              const padding = 40;
-              const availableHeight = window.innerHeight - padding * 2;
-              return Math.min(280, availableHeight) + 'px';
-            })()
-          } : {
-            // Desktop: Use existing positioning
-            left: modalPosition.x,
-            top: modalPosition.y,
-            transform: 'none'
-          })
+          // Use the positioning set by the useEffect
+          left: modalPosition.x,
+          top: modalPosition.y,
+          transform: window.innerWidth < 768 ? 'translateX(-50%)' : 'none'
         }}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
       >
         <CardContent className="p-3 md:p-4 h-full flex flex-col">
           {/* Header */}
