@@ -76,27 +76,22 @@ export function ResultsTable({
     trades: r.trades
   })));
 
-  // Sort results
+  // Sort results - now available for all users
   const sortedResults = [...results].sort((a, b) => {
-    if (isSubscribed) {
-      const fieldA = a[sortConfig.field as SortField];
-      const fieldB = b[sortConfig.field as SortField];
-      
-      if (fieldA < fieldB) {
-        return sortConfig.direction === "asc" ? -1 : 1;
-      }
-      if (fieldA > fieldB) {
-        return sortConfig.direction === "asc" ? 1 : -1;
-      }
-      return 0;
-    } else {
-      // For free users, always sort alphabetically by assetCode
-      return a.assetCode.localeCompare(b.assetCode);
+    const fieldA = a[sortConfig.field as SortField];
+    const fieldB = b[sortConfig.field as SortField];
+    
+    if (fieldA < fieldB) {
+      return sortConfig.direction === "asc" ? -1 : 1;
     }
+    if (fieldA > fieldB) {
+      return sortConfig.direction === "asc" ? 1 : -1;
+    }
+    return 0;
   });
 
-  // For free users, limit to 10 results
-  const displayResults = isSubscribed ? sortedResults : sortedResults.slice(0, 10);
+  // Show all results for all users
+  const displayResults = sortedResults;
 
   console.info(`DEBUG ResultsTable: After processing, displaying ${displayResults.length} results`);
 
@@ -110,8 +105,6 @@ export function ResultsTable({
   console.info(`DEBUG ResultsTable: After pagination, showing ${paginatedResults.length} results on page ${currentPage}`);
   
   const handleSort = (field: SortField) => {
-    if (!isSubscribed) return; // Disable sorting for free users
-    
     setSortConfig({
       field,
       direction:
@@ -122,7 +115,7 @@ export function ResultsTable({
   };
   
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (!isSubscribed || sortConfig.field !== field) {
+    if (sortConfig.field !== field) {
       return null;
     }
     
@@ -221,54 +214,47 @@ export function ResultsTable({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-semibold">Results</h2>
-          {!isSubscribed && results.length > 10 && (
-            <span className="text-sm text-muted-foreground">
-              Showing 10 of {results.length} results (Premium shows all)
-            </span>
-          )}
         </div>
       </div>
       
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3 overflow-hidden" data-tour="results-table">
-        {/* Mobile Sorting Controls for Premium users */}
-        {isSubscribed && (
-          <div className="mb-4 p-3 bg-muted/30 rounded-lg">
-            <div className="text-sm font-medium text-muted-foreground mb-2">Sort by:</div>
-            <div className="flex gap-1 overflow-x-auto pb-2" 
-                 style={{ 
-                   scrollbarWidth: 'none', 
-                   msOverflowStyle: 'none',
-                   whiteSpace: 'nowrap'
-                 }}>
-              {/* Use CSS class instead of dangerouslySetInnerHTML */}
-              {[
-                { field: "assetCode", label: "Stock" },
-                { field: "finalCapital", label: "Final Capital" },
-                { field: "trades", label: "Trades" },
-                { field: "profits", label: "Profits" },
-                { field: "losses", label: "Losses" }
-              ].map(({ field, label }) => (
-                <Button
-                  key={field}
-                  variant={sortConfig.field === field ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleSort(field as SortField)}
-                  className="h-8 px-2 text-xs whitespace-nowrap flex-shrink-0"
-                >
-                  {label}
-                  {sortConfig.field === field && (
-                    sortConfig.direction === "asc" ? (
-                      <ChevronUp className="ml-1 h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="ml-1 h-3 w-3" />
-                    )
-                  )}
-                </Button>
-              ))}
-            </div>
+        {/* Mobile Sorting Controls */}
+        <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+          <div className="text-sm font-medium text-muted-foreground mb-2">Sort by:</div>
+          <div className="flex gap-1 overflow-x-auto pb-2" 
+               style={{ 
+                 scrollbarWidth: 'none', 
+                 msOverflowStyle: 'none',
+                 whiteSpace: 'nowrap'
+               }}>
+            {/* Use CSS class instead of dangerouslySetInnerHTML */}
+            {[
+              { field: "assetCode", label: "Stock" },
+              { field: "finalCapital", label: "Final Capital" },
+              { field: "trades", label: "Trades" },
+              { field: "profits", label: "Profits" },
+              { field: "losses", label: "Losses" }
+            ].map(({ field, label }) => (
+              <Button
+                key={field}
+                variant={sortConfig.field === field ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleSort(field as SortField)}
+                className="h-8 px-2 text-xs whitespace-nowrap flex-shrink-0"
+              >
+                {label}
+                {sortConfig.field === field && (
+                  sortConfig.direction === "asc" ? (
+                    <ChevronUp className="ml-1 h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="ml-1 h-3 w-3" />
+                  )
+                )}
+              </Button>
+            ))}
           </div>
-        )}
+        </div>
         
         {paginatedResults.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -345,10 +331,7 @@ export function ResultsTable({
             <TableHeader>
               <TableRow>
                 <TableHead 
-                  className={cn(
-                    "w-20 text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="w-20 text-center cursor-pointer"
                   onClick={() => handleSort("assetCode")}
                 >
                   <div className="flex items-center justify-center">
@@ -357,10 +340,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("tradingDays")}
                 >
                   <div className="flex items-center justify-center">
@@ -369,10 +349,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("trades")}
                 >
                   <div className="flex items-center justify-center">
@@ -381,10 +358,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("tradePercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -393,10 +367,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("profits")}
                 >
                   <div className="flex items-center justify-center">
@@ -405,10 +376,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("profitPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -417,10 +385,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("losses")}
                 >
                   <div className="flex items-center justify-center">
@@ -429,10 +394,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("lossPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -441,10 +403,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("stops")}
                 >
                   <div className="flex items-center justify-center">
@@ -453,10 +412,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("stopPercentage")}
                 >
                   <div className="flex items-center justify-center">
@@ -465,10 +421,7 @@ export function ResultsTable({
                   </div>
                 </TableHead>
                 <TableHead 
-                  className={cn(
-                    "text-center",
-                    isSubscribed && "cursor-pointer"
-                  )}
+                  className="text-center cursor-pointer"
                   onClick={() => handleSort("finalCapital")}
                 >
                   <div className="flex items-center justify-center">
