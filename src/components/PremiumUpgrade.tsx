@@ -39,7 +39,7 @@ export function PremiumUpgrade() {
             Upgrade to <span className="font-semibold text-blue-600 dark:text-blue-400">Premium</span> for advanced analytics and premium processing
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            $39/month • Advanced analytics • Premium Processing (70% faster) • Priority support
+            $39/month • Advanced analytics • Premium Processing (98% faster) • Priority support
           </p>
         </div>
         <Button
