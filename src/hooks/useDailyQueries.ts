@@ -6,7 +6,7 @@ interface DailyQueriesData {
   count: number;
 }
 
-const DAILY_LIMIT = 3;
+const DAILY_LIMIT = 5;
 
 export function useDailyQueries() {
   const { user } = useAuth();
@@ -19,7 +19,7 @@ export function useDailyQueries() {
   };
 
   const getStorageKey = () => {
-    return user?.id ? `daily_queries_${user.id}` : 'daily_queries_anonymous';
+    return user?.email ? `daily_queries_${user.email}` : 'daily_queries_anonymous';
   };
 
   const loadDailyQueries = () => {
@@ -84,7 +84,7 @@ export function useDailyQueries() {
 
   useEffect(() => {
     loadDailyQueries();
-  }, [user?.id]);
+  }, [user?.email]);
 
   return {
     queriesUsed,

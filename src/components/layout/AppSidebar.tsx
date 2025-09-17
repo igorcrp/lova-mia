@@ -195,6 +195,20 @@ export function AppSidebar() {
       
       <SidebarFooter>
         <SidebarMenu>
+          {/* Credits moved above Tour */}
+          {!isSubscribed && (
+            <SidebarMenuItem>
+              <div className="flex items-center gap-3 px-3 py-2 text-sidebar-foreground">
+                <span className="w-4 h-4 flex items-center justify-center text-xs">C</span>
+                {!isCollapsed && (
+                  <span className="text-xs bg-accent/20 px-2 py-1 rounded-full">
+                    Credits: {queriesUsed}/{dailyLimit}
+                  </span>
+                )}
+              </div>
+            </SidebarMenuItem>
+          )}
+          
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <button 
@@ -202,16 +216,7 @@ export function AppSidebar() {
                 className="flex items-center gap-3 w-full text-sidebar-foreground hover:bg-sidebar/20 transition-colors"
               >
                 <HelpCircle size={18} />
-                {!isCollapsed && (
-                  <div className="flex items-center justify-between w-full">
-                    <span>Tour</span>
-                    {!isSubscribed && (
-                      <span className="text-xs bg-accent/20 px-2 py-1 rounded-full">
-                        Credits: {queriesUsed}/{dailyLimit}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {!isCollapsed && <span>Tour</span>}
               </button>
             </SidebarMenuButton>
           </SidebarMenuItem>

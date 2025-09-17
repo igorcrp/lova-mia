@@ -944,27 +944,8 @@ export function StockSetupForm({
             !form.watch("country") || 
             !form.watch("stockMarket") || 
             !form.watch("assetClass") || 
-            isTableValid === false ||
-            (!isSubscribed && !canRunQuery)
+            isTableValid === false
           }
-          onClick={(e) => {
-            if (!isSubscribed && !canRunQuery) {
-              e.preventDefault();
-              toast({
-                title: "Daily limit reached",
-                description: "Upgrade to Premium for unlimited queries",
-                action: (
-                  <Button 
-                    size="sm" 
-                    onClick={createCheckout}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600"
-                  >
-                    Upgrade Premium
-                  </Button>
-                )
-              });
-            }
-          }}
         >
           {isLoading ? (
             <>

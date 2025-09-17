@@ -164,10 +164,8 @@ export default function DaytradePage() {
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
-      // Increment query count for free users before starting analysis
-      if (!isSubscribed) {
-        incrementQueries();
-      }
+      // Increment query count before starting analysis (for tracking purposes)
+      incrementQueries();
       
       setIsLoading(true);
       setAnalysisResults([]);

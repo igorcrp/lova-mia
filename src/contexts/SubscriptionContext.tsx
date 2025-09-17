@@ -192,7 +192,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         dailyLimit,
         isQueryLimitReached: isLimitReached,
         incrementQueries,
-        canRunQuery: isSubscribed || !isLimitReached,
+        canRunQuery: true, // Remove all limitations for Free users
       }}
     >
       {children}
