@@ -60,11 +60,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             logger.log('Auth state changed:', event, session?.user?.email || 'no user');
             
-            if (event === 'SIGNED_OUT' || !session?.user) {
+            if (event === 'SIGNED_OUT') {
               cleanupAuthState();
               setUser(null);
-              // Only redirect to login if user is explicitly logged out, not on window focus/blur
-              if (event === 'SIGNED_OUT' && location.pathname !== '/login') {
+              // Only redirect to login if user is explicitly logged out
+              if (location.pathname !== '/login') {
                 navigate('/login');
               }
               return;
