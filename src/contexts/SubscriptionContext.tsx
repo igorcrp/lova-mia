@@ -173,8 +173,16 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
-    checkSubscription();
-  }, [user]);
+    // Verificar subscription apenas quando o usuário muda, sem re-verificações constantes
+    if (user) {
+      checkSubscription();
+    } else {
+      setIsSubscribed(false);
+      setSubscriptionTier(null);
+      setSubscriptionEnd(null);
+      setIsLoading(false);
+    }
+  }, [user?.id]); // Usar user.id ao invés de user para evitar re-renders desnecessários
 
   return (
     <SubscriptionContext.Provider

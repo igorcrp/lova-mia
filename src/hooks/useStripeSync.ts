@@ -29,14 +29,11 @@ export const useStripeSync = () => {
       }
     };
 
-    // Sincronizar na inicialização
+    // Sincronizar apenas na inicialização (remover intervalo automático)
     syncStripeData();
 
-  // Configurar intervalo para sincronização automática a cada 2 minutos para detectar mudanças
-  const interval = setInterval(syncStripeData, 2 * 60 * 1000);
-
-    // Limpar intervalo ao desmontar
-    return () => clearInterval(interval);
+    // Não configurar intervalo automático para evitar piscamentos constantes
+    // A sincronização agora será feita via trigger automático quando necessário
   }, []);
 
   // Função para sincronização manual se necessário
