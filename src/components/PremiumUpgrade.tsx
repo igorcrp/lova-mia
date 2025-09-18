@@ -7,27 +7,7 @@ export function PremiumUpgrade() {
   const { isSubscribed, createCheckout, openCustomerPortal, isLoading, isQueryLimitReached } = useSubscription();
 
   if (isSubscribed) {
-    return (
-      <div className="mt-4 p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Crown className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-            <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-              Premium Plan Active
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openCustomerPortal}
-            disabled={isLoading}
-            className="text-xs"
-          >
-            Manage Subscription
-          </Button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // For free users, show upgrade offer but without blocking functionality
