@@ -320,6 +320,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_login_history: {
+        Row: {
+          created_at: string
+          id: string
+          login_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          login_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          login_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_login_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -327,6 +356,7 @@ export type Database = {
           email_verified: boolean | null
           has_seen_tour: boolean | null
           id: string
+          last_login: string | null
           level_id: number | null
           name: string | null
           role: string | null
@@ -343,6 +373,7 @@ export type Database = {
           email_verified?: boolean | null
           has_seen_tour?: boolean | null
           id?: string
+          last_login?: string | null
           level_id?: number | null
           name?: string | null
           role?: string | null
@@ -359,6 +390,7 @@ export type Database = {
           email_verified?: boolean | null
           has_seen_tour?: boolean | null
           id?: string
+          last_login?: string | null
           level_id?: number | null
           name?: string | null
           role?: string | null
@@ -384,12 +416,9 @@ export type Database = {
           user_exists: boolean
         }[]
       }
-      current_user_level: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      current_user_level: { Args: never; Returns: number }
       get_current_user: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           email: string
@@ -401,23 +430,34 @@ export type Database = {
           subscription_tier: string
         }[]
       }
-      get_stock_data: {
-        Args:
-          | {
+      get_stock_data:
+        | {
+            Args: {
+              p_limit_rows?: number
+              p_stock_code_param: string
+              p_table_name: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
               end_date?: string
               start_date?: string
               stock_code_param: string
               table_name: string
             }
-          | {
-              p_limit_rows?: number
-              p_stock_code_param: string
-              p_table_name: string
-            }
-        Returns: Json
-      }
+            Returns: {
+              close: number
+              date: string
+              high: number
+              low: number
+              open: number
+              stock_code: string
+              volume: number
+            }[]
+          }
       get_subscription_status_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           subscribed: boolean
           subscription_end: string
@@ -429,7 +469,7 @@ export type Database = {
         Returns: string[]
       }
       get_user_profile_safe: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           email: string
@@ -442,7 +482,7 @@ export type Database = {
         }[]
       }
       get_user_profile_secure: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           email: string
@@ -454,7 +494,7 @@ export type Database = {
         }[]
       }
       get_user_subscription_safe: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           subscribed: boolean
           subscription_end: string
@@ -462,25 +502,17 @@ export type Database = {
         }[]
       }
       get_user_subscription_status: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           subscribed: boolean
           subscription_end: string
           subscription_tier: string
         }[]
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      populate_assets_control: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      table_exists: {
-        Args: { p_table_name: string }
-        Returns: boolean
-      }
+      is_admin: { Args: never; Returns: boolean }
+      populate_assets_control: { Args: never; Returns: undefined }
+      record_user_login: { Args: never; Returns: undefined }
+      table_exists: { Args: { p_table_name: string }; Returns: boolean }
       update_user_level_admin_only: {
         Args: { new_level: number; target_user_id: string }
         Returns: undefined

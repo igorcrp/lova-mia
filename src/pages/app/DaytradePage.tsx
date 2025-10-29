@@ -4,6 +4,7 @@ import { ResultsTable } from "@/components/ResultsTable";
 import { StockDetailView } from "@/components/StockDetailView";
 import { PremiumUpgrade } from "@/components/PremiumUpgrade";
 import { PlatformTour } from "@/components/PlatformTour";
+import { QueryLimitModal } from "@/components/QueryLimitModal";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +16,9 @@ import { Progress } from "@/components/ui/progress";
 import { countBusinessDays, getStartDateForPeriod } from "@/utils/dateUtils";
 
 export default function DaytradePage() {
-  const { isSubscribed, incrementQueries } = useSubscription();
+  const { isSubscribed, incrementQueries, isQueryLimitReached } = useSubscription();
   const { user, markTourAsCompleted } = useAuth();
+  const [showLimitModal, setShowLimitModal] = useState(false);
   
   // Load state from localStorage (both mobile and desktop)
   const loadStateFromStorage = () => {
@@ -164,8 +166,19 @@ export default function DaytradePage() {
 
   const runAnalysis = async (params: StockAnalysisParams) => {
     try {
+      // Check if free user has reached limit BEFORE incrementing
+      if (!isSubscribed && isQueryLimitReached) {
+        setShowLimitModal(true);
+        return;
+      }
+      
       // Increment query count before starting analysis (for tracking purposes)
       incrementQueries();
+      
+      // Show modal after incrementing if this was the last free query
+      if (!isSubscribed && isQueryLimitReached) {
+        setShowLimitModal(true);
+      }
       
       setIsLoading(true);
       setAnalysisResults([]);
@@ -420,6 +433,12 @@ export default function DaytradePage() {
             description: "You're now ready to start analyzing stocks!"
           });
         }}
+      />
+
+      {/* Query Limit Modal */}
+      <QueryLimitModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
       />
     </div>
   );

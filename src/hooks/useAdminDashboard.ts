@@ -10,6 +10,10 @@ export interface DashboardStats {
     date: string;
     registrations: number;
   }>;
+  dailyLogins: Array<{
+    date: string;
+    logins: number;
+  }>;
 }
 
 export function useAdminDashboard() {
@@ -98,10 +102,37 @@ export function useAdminDashboard() {
 
       totalAssets = uniqueAssets.size;
 
+      // Fetch daily logins from user_login_history
+      const { data: loginHistoryData, error: loginHistoryError } = await supabase
+        .from('user_login_history')
+        .select('login_at')
+        .gte('login_at', thirtyDaysAgo.toISOString());
+
+      if (loginHistoryError) {
+        console.error("Error fetching login history:", loginHistoryError);
+      }
+
+      // Process daily logins by date
+      const loginsByDate: { [key: string]: number } = {};
+      loginHistoryData?.forEach(login => {
+        if (login.login_at) {
+          const date = new Date(login.login_at).toLocaleDateString('en-US', { 
+            month: 'numeric', 
+            day: 'numeric' 
+          });
+          loginsByDate[date] = (loginsByDate[date] || 0) + 1;
+        }
+      });
+
+      const dailyLogins = Object.entries(loginsByDate)
+        .map(([date, logins]) => ({ date, logins }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
       setStats({
         totalUsers: userCount || 0,
         totalAssets,
-        userRegistrations
+        userRegistrations,
+        dailyLogins
       });
     } catch (error) {
       console.error("Failed to fetch dashboard stats", error);

@@ -85,6 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && mounted) {
           await handleSignedInUser(session.user.email!, session.user);
+          
+          // Record login when session exists
+          try {
+            await supabase.rpc('record_user_login');
+          } catch (err) {
+            logger.error('Failed to record login:', err);
+          }
         }
 
         // Clean up on unmount
