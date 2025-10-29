@@ -8,6 +8,7 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { useGTM } from "@/hooks/useGTM";
 
 // Admin Navigation Component
 const AdminNavigator = () => {
@@ -38,9 +39,15 @@ const queryClient = new QueryClient({
   },
 });
 
+const GTMTracker = () => {
+  useGTM();
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
+      <GTMTracker />
       <AuthProvider>
         <SubscriptionProvider>
           <ThemeProvider>
