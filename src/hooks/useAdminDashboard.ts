@@ -64,43 +64,17 @@ export function useAdminDashboard() {
         .map(([date, registrations]) => ({ date, registrations }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // Fetch market data sources to get table names
-      const { data: marketSources, error: sourcesError } = await supabase
-        .from('market_data_sources')
-        .select('stock_table');
+      // Count total assets from assets_control table (the correct source)
+      const { count: assetsCount, error: assetsError } = await supabase
+        .from('assets_control')
+        .select('*', { count: 'exact', head: true });
 
-      if (sourcesError) {
-        console.error("Error fetching market sources:", sourcesError);
-        throw sourcesError;
+      if (assetsError) {
+        console.error("Error fetching assets count:", assetsError);
+        throw assetsError;
       }
 
-      // Count unique assets across all tables
-      let totalAssets = 0;
-      const uniqueAssets = new Set<string>();
-
-      for (const source of marketSources || []) {
-        try {
-          const { data: assetsData, error: assetsError } = await fromDynamic(source.stock_table)
-            .select('stock_code');
-
-          if (assetsError) {
-            console.error(`Error fetching from ${source.stock_table}:`, assetsError);
-            continue;
-          }
-
-          if (assetsData && Array.isArray(assetsData)) {
-            assetsData.forEach((asset: any) => {
-              if (asset && asset.stock_code) {
-                uniqueAssets.add(asset.stock_code);
-              }
-            });
-          }
-        } catch (error) {
-          console.error(`Failed to fetch assets from ${source.stock_table}:`, error);
-        }
-      }
-
-      totalAssets = uniqueAssets.size;
+      const totalAssets = assetsCount || 0;
 
       // Fetch daily logins from user_login_history
       const { data: loginHistoryData, error: loginHistoryError } = await supabase
